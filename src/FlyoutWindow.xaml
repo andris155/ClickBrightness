@@ -1,0 +1,68 @@
+<Window
+    x:Class="BrightnessApp.FlyoutWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:BrightnessApp">
+
+    <Grid x:Name="RootGrid" Background="Transparent">
+        <Grid.ChildrenTransitions>
+            <TransitionCollection/>
+        </Grid.ChildrenTransitions>
+        <Border x:Name="ContainerBorder"
+                Background="Transparent"
+                BorderThickness="0"
+                CornerRadius="8"
+                Padding="12,10,12,10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Title -->
+                <TextBlock x:Name="TitleText"
+                           Grid.Row="0"
+                           Text="Brightness 50%"
+                           FontFamily="Segoe UI Variable Text, Segoe UI"
+                           FontSize="13.5"
+                           FontWeight="Normal"
+                           Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                           Margin="0,0,0,14"
+                           HorizontalAlignment="Center"/>
+
+                <!-- Content Grid: 2 columns (Buttons, Slider) -->
+                <Grid Grid.Row="1" HorizontalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Column 0: 21 Preset Buttons -->
+                    <StackPanel x:Name="ButtonStack"
+                                Grid.Column="0"
+                                Spacing="2"
+                                VerticalAlignment="Top">
+                        <StackPanel.ChildrenTransitions>
+                            <TransitionCollection/>
+                        </StackPanel.ChildrenTransitions>
+                    </StackPanel>
+
+                    <!-- Column 1: Native WinUI 3 Slider -->
+                    <Slider x:Name="BrightnessSlider"
+                            Grid.Column="1"
+                            Orientation="Vertical"
+                            Minimum="0"
+                            Maximum="100"
+                            StepFrequency="1"
+                            SmallChange="1"
+                            LargeChange="5"
+                            Height="502"
+                            Margin="7,0,0,0"
+                            IsThumbToolTipEnabled="True"
+                            VerticalAlignment="Top"
+                            HorizontalAlignment="Center"/>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
