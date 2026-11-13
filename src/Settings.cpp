@@ -11,6 +11,19 @@ AppSettings g_Settings;
 const std::wstring& AppSettings::GetIniFilePath() {
     static std::wstring s_iniPath;
     if (s_iniPath.empty()) {
+        // If running in portable mode (settings.ini or portable.txt exists next to exe), keep settings app-local
+        wchar_t exePath[MAX_PATH] = { 0 };
+        DWORD len = GetModuleFileNameW(NULL, exePath, MAX_PATH);
+        if (len > 0 && len < MAX_PATH) {
+            std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
+            std::filesystem::path localIni = exeDir / L"settings.ini";
+            std::filesystem::path portableMarker = exeDir / L"portable.txt";
+            if (std::filesystem::exists(localIni) || std::filesystem::exists(portableMarker)) {
+                s_iniPath = localIni.wstring();
+                return s_iniPath;
+            }
+        }
+
         PWSTR localAppData = nullptr;
         if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_CREATE, NULL, &localAppData))) {
             std::filesystem::path dir = std::filesystem::path(localAppData) / L"ClickBrightness";
