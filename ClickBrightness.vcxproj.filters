@@ -100,7 +100,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-    <None Include="resources\sun.ico">
+    <None Include="resources\program.ico">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>

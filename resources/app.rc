@@ -1,7 +1,7 @@
 #include <windows.h>
 #include "resource.h"
 
-IDI_APP_ICON ICON "sun.ico"
+IDI_APP_ICON ICON "program.ico"
 
 
 // Version Information

@@ -405,7 +405,7 @@ namespace winrt::BrightnessApp::implementation
                 if (GetModuleFileNameW(NULL, exePath, MAX_PATH))
                 {
                     std::filesystem::path dir = std::filesystem::path(exePath).parent_path();
-                    std::filesystem::path icoPath = dir / L"resources" / L"sun.ico";
+                    std::filesystem::path icoPath = dir / L"resources" / L"program.ico";
                     if (std::filesystem::exists(icoPath))
                     {
                         hApp = (HICON)::LoadImageW(NULL, icoPath.c_str(), IMAGE_ICON, 48, 48, LR_LOADFROMFILE);

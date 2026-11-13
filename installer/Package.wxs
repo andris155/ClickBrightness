@@ -10,7 +10,7 @@
     <MajorUpgrade DowngradeErrorMessage="A newer version of ClickBrightness is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
-    <Icon Id="AppIcon" SourceFile="$(var.ProjectDir)\resources\sun.ico" />
+    <Icon Id="AppIcon" SourceFile="$(var.ProjectDir)\resources\program.ico" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon" />
     <Property Id="INSTALLDESKTOPSHORTCUT" Value="1" />
 
