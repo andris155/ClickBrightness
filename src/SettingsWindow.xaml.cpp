@@ -1492,7 +1492,7 @@ namespace winrt::BrightnessApp::implementation
             g_Settings.hotkeyDelayMs = 1000;
             g_Settings.hotkeyRepeatIntervalMs = 90;
             g_Settings.overlayTheme = 0;
-            g_Settings.overlayTimeoutMs = 1500;
+            g_Settings.overlayTimeoutMs = 2000;
             g_Settings.overlayUseWindowsAccent = true;
             g_Settings.overlayAccentColor = RGB(0, 120, 212);
             g_Settings.flyoutUseWindowsAccent = true;

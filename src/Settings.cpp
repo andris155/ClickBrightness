@@ -139,7 +139,7 @@ void AppSettings::Load() {
     overlayTheme = GetPrivateProfileIntW(L"Overlay", L"Theme", 0, ini.c_str());
     if (overlayTheme < 0 || overlayTheme > 2) overlayTheme = 0;
 
-    overlayTimeoutMs = GetPrivateProfileIntW(L"Overlay", L"TimeoutMs", 1500, ini.c_str());
+    overlayTimeoutMs = GetPrivateProfileIntW(L"Overlay", L"TimeoutMs", 2000, ini.c_str());
     if (overlayTimeoutMs < 500) overlayTimeoutMs = 500;
     if (overlayTimeoutMs > 10000) overlayTimeoutMs = 10000;
 
