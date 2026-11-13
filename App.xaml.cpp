@@ -95,7 +95,7 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
             }
             break;
         }
-        case WM_LBUTTONDOWN:
+        case WM_LBUTTONUP:
         case NIN_SELECT:
         {
             ULONGLONG now = GetTickCount64();

@@ -187,7 +187,7 @@ namespace winrt::BrightnessApp::implementation
                 if (presenter)
                 {
                     presenter.SetBorderAndTitleBar(false, false);
-                    presenter.IsAlwaysOnTop(false);
+                    presenter.IsAlwaysOnTop(true);
                     presenter.IsResizable(false);
                     presenter.IsMinimizable(false);
                     presenter.IsMaximizable(false);
@@ -201,11 +201,11 @@ namespace winrt::BrightnessApp::implementation
             SetWindowLongPtrW(m_hwnd, GWL_STYLE, style);
 
             LONG_PTR exStyle = GetWindowLongPtrW(m_hwnd, GWL_EXSTYLE);
-            exStyle &= ~(WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE | WS_EX_DLGMODALFRAME | WS_EX_TOPMOST);
-            exStyle |= WS_EX_TOOLWINDOW;
+            exStyle &= ~(WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE | WS_EX_DLGMODALFRAME);
+            exStyle |= WS_EX_TOOLWINDOW | WS_EX_TOPMOST;
             SetWindowLongPtrW(m_hwnd, GWL_EXSTYLE, exStyle);
 
-            SetWindowPos(m_hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED | SWP_NOACTIVATE);
+            SetWindowPos(m_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED | SWP_NOACTIVATE);
 
             COLORREF borderColor = DWMWA_COLOR_DEFAULT;
             DwmSetWindowAttribute(m_hwnd, DWMWA_BORDER_COLOR, &borderColor, sizeof(borderColor));
@@ -563,30 +563,100 @@ namespace winrt::BrightnessApp::implementation
         int width = DpiHelper::Scale(131, dpi);
         int height = DpiHelper::Scale(566, dpi);
 
+        // Check if opened from Windows hidden icons overflow window
+        HWND hOverflow = FindWindowW(L"TopLevelWindowForOverflowXamlIsland", NULL);
+        if (!hOverflow)
+        {
+            hOverflow = FindWindowW(L"NotifyIconOverflowWindow", NULL);
+        }
+        RECT rcOverflow = { 0 };
+        bool isFromOverflow = false;
+        if (hOverflow && ::IsWindowVisible(hOverflow) && GetWindowRect(hOverflow, &rcOverflow))
+        {
+            if (pt.x >= rcOverflow.left && pt.x <= rcOverflow.right &&
+                pt.y >= rcOverflow.top && pt.y <= rcOverflow.bottom)
+            {
+                isFromOverflow = true;
+            }
+        }
+
+        // Also query tray icon rectangle
+        RECT rcIcon = { 0 };
+        NOTIFYICONIDENTIFIER nii = { sizeof(NOTIFYICONIDENTIFIER) };
+        nii.hWnd = g_TrayIcon.GetOwnerWnd();
+        nii.uID = g_TrayIcon.GetId();
+        if (SUCCEEDED(Shell_NotifyIconGetRect(&nii, &rcIcon)))
+        {
+            if (rcIcon.right > rcIcon.left && rcIcon.bottom > rcIcon.top)
+            {
+                int iconCenterX = rcIcon.left + (rcIcon.right - rcIcon.left) / 2;
+                pt.x = iconCenterX;
+
+                if (!isFromOverflow && hOverflow && ::IsWindowVisible(hOverflow))
+                {
+                    if (rcIcon.left >= rcOverflow.left && rcIcon.right <= rcOverflow.right &&
+                        rcIcon.top >= rcOverflow.top && rcIcon.bottom <= rcOverflow.bottom)
+                    {
+                        isFromOverflow = true;
+                    }
+                }
+            }
+        }
+
         int x = pt.x - width / 2;
         int y;
-        if (pt.y < (mi.rcWork.top + mi.rcWork.bottom) / 2)
+        if (isFromOverflow && (rcOverflow.bottom > rcOverflow.top))
         {
-            y = mi.rcWork.top + DpiHelper::Scale(8, dpi);
+            // Position above the hidden icons section like the right-click menu
+            if (pt.y < (mi.rcWork.top + mi.rcWork.bottom) / 2)
+            {
+                // Top taskbar: position below the overflow window
+                y = rcOverflow.bottom + DpiHelper::Scale(8, dpi);
+            }
+            else
+            {
+                // Bottom taskbar: position directly above the top of the overflow window
+                y = rcOverflow.top - height - DpiHelper::Scale(8, dpi);
+                if (y < mi.rcWork.top)
+                {
+                    // If it does not fit vertically above the overflow window, position to its left
+                    if (rcOverflow.left - width - DpiHelper::Scale(8, dpi) >= mi.rcWork.left)
+                    {
+                        x = rcOverflow.left - width - DpiHelper::Scale(8, dpi);
+                        y = mi.rcWork.bottom - height - DpiHelper::Scale(14, dpi);
+                    }
+                    else
+                    {
+                        y = mi.rcWork.top + DpiHelper::Scale(8, dpi);
+                    }
+                }
+            }
         }
         else
         {
-            y = mi.rcWork.bottom - height - DpiHelper::Scale(14, dpi);
+            if (pt.y < (mi.rcWork.top + mi.rcWork.bottom) / 2)
+            {
+                y = mi.rcWork.top + DpiHelper::Scale(8, dpi);
+            }
+            else
+            {
+                y = mi.rcWork.bottom - height - DpiHelper::Scale(14, dpi);
+            }
         }
 
-        if (x + width > mi.rcWork.right)
+        if (x + width > mi.rcWork.right - DpiHelper::Scale(8, dpi))
         {
             x = mi.rcWork.right - width - DpiHelper::Scale(8, dpi);
         }
-        if (x < mi.rcWork.left)
+        if (x < mi.rcWork.left + DpiHelper::Scale(8, dpi))
         {
             x = mi.rcWork.left + DpiHelper::Scale(8, dpi);
         }
-        if (y + height > mi.rcWork.bottom)
+        if (y + height > mi.rcWork.bottom - DpiHelper::Scale(8, dpi))
         {
-            y = mi.rcWork.bottom - height - DpiHelper::Scale(14, dpi);
+            y = mi.rcWork.bottom - height - DpiHelper::Scale(8, dpi);
         }
-        if (y < mi.rcWork.top)
+        if (y < mi.rcWork.top + DpiHelper::Scale(8, dpi))
         {
             y = mi.rcWork.top + DpiHelper::Scale(8, dpi);
         }
@@ -598,7 +668,7 @@ namespace winrt::BrightnessApp::implementation
         m_lastW = width;
         m_lastH = height;
 
-        UINT swpFlags = SWP_NOACTIVATE;
+        UINT swpFlags = SWP_SHOWWINDOW;
         if (!sizeChanged)
         {
             swpFlags |= SWP_NOSIZE;
@@ -606,7 +676,7 @@ namespace winrt::BrightnessApp::implementation
 
         if (m_hwnd)
         {
-            SetWindowPos(m_hwnd, HWND_TOP, x, y, width, height, swpFlags);
+            SetWindowPos(m_hwnd, HWND_TOPMOST, x, y, width, height, swpFlags);
             SetForegroundWindow(m_hwnd);
             SetFocus(m_hwnd);
         }
