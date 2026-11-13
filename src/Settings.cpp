@@ -91,6 +91,8 @@ void AppSettings::Load() {
     hotkeyDelayMs = GetPrivateProfileIntW(L"Delay", L"WaitTimeMs", 1000, ini.c_str());
     if (hotkeyDelayMs < 100 || hotkeyDelayMs > 3000) hotkeyDelayMs = 1000;
 
+    trayShowPercentage = (GetPrivateProfileIntW(L"Tray", L"ShowPercentage", 1, ini.c_str()) != 0);
+
     wchar_t fontBuf[128] = { 0 };
     GetPrivateProfileStringW(L"Tray", L"Font", L"Segoe UI Variable Text", fontBuf, 128, ini.c_str());
     trayFont = fontBuf;
@@ -226,6 +228,7 @@ void AppSettings::Save() const {
     WritePrivateProfileStringW(L"Overlay", L"UseWindowsAccent", overlayUseWindowsAccent ? L"1" : L"0", ini.c_str());
     WritePrivateProfileStringW(L"Overlay", L"AccentColor", FormatColor(overlayAccentColor).c_str(), ini.c_str());
 
+    WritePrivateProfileStringW(L"Tray", L"ShowPercentage", trayShowPercentage ? L"1" : L"0", ini.c_str());
     WritePrivateProfileStringW(L"Tray", L"Font", trayFont.c_str(), ini.c_str());
     WritePrivateProfileStringW(L"Tray", L"FontSize", std::to_wstring(trayFontSize).c_str(), ini.c_str());
     WritePrivateProfileStringW(L"Tray", L"FontSize100", std::to_wstring(trayFontSize100).c_str(), ini.c_str());

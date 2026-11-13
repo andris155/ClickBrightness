@@ -40,6 +40,7 @@ struct AppSettings {
     int hotkeyRepeatIntervalMs = 90;   // Default: 90 ms (~11 steps/sec, ~1.8s for 0-100% with step=5)
 
     // Tray Appearance
+    bool trayShowPercentage = true;                    // Default: ON (Show live brightness percentage)
     std::wstring trayFont = L"Segoe UI Variable Text"; // Default font: Segoe UI Variable Text
     int trayFontSize = 102;                            // Default: 102% (1-2 digits)
     int trayFontSize100 = 63;                          // Default: 63% (3 digits / 100)

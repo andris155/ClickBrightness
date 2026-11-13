@@ -204,12 +204,16 @@ bool TrayIcon::Create(HWND hOwnerWnd, UINT uCallbackMsg, UINT uId) {
         DestroyIcon(m_hBaseSunIcon);
         m_hBaseSunIcon = NULL;
     }
+    HWND hTaskbar = FindWindowW(L"Shell_TrayWnd", NULL);
+    UINT dpi = hTaskbar ? GetDpiForWindow(hTaskbar) : GetDpiForSystem();
+    int iconSize = GetSystemMetricsForDpi(SM_CXSMICON, dpi);
+    if (iconSize <= 0) iconSize = 16;
     m_hBaseSunIcon = (HICON)LoadImageW(
         GetModuleHandleW(NULL),
         MAKEINTRESOURCEW(IDI_APP_ICON),
         IMAGE_ICON,
-        GetSystemMetrics(SM_CXSMICON),
-        GetSystemMetrics(SM_CYSMICON),
+        iconSize,
+        iconSize,
         LR_DEFAULTCOLOR
     );
 
@@ -423,10 +427,29 @@ bool TrayIcon::UpdateBrightness(int brightness) {
     if (brightness > 100) brightness = 100;
     m_lastBrightness = brightness;
 
-    HICON hNewIcon = m_iconCache[brightness];
-    if (!hNewIcon) {
-        hNewIcon = CreateBrightnessIcon(brightness);
-        m_iconCache[brightness] = hNewIcon;
+    HICON hNewIcon = NULL;
+    if (g_Settings.trayShowPercentage) {
+        hNewIcon = m_iconCache[brightness];
+        if (!hNewIcon) {
+            hNewIcon = CreateBrightnessIcon(brightness);
+            m_iconCache[brightness] = hNewIcon;
+        }
+    } else {
+        if (!m_hBaseSunIcon) {
+            HWND hTaskbar = FindWindowW(L"Shell_TrayWnd", NULL);
+            UINT dpi = hTaskbar ? GetDpiForWindow(hTaskbar) : GetDpiForSystem();
+            int iconSize = GetSystemMetricsForDpi(SM_CXSMICON, dpi);
+            if (iconSize <= 0) iconSize = 16;
+            m_hBaseSunIcon = (HICON)LoadImageW(
+                GetModuleHandleW(NULL),
+                MAKEINTRESOURCEW(IDI_APP_ICON),
+                IMAGE_ICON,
+                iconSize,
+                iconSize,
+                LR_DEFAULTCOLOR
+            );
+        }
+        hNewIcon = m_hBaseSunIcon ? m_hBaseSunIcon : LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
     }
     if (!hNewIcon) return false;
 

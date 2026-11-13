@@ -533,6 +533,7 @@ namespace winrt::BrightnessApp::implementation
                 { g_Loc.Get(L"Opt_OverlayCustomAccent", L"Custom Accent Color").c_str(), catOsd, L"osd overlay custom accent color picker", L"OSD", OverlayAccentColorPickerButton() },
 
                 // System Tray
+                { g_Loc.Get(L"Opt_TrayShowPercentage", L"Show Percentage Icon").c_str(), catTray, L"tray percentage icon show disable font number live", L"Tray", TrayShowPercentageToggle() },
                 { g_Loc.Get(L"Opt_TrayFont", L"Tray Icon Font").c_str(), catTray, L"tray font family typography", L"Tray", TrayFontComboBox() },
                 { g_Loc.Get(L"Opt_TrayFontSize", L"Tray Font Size (%)").c_str(), catTray, L"tray font size scale", L"Tray", TrayFontSizeSlider() },
                 { g_Loc.Get(L"Opt_TrayFontSize100", L"100% Width (%)").c_str(), catTray, L"tray 100 width scale", L"Tray", TrayFontSize100Slider() },
@@ -1046,6 +1047,18 @@ namespace winrt::BrightnessApp::implementation
             g_OverlayWindow.OnThemeChanged();
         });
 
+        // Tray Show Percentage Toggle
+        TrayShowPercentageToggle().Toggled([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            bool on = TrayShowPercentageToggle().IsOn();
+            g_Settings.trayShowPercentage = on;
+            TrayShowPercentageStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+            TrayTypographyPanel().Visibility(on ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+            g_TrayIcon.OnThemeChanged();
+            ApplyAndSave();
+        });
+
         // Tray Font ComboBox
         TrayFontComboBox().SelectionChanged([this](auto&&, auto&&)
         {
@@ -1490,6 +1503,7 @@ namespace winrt::BrightnessApp::implementation
             g_Settings.flyoutScrollDelayMs = 1000;
             g_Settings.flyoutButtonDelayEnabled = false;
             g_Settings.flyoutButtonDelayMs = 500;
+            g_Settings.trayShowPercentage = true;
             g_Settings.trayFont = L"Segoe UI Variable Text";
             g_Settings.trayFontSize = 102;
             g_Settings.trayFontSize100 = 63;
@@ -1889,6 +1903,10 @@ namespace winrt::BrightnessApp::implementation
         // System Tray
         TrayHeaderTitle().Text(g_Loc.Get(L"Tray_Title", L"System Tray Icon"));
         TrayHeaderSubtitle().Text(g_Loc.Get(L"Tray_Subtitle", L"Taskbar indicator, live percentage typography, and mouse actions"));
+        TrayAppearanceSectionTitle().Text(g_Loc.Get(L"Sec_TrayAppearance", L"System Tray Icon"));
+        TrayShowPercentageTitleText().Text(g_Loc.Get(L"Opt_TrayShowPercentage", L"Show Percentage Icon"));
+        TrayShowPercentageDescText().Text(g_Loc.Get(L"Desc_TrayShowPercentage", L"Display current brightness percentage on the system tray icon"));
+        TrayShowPercentageStatusText().Text(TrayShowPercentageToggle().IsOn() ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
         TrayTypographySectionTitle().Text(g_Loc.Get(L"Sec_TrayTypography", L"System Tray Icon Typography"));
         TrayFontTitleText().Text(g_Loc.Get(L"Opt_TrayFont", L"Number Font"));
         TrayFontDescText().Text(g_Loc.Get(L"Desc_TrayFont", L"DirectWrite rendered font for tray icon"));
@@ -2229,6 +2247,11 @@ namespace winrt::BrightnessApp::implementation
         OverlayUseWindowsAccentToggle().IsOn(g_Settings.overlayUseWindowsAccent);
         OverlayUseWindowsAccentStatusText().Text(g_Settings.overlayUseWindowsAccent ? L"On" : L"Off");
         OverlayAccentColorCard().Visibility(g_Settings.overlayUseWindowsAccent ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible);
+
+        // Tray Percentage Icon
+        TrayShowPercentageToggle().IsOn(g_Settings.trayShowPercentage);
+        TrayShowPercentageStatusText().Text(g_Settings.trayShowPercentage ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+        TrayTypographyPanel().Visibility(g_Settings.trayShowPercentage ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
 
         // Tray Font
         std::wstring curFont = g_Settings.trayFont;

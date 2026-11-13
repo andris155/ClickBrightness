@@ -110,6 +110,9 @@
   "Desc_OverlayCustomAccent": "Fill color for OSD indicator bar (configured when Windows accent is off)",
 
   "Tray_Title": "System Tray Icon",
+  "Sec_TrayAppearance": "System Tray Icon",
+  "Opt_TrayShowPercentage": "Show Percentage Icon",
+  "Desc_TrayShowPercentage": "Display current brightness percentage on the system tray icon",
   "Sec_TrayTypography": "System Tray Icon Typography",
   "Opt_TrayFont": "Tray Icon Font",
   "Desc_TrayFont": "Font family used to render the taskbar tray brightness number",

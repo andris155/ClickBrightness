@@ -110,6 +110,9 @@
   "Desc_OverlayCustomAccent": "Az OSD sáv egyéni színe (ha a Windows kiemelő szín ki van kapcsolva)",
 
   "Tray_Title": "Tálcaikon",
+  "Sec_TrayAppearance": "Tálcaikon",
+  "Opt_TrayShowPercentage": "Százalékos ikon megjelenítése",
+  "Desc_TrayShowPercentage": "Az aktuális fényerő százalékának megjelenítése az értesítési tálcaikonon",
   "Sec_TrayTypography": "Tálcaikon tipográfiája",
   "Opt_TrayFont": "Tálcaikon betűtípusa",
   "Desc_TrayFont": "A tálcán lévő fényerőszám megjelenítéséhez használt DirectWrite betűtípus",
