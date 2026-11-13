@@ -1,7 +1,7 @@
 # ClickBrightness
 
 <p align="center">
-  <img src="resources/app_icon.png" alt="ClickBrightness Logo" width="128" height="128" /><br/>
+  <img src="resources/sun.ico" alt="ClickBrightness Logo" width="128" height="128" /><br/>
   <strong>Lightweight, modern Windows 11 DDC/CI monitor brightness utility</strong><br/><br/>
   <img src="https://img.shields.io/badge/Platform-Windows%2011%20%7C%2010-0078D4" alt="Platform" />
   <img src="https://img.shields.io/badge/Framework-WinUI%203-0078D4" alt="Framework" />
