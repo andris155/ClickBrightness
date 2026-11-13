@@ -1,12 +1,16 @@
 # ClickBrightness
 
 <p align="center">
-  <img src="resources/app_icon_256.png" alt="ClickBrightness Logo" width="128" height="128" />
+  <img src="resources/app_icon.png" alt="ClickBrightness Logo" width="128" height="128" /><br/>
+  <strong>Lightweight, modern Windows 11 DDC/CI monitor brightness utility</strong><br/><br/>
+  <img src="https://img.shields.io/badge/Platform-Windows%2011%20%7C%2010-0078D4" alt="Platform" />
+  <img src="https://img.shields.io/badge/Framework-WinUI%203-0078D4" alt="Framework" />
+  <img src="https://img.shields.io/badge/Architecture-x64%20%7C%20ARM64-success" alt="Architecture" />
+  <img src="https://img.shields.io/badge/License-MIT-lightgrey" alt="License" />
+  <img src="https://img.shields.io/badge/Made%20With-Vibecoding-purple" alt="Vibecoded" />
 </p>
 
-<p align="center">
-  <strong>Lightweight, modern Windows 11 DDC/CI monitor brightness utility</strong>
-</p>
+> **Note:** This is a vibecoded application (built and refined with AI assistance).
 
 <p align="center">
   <a href="#features">Features</a> •
@@ -140,22 +144,22 @@ The installer includes:
    wix extension add WixToolset.Util.wixext/5.0.2
    ```
 
-### Build Commands
+### Building
 
-Open a Command Prompt or PowerShell in the repository root:
+#### Method 1: Visual Studio (Recommended)
+1. Open `ClickBrightness.sln` in Visual Studio 2022.
+2. Select your desired Configuration (`Release`) and Platform (`x64` or `ARM64`).
+3. Press `Ctrl + Shift + B` (or **Build** → **Build Solution**).
+
+#### Method 2: MSBuild Command Line
+Open a Developer Command Prompt or PowerShell in the repository root:
 
 ```cmd
-:: Build x64 Release (Default)
-build.bat Release x64 --no-pause
+:: Build x64 Release
+msbuild ClickBrightness.sln /p:Configuration=Release /p:Platform=x64 /m
 
 :: Build ARM64 Release
-build.bat Release ARM64 --no-pause
-
-:: Clean rebuild
-build.bat Release x64 -c --no-pause
-
-:: Build WiX MSI Installers (both x64 and ARM64)
-build-installer.bat all --no-pause
+msbuild ClickBrightness.sln /p:Configuration=Release /p:Platform=ARM64 /m
 ```
 
 Binaries will be placed in `bin\<Platform>\Release\`.
