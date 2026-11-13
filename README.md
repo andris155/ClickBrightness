@@ -95,8 +95,8 @@ Built with **C++/WinRT** and **WinUI 3** (Windows App SDK), ClickBrightness feat
 
 ### Option 1: Windows Installer (MSI)
 Download the latest installer matching your CPU architecture from the releases:
-- **x64**: `ClickBrightness-1.0.0-x64.msi`
-- **ARM64**: `ClickBrightness-1.0.0-arm64.msi`
+- **x64**: `ClickBrightness-1.0.1-x64.msi`
+- **ARM64**: `ClickBrightness-1.0.1-arm64.msi`
 
 The installer includes:
 - Per-machine installation in `Program Files\ClickBrightness`.
@@ -151,7 +151,19 @@ The installer includes:
 2. Select your desired Configuration (`Release`) and Platform (`x64` or `ARM64`).
 3. Press `Ctrl + Shift + B` (or **Build** → **Build Solution**).
 
-#### Method 2: MSBuild Command Line
+#### Method 2: Batch Scripts (Quick & Self-Contained)
+You can directly run or double-click the included batch scripts in Explorer or terminal:
+
+| Target | Architecture | Binary Build | Installer (MSI) | Portable ZIP |
+| :--- | :--- | :--- | :--- | :--- |
+| **x64** | Intel / AMD 64-bit | `build.bat` | `build-installer.bat` | `build-portable.bat` |
+| **ARM64** | Snapdragon X, Surface ARM | `build-arm64.bat` | `build-installer-arm64.bat` | `build-portable-arm64.bat` |
+
+*Options:*
+- Pass `-c` or `--clean` to `build.bat` / `build-arm64.bat` for a clean rebuild.
+- Pass `--no-pause` to avoid the confirmation pause when running from scripts/CI.
+
+#### Method 3: MSBuild Command Line
 Open a Developer Command Prompt or PowerShell in the repository root:
 
 ```cmd
