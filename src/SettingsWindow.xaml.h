@@ -43,6 +43,8 @@ namespace winrt::BrightnessApp::implementation
 
         HWND m_hwnd{ nullptr };
         Microsoft::UI::Windowing::AppWindow m_appWindow{ nullptr };
+        HICON m_hIconBig{ nullptr };
+        HICON m_hIconSmall{ nullptr };
 
         int m_captureTarget{ 0 }; // 0 = None, 1 = Up, 2 = Down, 3 = Preset1, 4 = Preset2
         UINT m_curUpKey{ 0x7D }; // VK_F14

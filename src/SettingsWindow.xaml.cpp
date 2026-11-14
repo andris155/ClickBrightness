@@ -134,6 +134,16 @@ namespace winrt::BrightnessApp::implementation
         {
             RemoveWindowSubclass(m_hwnd, SubclassProc, 1);
         }
+        if (m_hIconBig)
+        {
+            ::DestroyIcon(m_hIconBig);
+            m_hIconBig = nullptr;
+        }
+        if (m_hIconSmall)
+        {
+            ::DestroyIcon(m_hIconSmall);
+            m_hIconSmall = nullptr;
+        }
     }
 
     void SettingsWindow::SetupWindow()
@@ -161,12 +171,76 @@ namespace winrt::BrightnessApp::implementation
             BOOL forceDisableTransitions = FALSE;
             DwmSetWindowAttribute(m_hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, &forceDisableTransitions, sizeof(forceDisableTransitions));
 
+            // Load and apply application icons for window titlebar, taskbar button, preview thumbnail, and Alt-Tab
+            HINSTANCE hInst = ::GetModuleHandleW(NULL);
+            UINT dpi = GetDpiForWindow(m_hwnd);
+            if (dpi == 0) dpi = 96;
+
+            int iconBigSize = ::GetSystemMetricsForDpi(SM_CXICON, dpi);
+            int iconSmallSize = ::GetSystemMetricsForDpi(SM_CXSMICON, dpi);
+            if (iconBigSize <= 0) iconBigSize = 32;
+            if (iconSmallSize <= 0) iconSmallSize = 16;
+
+            m_hIconBig = (HICON)::LoadImageW(hInst, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON,
+                iconBigSize, iconBigSize, LR_DEFAULTCOLOR);
+            if (!m_hIconBig)
+            {
+                m_hIconBig = (HICON)::LoadImageW(hInst, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON, 32, 32, LR_DEFAULTCOLOR);
+            }
+
+            m_hIconSmall = (HICON)::LoadImageW(hInst, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON,
+                iconSmallSize, iconSmallSize, LR_DEFAULTCOLOR);
+            if (!m_hIconSmall)
+            {
+                m_hIconSmall = (HICON)::LoadImageW(hInst, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR);
+            }
+
+            std::wstring icoFullPath;
+            wchar_t exePath[MAX_PATH];
+            if (::GetModuleFileNameW(NULL, exePath, MAX_PATH))
+            {
+                std::filesystem::path dir = std::filesystem::path(exePath).parent_path();
+                std::filesystem::path icoPath = dir / L"resources" / L"program.ico";
+                if (std::filesystem::exists(icoPath))
+                {
+                    icoFullPath = icoPath.wstring();
+                    if (!m_hIconBig)
+                    {
+                        m_hIconBig = (HICON)::LoadImageW(NULL, icoFullPath.c_str(), IMAGE_ICON, iconBigSize, iconBigSize, LR_LOADFROMFILE);
+                    }
+                    if (!m_hIconSmall)
+                    {
+                        m_hIconSmall = (HICON)::LoadImageW(NULL, icoFullPath.c_str(), IMAGE_ICON, iconSmallSize, iconSmallSize, LR_LOADFROMFILE);
+                    }
+                }
+            }
+
+            if (m_hIconBig)
+            {
+                ::SendMessageW(m_hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(m_hIconBig));
+                ::SetClassLongPtrW(m_hwnd, GCLP_HICON, reinterpret_cast<LONG_PTR>(m_hIconBig));
+            }
+            if (m_hIconSmall)
+            {
+                ::SendMessageW(m_hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(m_hIconSmall));
+                ::SetClassLongPtrW(m_hwnd, GCLP_HICONSM, reinterpret_cast<LONG_PTR>(m_hIconSmall));
+            }
+
             auto windowId = Microsoft::UI::GetWindowIdFromWindow(m_hwnd);
             m_appWindow = Microsoft::UI::Windowing::AppWindow::GetFromWindowId(windowId);
 
             if (m_appWindow)
             {
                 m_appWindow.Title(L"ClickBrightness Settings");
+                if (!icoFullPath.empty())
+                {
+                    m_appWindow.SetIcon(icoFullPath);
+                }
+                else if (m_hIconSmall || m_hIconBig)
+                {
+                    HICON hIconForApp = m_hIconSmall ? m_hIconSmall : m_hIconBig;
+                    m_appWindow.SetIcon(winrt::Microsoft::UI::IconId{ reinterpret_cast<uint64_t>(hIconForApp) });
+                }
 
                 // Set size and center on screen
                 UINT dpi = GetDpiForWindow(m_hwnd);
@@ -2126,7 +2200,20 @@ namespace winrt::BrightnessApp::implementation
         auto* pThis = reinterpret_cast<SettingsWindow*>(dwRefData);
         if (!pThis) return DefSubclassProc(hWnd, uMsg, wParam, lParam);
 
-        if (uMsg == WM_ERASEBKGND)
+        if (uMsg == WM_GETICON)
+        {
+            if (wParam == ICON_BIG || wParam == 2 /* ICON_BIG2 */)
+            {
+                if (pThis->m_hIconBig) return reinterpret_cast<LRESULT>(pThis->m_hIconBig);
+            }
+            else if (wParam == ICON_SMALL)
+            {
+                if (pThis->m_hIconSmall) return reinterpret_cast<LRESULT>(pThis->m_hIconSmall);
+            }
+            if (pThis->m_hIconSmall) return reinterpret_cast<LRESULT>(pThis->m_hIconSmall);
+            if (pThis->m_hIconBig) return reinterpret_cast<LRESULT>(pThis->m_hIconBig);
+        }
+        else if (uMsg == WM_ERASEBKGND)
         {
             HDC hdc = reinterpret_cast<HDC>(wParam);
             if (hdc)
