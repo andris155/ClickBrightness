@@ -362,6 +362,8 @@ namespace winrt::BrightnessApp::implementation
                 int backdropType = g_Settings.transparencyEnabled ? DWMSBT_TRANSIENTWINDOW : DWMSBT_NONE;
                 DwmSetWindowAttribute(m_hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdropType, sizeof(backdropType));
             }
+
+            RootGrid().UpdateLayout();
         }
 
         auto res = BrightnessSlider().Resources();
@@ -534,6 +536,7 @@ namespace winrt::BrightnessApp::implementation
         m_pendingBrightness = m_brightness;
         m_hasPendingBrightness = false;
         UpdateTheme();
+        RootGrid().UpdateLayout();
         m_isUpdatingSlider = true;
         BrightnessSlider().Value(m_brightness);
         m_isUpdatingSlider = false;

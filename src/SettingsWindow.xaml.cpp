@@ -811,6 +811,9 @@ namespace winrt::BrightnessApp::implementation
                 g_Settings.appTheme = idx;
                 ApplyTheme();
                 ApplyAndSave();
+                g_OverlayWindow.OnThemeChanged();
+                g_FlyoutWindow.OnThemeChanged();
+                g_TrayIcon.OnThemeChanged();
             }
         });
 
@@ -1068,6 +1071,8 @@ namespace winrt::BrightnessApp::implementation
             {
                 g_Settings.overlayTheme = oTheme;
                 g_OverlayWindow.OnThemeChanged();
+                g_FlyoutWindow.OnThemeChanged();
+                g_TrayIcon.OnThemeChanged();
                 ApplyAndSave();
             }
         });
