@@ -1569,13 +1569,12 @@ namespace winrt::BrightnessApp::implementation
         bool driverOk = g_MonitorManager.IsDriverAvailable();
         if (driverOk)
         {
-            HardwareStatusInfoBar().Severity(winrt::Microsoft::UI::Xaml::Controls::InfoBarSeverity::Success);
-            HardwareStatusInfoBar().Title(g_Loc.Get(L"Status_Ready_Title", L"Hardware DDC/CI Ready"));
-            HardwareStatusInfoBar().Message(g_Loc.Get(L"Status_Ready_Msg", L"DDC/CI communication active. Hardware monitor brightness will update directly."));
+            HardwareStatusInfoBar().IsOpen(false);
             MonitorsSummaryText().Text(g_Loc.Get(L"Status_Summary_Ready", L"DDC/CI driver active. Hardware brightness control enabled."));
         }
         else
         {
+            HardwareStatusInfoBar().IsOpen(true);
             HardwareStatusInfoBar().Severity(winrt::Microsoft::UI::Xaml::Controls::InfoBarSeverity::Warning);
             HardwareStatusInfoBar().Title(g_Loc.Get(L"Status_Offline_Title", L"DDC/CI Driver Offline"));
             HardwareStatusInfoBar().Message(g_Loc.Get(L"Status_Offline_Msg", L"No DDC/CI compatible monitor answered, or driver is still initializing."));

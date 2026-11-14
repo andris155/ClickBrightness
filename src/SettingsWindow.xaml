@@ -119,7 +119,7 @@
                                 </StackPanel>
                             </Grid>
 
-                            <InfoBar x:Name="HardwareStatusInfoBar" IsOpen="True" IsClosable="False" Severity="Informational" Title="Monitor Status" Message="Checking display hardware..." Margin="0,0,0,12"/>
+                            <InfoBar x:Name="HardwareStatusInfoBar" IsOpen="False" IsClosable="False" Severity="Warning" Margin="0,0,0,12"/>
 
                             <!-- App Theme & Language -->
                             <TextBlock x:Name="AppearanceSectionTitle" Text="Appearance" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,6"/>

@@ -13,6 +13,7 @@
 > **Note:** This is a vibecoded application (built and refined with AI assistance).
 
 <p align="center">
+  <a href="#screenshots">Screenshots</a> •
   <a href="#features">Features</a> •
   <a href="#installation">Installation</a> •
   <a href="#keyboard-shortcuts">Shortcuts</a> •
@@ -30,6 +31,36 @@
 Unlike traditional software dimmers that merely draw a semi-transparent dark overlay on your screen, ClickBrightness communicates directly with your monitor's internal hardware controller over I2C, adjusting the actual backlight level for genuine power savings, reduced eye strain, and preserved color accuracy and contrast.
 
 Built with **C++/WinRT** and **WinUI 3** (Windows App SDK), ClickBrightness features a modern Windows 11 Fluent interface with Mica backdrops, native Dark/Light themes, smooth animations, and system accent color integration.
+
+---
+
+## Screenshots
+
+### Settings Window
+*Full configuration with real-time preview, Mica backdrop, monitor detection, hotkey assignment, and tray percentage customizer.*
+
+<p align="center">
+  <img src="assets/SettingsWindowDarkMode.png" alt="Settings Window (Dark Mode)" width="49%" />
+  <img src="assets/SettingsWindowLightMode.png" alt="Settings Window (Light Mode)" width="49%" />
+</p>
+
+### Quick Flyout Slider
+*Hardware brightness slider with step buttons, quick preset shortcuts (0%, 25%, 50%, 75%, 100%), and mouse wheel stepping.*
+
+<p align="center">
+  <img src="assets/FlyoutWindowDarkMode.png" alt="Flyout Slider (Dark Mode)" width="280" />
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="assets/FlyoutWindowLightMode.png" alt="Flyout Slider (Light Mode)" width="280" />
+</p>
+
+### On-Screen Display (OSD)
+*Modern Windows 11 floating banner with smooth animations for real-time brightness adjustments.*
+
+<p align="center">
+  <img src="assets/OSDDarkMode.png" alt="OSD Banner (Dark Mode)" width="360" />
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="assets/OSDLightMode.png" alt="OSD Banner (Light Mode)" width="360" />
+</p>
 
 ---
 
