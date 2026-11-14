@@ -165,9 +165,6 @@ namespace winrt::BrightnessApp::implementation
             COLORREF captionColor = isDark ? RGB(32, 32, 32) : RGB(243, 243, 243);
             DwmSetWindowAttribute(m_hwnd, DWMWA_CAPTION_COLOR, &captionColor, sizeof(captionColor));
 
-            COLORREF borderColor = isDark ? RGB(45, 45, 45) : RGB(220, 220, 220);
-            DwmSetWindowAttribute(m_hwnd, DWMWA_BORDER_COLOR, &borderColor, sizeof(borderColor));
-
             BOOL forceDisableTransitions = FALSE;
             DwmSetWindowAttribute(m_hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, &forceDisableTransitions, sizeof(forceDisableTransitions));
 
@@ -277,9 +274,6 @@ namespace winrt::BrightnessApp::implementation
 
                         COLORREF captionColor = isDark ? RGB(32, 32, 32) : RGB(243, 243, 243);
                         DwmSetWindowAttribute(m_hwnd, DWMWA_CAPTION_COLOR, &captionColor, sizeof(captionColor));
-
-                        COLORREF borderColor = isDark ? RGB(45, 45, 45) : RGB(220, 220, 220);
-                        DwmSetWindowAttribute(m_hwnd, DWMWA_BORDER_COLOR, &borderColor, sizeof(borderColor));
                     }
 
                     winrt::Windows::UI::Color solidBg = isDark
@@ -434,10 +428,7 @@ namespace winrt::BrightnessApp::implementation
             COLORREF captionColor = isDark ? RGB(32, 32, 32) : RGB(243, 243, 243);
             DwmSetWindowAttribute(m_hwnd, DWMWA_CAPTION_COLOR, &captionColor, sizeof(captionColor));
 
-            COLORREF borderColor = isDark ? RGB(45, 45, 45) : RGB(220, 220, 220);
-            DwmSetWindowAttribute(m_hwnd, DWMWA_BORDER_COLOR, &borderColor, sizeof(borderColor));
-
-            SetWindowPos(m_hwnd, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+            SetWindowPos(m_hwnd, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE);
         }
 
         UpdateTitleBarButtons(isDark);
