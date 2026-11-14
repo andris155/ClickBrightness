@@ -172,12 +172,20 @@ void AppSettings::Load() {
 
 
 
+    bool regStartWithWin = IsStartWithWindowsEnabled();
     if (!IsInstalledInProgramFiles()) {
-        SetStartWithWindows(false);
-        startWithWindows = false;
+        // Not running from Program Files (e.g. debug or portable build).
+        // Block modifications to startup registry; keep existing startup state if already active.
+        int iniStartWithWin = GetPrivateProfileIntW(L"General", L"StartWithWindows", -1, ini.c_str());
+        if (regStartWithWin) {
+            startWithWindows = true;
+        } else if (iniStartWithWin != -1) {
+            startWithWindows = (iniStartWithWin == 1);
+        } else {
+            startWithWindows = false;
+        }
     } else {
         int iniStartWithWin = GetPrivateProfileIntW(L"General", L"StartWithWindows", -1, ini.c_str());
-        bool regStartWithWin = IsStartWithWindowsEnabled();
         if (iniStartWithWin == 1 && !regStartWithWin) {
             SetStartWithWindows(true);
             startWithWindows = true;
@@ -327,7 +335,8 @@ bool AppSettings::IsInstalledInProgramFiles() {
 
 bool AppSettings::SetStartWithWindows(bool enable) {
     if (!IsInstalledInProgramFiles()) {
-        enable = false;
+        // Block changes when not installed in Program Files without touching existing registry entries
+        return false;
     }
 
     HKEY hKey = NULL;

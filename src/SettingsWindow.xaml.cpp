@@ -1348,9 +1348,10 @@ namespace winrt::BrightnessApp::implementation
             if (!AppSettings::IsInstalledInProgramFiles())
             {
                 m_isUpdatingUI = true;
-                StartWithWindowsToggle().IsOn(false);
+                bool startWithWin = g_Settings.startWithWindows || AppSettings::IsStartWithWindowsEnabled();
+                StartWithWindowsToggle().IsOn(startWithWin);
                 StartWithWindowsToggle().IsEnabled(false);
-                StartWithWindowsStatusText().Text(g_Loc.Get(L"Common_Off", L"Off"));
+                StartWithWindowsStatusText().Text(startWithWin ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
                 m_isUpdatingUI = false;
                 return;
             }
@@ -1868,19 +1869,19 @@ namespace winrt::BrightnessApp::implementation
         StartupDisplaysSectionTitle().Text(g_Loc.Get(L"Sec_StartupDisplays", L"Startup & Displays"));
         StartWithWindowsTitleText().Text(g_Loc.Get(L"Opt_StartWithWindows", L"Start with Windows"));
         bool isInstalled = AppSettings::IsInstalledInProgramFiles();
+        bool startWithWin = g_Settings.startWithWindows || AppSettings::IsStartWithWindowsEnabled();
         if (isInstalled)
         {
             StartWithWindowsDescText().Text(g_Loc.Get(L"Desc_StartWithWindows", L"Launch ClickBrightness automatically on system logon"));
             StartWithWindowsToggle().IsEnabled(true);
-            StartWithWindowsStatusText().Text(StartWithWindowsToggle().IsOn() ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
         }
         else
         {
             StartWithWindowsDescText().Text(g_Loc.Get(L"Desc_StartWithWindows_NotInstalled", L"Launch ClickBrightness automatically on system logon (Available when installed in Program Files)"));
             StartWithWindowsToggle().IsEnabled(false);
-            StartWithWindowsToggle().IsOn(false);
-            StartWithWindowsStatusText().Text(g_Loc.Get(L"Common_Off", L"Off"));
         }
+        StartWithWindowsToggle().IsOn(startWithWin);
+        StartWithWindowsStatusText().Text(startWithWin ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
 
         MonitorsToControlTitleText().Text(g_Loc.Get(L"Opt_MonitorsToControl", L"Monitors to Control"));
         MonitorsToControlDescText().Text(g_Loc.Get(L"Desc_MonitorsToControl", L"Select which monitors have their brightness adjusted"));
@@ -2404,19 +2405,10 @@ namespace winrt::BrightnessApp::implementation
 
         // Start with Windows
         bool isInstalled = AppSettings::IsInstalledInProgramFiles();
-        if (isInstalled)
-        {
-            bool startWithWin = AppSettings::IsStartWithWindowsEnabled();
-            StartWithWindowsToggle().IsEnabled(true);
-            StartWithWindowsToggle().IsOn(startWithWin);
-            StartWithWindowsStatusText().Text(startWithWin ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
-        }
-        else
-        {
-            StartWithWindowsToggle().IsEnabled(false);
-            StartWithWindowsToggle().IsOn(false);
-            StartWithWindowsStatusText().Text(g_Loc.Get(L"Common_Off", L"Off"));
-        }
+        bool startWithWin = g_Settings.startWithWindows || AppSettings::IsStartWithWindowsEnabled();
+        StartWithWindowsToggle().IsEnabled(isInstalled);
+        StartWithWindowsToggle().IsOn(startWithWin);
+        StartWithWindowsStatusText().Text(startWithWin ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
 
         // Flyout Handle Colors
         auto loadColorToUI = [](
