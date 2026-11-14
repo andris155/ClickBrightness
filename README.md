@@ -126,8 +126,8 @@ Built with **C++/WinRT** and **WinUI 3** (Windows App SDK), ClickBrightness feat
 
 ### Option 1: Windows Installer (MSI)
 Download the latest installer matching your CPU architecture from the releases:
-- **x64**: `ClickBrightness-1.0.1-x64.msi`
-- **ARM64**: `ClickBrightness-1.0.1-arm64.msi`
+- **x64**: `ClickBrightness-1.0.2-x64.msi`
+- **ARM64**: `ClickBrightness-1.0.2-arm64.msi`
 
 The installer includes:
 - Per-machine installation in `Program Files\ClickBrightness`.
@@ -138,7 +138,7 @@ The installer includes:
 ### Option 2: Portable / Standalone
 1. Download or compile `ClickBrightness.exe` and its associated runtime files.
 2. Place the executable and the `lang/` directory into any folder of your choice.
-3. Run `ClickBrightness.exe`. Settings will be saved automatically to `ClickBrightness.ini` in the application folder.
+3. Run `ClickBrightness.exe`. Settings will be saved automatically to `settings.ini` in the application folder.
 
 ---
 
