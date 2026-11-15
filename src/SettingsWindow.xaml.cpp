@@ -456,6 +456,49 @@ namespace winrt::BrightnessApp::implementation
         m_flyoutSliderPanel = FlyoutSliderPanel();
         m_aboutPanel = AboutPanel();
 
+        // Load actual program icon for Titlebar and About page
+        try
+        {
+            HICON hTitleIcon = m_hIconSmall;
+            bool destroyTitleIcon = false;
+            if (!hTitleIcon)
+            {
+                hTitleIcon = (HICON)::LoadImageW(::GetModuleHandleW(NULL), MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR);
+                if (hTitleIcon) destroyTitleIcon = true;
+            }
+            if (!hTitleIcon)
+            {
+                wchar_t exePath[MAX_PATH];
+                if (GetModuleFileNameW(NULL, exePath, MAX_PATH))
+                {
+                    std::filesystem::path dir = std::filesystem::path(exePath).parent_path();
+                    std::filesystem::path icoPath = dir / L"resources" / L"program.ico";
+                    if (std::filesystem::exists(icoPath))
+                    {
+                        hTitleIcon = (HICON)::LoadImageW(NULL, icoPath.c_str(), IMAGE_ICON, 16, 16, LR_LOADFROMFILE);
+                        if (hTitleIcon) destroyTitleIcon = true;
+                    }
+                }
+            }
+            if (hTitleIcon)
+            {
+                UINT dpi = m_hwnd ? GetDpiForWindow(m_hwnd) : 96;
+                if (dpi == 0) dpi = 96;
+                int smIconSize = ::GetSystemMetricsForDpi(SM_CXSMICON, dpi);
+                if (smIconSize <= 0) smIconSize = 16;
+                auto wbTitle = HIconToWriteableBitmap(hTitleIcon, smIconSize, smIconSize);
+                if (wbTitle)
+                {
+                    AppTitleBarIcon().Source(wbTitle);
+                }
+                if (destroyTitleIcon)
+                {
+                    ::DestroyIcon(hTitleIcon);
+                }
+            }
+        }
+        catch (...) {}
+
         // Load actual program icon for About page
         try
         {
