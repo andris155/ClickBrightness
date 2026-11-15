@@ -24,7 +24,7 @@
     <!-- Clean up startup registry entry on uninstall -->
     <CustomAction Id="CleanupStartupRun"
                   Directory="SystemFolder"
-                  ExeCommand="cmd.exe /c reg delete HKCU\Software\Microsoft\Windows\CurrentVersion\Run /v ClickBrightness /f &amp; reg delete HKCU\Software\Microsoft\Windows\CurrentVersion\Run /v BrightnessApp /f"
+                  ExeCommand="reg.exe delete HKCU\Software\Microsoft\Windows\CurrentVersion\Run /v ClickBrightness /f"
                   Execute="immediate"
                   Return="ignore" />
 
