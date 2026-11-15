@@ -228,7 +228,7 @@ namespace winrt::BrightnessApp::implementation
 
             if (m_appWindow)
             {
-                m_appWindow.Title(L"ClickBrightness Settings");
+                m_appWindow.Title(L"ClickBrightness settings");
                 if (!icoFullPath.empty())
                 {
                     m_appWindow.SetIcon(icoFullPath);
@@ -1846,9 +1846,9 @@ namespace winrt::BrightnessApp::implementation
 
         if (m_appWindow)
         {
-            m_appWindow.Title(g_Loc.Get(L"AppTitle", L"ClickBrightness Settings"));
+            m_appWindow.Title(g_Loc.Get(L"AppTitle", L"ClickBrightness settings"));
         }
-        AppTitleBarText().Text(g_Loc.Get(L"AppTitle", L"ClickBrightness Settings"));
+        AppTitleBarText().Text(g_Loc.Get(L"AppTitle", L"ClickBrightness settings"));
 
         // Navigation
         NavItemGeneral().Content(box_value(g_Loc.Get(L"Nav_General", L"General")));
