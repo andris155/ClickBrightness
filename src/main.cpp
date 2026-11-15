@@ -18,7 +18,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
     // Single instance mutex check & message forwarding
-    HANDLE hMutex = CreateMutexW(NULL, TRUE, L"ClickBrightness_v1.0.4_SingleInstance_Mutex");
+    HANDLE hMutex = CreateMutexW(NULL, TRUE, L"ClickBrightness_v1.0.5_SingleInstance_Mutex");
     if (GetLastError() == ERROR_ALREADY_EXISTS)
     {
         const wchar_t* targetEvent = nullptr;

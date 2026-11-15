@@ -187,7 +187,7 @@ namespace winrt::BrightnessApp::implementation
                 if (presenter)
                 {
                     presenter.SetBorderAndTitleBar(false, false);
-                    presenter.IsAlwaysOnTop(true);
+                    presenter.IsAlwaysOnTop(false);
                     presenter.IsResizable(false);
                     presenter.IsMinimizable(false);
                     presenter.IsMaximizable(false);
@@ -201,11 +201,11 @@ namespace winrt::BrightnessApp::implementation
             SetWindowLongPtrW(m_hwnd, GWL_STYLE, style);
 
             LONG_PTR exStyle = GetWindowLongPtrW(m_hwnd, GWL_EXSTYLE);
-            exStyle &= ~(WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE | WS_EX_DLGMODALFRAME);
-            exStyle |= WS_EX_TOOLWINDOW | WS_EX_TOPMOST;
+            exStyle &= ~(WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE | WS_EX_DLGMODALFRAME | WS_EX_TOPMOST);
+            exStyle |= WS_EX_TOOLWINDOW;
             SetWindowLongPtrW(m_hwnd, GWL_EXSTYLE, exStyle);
 
-            SetWindowPos(m_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED | SWP_NOACTIVATE);
+            SetWindowPos(m_hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED | SWP_NOACTIVATE);
 
             COLORREF borderColor = DWMWA_COLOR_DEFAULT;
             DwmSetWindowAttribute(m_hwnd, DWMWA_BORDER_COLOR, &borderColor, sizeof(borderColor));
@@ -647,19 +647,19 @@ namespace winrt::BrightnessApp::implementation
             }
         }
 
-        if (x + width > mi.rcWork.right - DpiHelper::Scale(8, dpi))
+        if (x + width > mi.rcWork.right)
         {
             x = mi.rcWork.right - width - DpiHelper::Scale(8, dpi);
         }
-        if (x < mi.rcWork.left + DpiHelper::Scale(8, dpi))
+        if (x < mi.rcWork.left)
         {
             x = mi.rcWork.left + DpiHelper::Scale(8, dpi);
         }
-        if (y + height > mi.rcWork.bottom - DpiHelper::Scale(8, dpi))
+        if (y + height > mi.rcWork.bottom)
         {
-            y = mi.rcWork.bottom - height - DpiHelper::Scale(8, dpi);
+            y = mi.rcWork.bottom - height - DpiHelper::Scale(14, dpi);
         }
-        if (y < mi.rcWork.top + DpiHelper::Scale(8, dpi))
+        if (y < mi.rcWork.top)
         {
             y = mi.rcWork.top + DpiHelper::Scale(8, dpi);
         }
@@ -671,7 +671,7 @@ namespace winrt::BrightnessApp::implementation
         m_lastW = width;
         m_lastH = height;
 
-        UINT swpFlags = SWP_SHOWWINDOW;
+        UINT swpFlags = SWP_NOACTIVATE;
         if (!sizeChanged)
         {
             swpFlags |= SWP_NOSIZE;
@@ -679,7 +679,7 @@ namespace winrt::BrightnessApp::implementation
 
         if (m_hwnd)
         {
-            SetWindowPos(m_hwnd, HWND_TOPMOST, x, y, width, height, swpFlags);
+            SetWindowPos(m_hwnd, HWND_TOP, x, y, width, height, swpFlags);
             SetForegroundWindow(m_hwnd);
             SetFocus(m_hwnd);
         }
