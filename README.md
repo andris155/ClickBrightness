@@ -39,28 +39,23 @@ Built with **C++/WinRT** and **WinUI 3** (Windows App SDK), ClickBrightness feat
 ### Settings Window
 *Full configuration with real-time preview, Mica backdrop, monitor detection, hotkey assignment, and tray percentage customizer.*
 
-<p align="center">
-  <img src="assets/SettingsWindowDarkMode.png" alt="Settings Window (Dark Mode)" width="49%" />
-  <img src="assets/SettingsWindowLightMode.png" alt="Settings Window (Light Mode)" width="49%" />
-</p>
+| Dark Mode | Light Mode |
+| :---: | :---: |
+| <img src="assets/SettingsWindowDarkMode.png" alt="Settings Window (Dark Mode)" /> | <img src="assets/SettingsWindowLightMode.png" alt="Settings Window (Light Mode)" /> |
 
 ### Quick Flyout Slider
 *Hardware brightness slider with step buttons, quick preset shortcuts (0%, 25%, 50%, 75%, 100%), and mouse wheel stepping.*
 
-<p align="center">
-  <img src="assets/FlyoutWindowDarkMode.png" alt="Flyout Slider (Dark Mode)" width="280" />
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="assets/FlyoutWindowLightMode.png" alt="Flyout Slider (Light Mode)" width="280" />
-</p>
+| Dark Mode | Light Mode |
+| :---: | :---: |
+| <img src="assets/FlyoutWindowDarkMode.png" alt="Flyout Slider (Dark Mode)" width="280" /> | <img src="assets/FlyoutWindowLightMode.png" alt="Flyout Slider (Light Mode)" width="280" /> |
 
 ### On-Screen Display (OSD)
 *Modern Windows 11 floating banner with smooth animations for real-time brightness adjustments.*
 
-<p align="center">
-  <img src="assets/OSDDarkMode.png" alt="OSD Banner (Dark Mode)" width="360" />
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="assets/OSDLightMode.png" alt="OSD Banner (Light Mode)" width="360" />
-</p>
+| Dark Mode | Light Mode |
+| :---: | :---: |
+| <img src="assets/OSDDarkMode.png" alt="OSD Banner (Dark Mode)" width="360" /> | <img src="assets/OSDLightMode.png" alt="OSD Banner (Light Mode)" width="360" /> |
 
 ---
 
