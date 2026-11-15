@@ -141,6 +141,12 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
         return 0;
     }
 
+    case WM_CLOSE:
+    {
+        ExitApp();
+        return 0;
+    }
+
     case WM_HOTKEY:
     {
         static ULONGLONG s_lastHotkeyTick = 0;

@@ -7,7 +7,9 @@
            UpgradeCode="5B8A6E32-159D-4F62-8E81-A2B0957A54C1"
            Scope="perMachine">
 
-    <MajorUpgrade DowngradeErrorMessage="A newer version of ClickBrightness is already installed." />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of ClickBrightness is already installed."
+                  AllowSameVersionUpgrades="yes"
+                  Schedule="afterInstallInitialize" />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <Icon Id="AppIcon" SourceFile="$(var.ProjectDir)\resources\program.ico" />
@@ -17,7 +19,7 @@
     <!-- End-User License Agreement -->
     <WixVariable Id="WixUILicenseRtf" Value="$(var.ProjectDir)\installer\License.rtf" />
 
-    <util:CloseApplication Target="ClickBrightness.exe" CloseMessage="yes" Description="ClickBrightness is currently running. Please close it before continuing." RebootPrompt="no" />
+    <util:CloseApplication Target="ClickBrightness.exe" CloseMessage="yes" ElevatedCloseMessage="yes" Description="ClickBrightness is currently running. Please close it before continuing." RebootPrompt="no" />
 
     <StandardDirectory Id="SystemFolder" />
 
@@ -44,8 +46,8 @@
                   Target="[INSTALLFOLDER]ClickBrightness.exe"
                   WorkingDirectory="INSTALLFOLDER"
                   Icon="AppIcon" />
-        <RegistryValue Root="HKCU" Key="Software\andris155\ClickBrightness" Name="installed" Type="integer" Value="1" KeyPath="yes" />
-        <RemoveRegistryKey Root="HKCU" Key="Software\andris155\ClickBrightness" Action="removeOnUninstall" />
+        <RegistryValue Root="HKLM" Key="Software\andris155\ClickBrightness" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+        <RemoveRegistryKey Root="HKLM" Key="Software\andris155\ClickBrightness" Action="removeOnUninstall" />
       </Component>
     </StandardDirectory>
 
@@ -58,7 +60,7 @@
                   Target="[INSTALLFOLDER]ClickBrightness.exe"
                   WorkingDirectory="INSTALLFOLDER"
                   Icon="AppIcon" />
-        <RegistryValue Root="HKCU" Key="Software\andris155\ClickBrightness" Name="desktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryValue Root="HKLM" Key="Software\andris155\ClickBrightness" Name="desktopShortcut" Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </StandardDirectory>
 
