@@ -725,8 +725,20 @@ void TrayIcon::ShowContextMenu() {
             s_trayMenuFlyout.MenuFlyoutPresenterStyle(presenterStyle);
         }
 
-        // Position 1x1 anchor window just above the tray icon boundary so it never covers the icon
-        SetWindowPos(s_hTrayMenuWnd, HWND_TOPMOST, iconCenterX, iconY - 1, 1, 1, SWP_SHOWWINDOW);
+        // Detect taskbar orientation (top vs bottom) supporting both single and multi-monitor setups
+        bool isTopTaskbar = (iconY < 100);
+        POINT ptIcon = { iconCenterX, iconY };
+        HMONITOR hMon = MonitorFromPoint(ptIcon, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO mi = { sizeof(mi) };
+        if (GetMonitorInfoW(hMon, &mi))
+        {
+            isTopTaskbar = (iconY - mi.rcMonitor.top < 100);
+        }
+
+        // Position 1x1 anchor window just outside the tray icon boundary so it never covers the icon
+        int anchorY = isTopTaskbar ? (iconY + iconH + 1) : (iconY - 1);
+        SetWindowPos(s_hTrayMenuWnd, HWND_TOPMOST, iconCenterX, anchorY, 1, 1, SWP_SHOWWINDOW);
+        ShowWindow(s_hTrayMenuWnd, SW_SHOW);
 
         SetForegroundWindow(s_hTrayMenuWnd);
 
@@ -749,7 +761,14 @@ void TrayIcon::ShowContextMenu() {
         }
 
         winrt::Microsoft::UI::Xaml::Controls::Primitives::FlyoutShowOptions options;
-        options.Placement(winrt::Microsoft::UI::Xaml::Controls::Primitives::FlyoutPlacementMode::Top);
+        if (isTopTaskbar)
+        {
+            options.Placement(winrt::Microsoft::UI::Xaml::Controls::Primitives::FlyoutPlacementMode::Bottom);
+        }
+        else
+        {
+            options.Placement(winrt::Microsoft::UI::Xaml::Controls::Primitives::FlyoutPlacementMode::Top);
+        }
         options.ShowMode(winrt::Microsoft::UI::Xaml::Controls::Primitives::FlyoutShowMode::Standard);
         s_trayMenuFlyout.ShowAt(s_trayMenuRoot, options);
         s_isMenuOpen = true;

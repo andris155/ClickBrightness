@@ -499,39 +499,6 @@ namespace winrt::BrightnessApp::implementation
         }
         catch (...) {}
 
-        // Load actual program icon for About page
-        try
-        {
-            HICON hApp = (HICON)::LoadImageW(::GetModuleHandleW(NULL), MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON, 48, 48, LR_DEFAULTCOLOR);
-            if (!hApp)
-            {
-                hApp = (HICON)::LoadImageW(::GetModuleHandleW(NULL), MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE);
-            }
-            if (!hApp)
-            {
-                wchar_t exePath[MAX_PATH];
-                if (GetModuleFileNameW(NULL, exePath, MAX_PATH))
-                {
-                    std::filesystem::path dir = std::filesystem::path(exePath).parent_path();
-                    std::filesystem::path icoPath = dir / L"resources" / L"program.ico";
-                    if (std::filesystem::exists(icoPath))
-                    {
-                        hApp = (HICON)::LoadImageW(NULL, icoPath.c_str(), IMAGE_ICON, 48, 48, LR_LOADFROMFILE);
-                    }
-                }
-            }
-            if (hApp)
-            {
-                auto wbApp = HIconToWriteableBitmap(hApp, 48, 48);
-                if (wbApp)
-                {
-                    AboutAppIconImage().Source(wbApp);
-                }
-                DestroyIcon(hApp);
-            }
-        }
-        catch (...) {}
-
         // Start with only GeneralPanel attached to SubmenuContainer
         auto initialChildren = SubmenuContainer().Children();
         initialChildren.Clear();
@@ -565,6 +532,7 @@ namespace winrt::BrightnessApp::implementation
             }
             else if (tag == L"Tray")
             {
+                EnsureTrayTabLoaded();
                 m_trayPanel.Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
                 children.Append(m_trayPanel);
             }
@@ -575,6 +543,7 @@ namespace winrt::BrightnessApp::implementation
             }
             else if (tag == L"About")
             {
+                EnsureAboutTabLoaded();
                 m_aboutPanel.Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
                 children.Append(m_aboutPanel);
             }
@@ -673,9 +642,9 @@ namespace winrt::BrightnessApp::implementation
             if (entry.navTag == L"General") NavView().SelectedItem(NavItemGeneral());
             else if (entry.navTag == L"Shortcuts") NavView().SelectedItem(NavItemShortcuts());
             else if (entry.navTag == L"OSD") NavView().SelectedItem(NavItemOSD());
-            else if (entry.navTag == L"Tray") NavView().SelectedItem(NavItemTray());
+            else if (entry.navTag == L"Tray") { EnsureTrayTabLoaded(); NavView().SelectedItem(NavItemTray()); }
             else if (entry.navTag == L"FlyoutSlider") NavView().SelectedItem(NavItemFlyoutSlider());
-            else if (entry.navTag == L"About") NavView().SelectedItem(NavItemAbout());
+            else if (entry.navTag == L"About") { EnsureAboutTabLoaded(); NavView().SelectedItem(NavItemAbout()); }
 
             if (entry.targetControl)
             {
@@ -789,18 +758,6 @@ namespace winrt::BrightnessApp::implementation
                 }
             }
         });
-
-        // Populate standard fonts
-        TrayFontComboBox().Items().Append(box_value(L"Segoe UI Variable Text"));
-        TrayFontComboBox().Items().Append(box_value(L"Segoe UI Variable Small"));
-        TrayFontComboBox().Items().Append(box_value(L"Segoe UI Variable Display"));
-        TrayFontComboBox().Items().Append(box_value(L"Segoe UI"));
-        TrayFontComboBox().Items().Append(box_value(L"Segoe UI Semibold"));
-        TrayFontComboBox().Items().Append(box_value(L"Trebuchet MS"));
-        TrayFontComboBox().Items().Append(box_value(L"Arial"));
-        TrayFontComboBox().Items().Append(box_value(L"Consolas"));
-        TrayFontComboBox().Items().Append(box_value(L"Tahoma"));
-        TrayFontComboBox().Items().Append(box_value(L"Verdana"));
 
         // Language ComboBox
         LanguageComboBox().SelectionChanged([this](auto&&, auto&&)
@@ -1651,6 +1608,86 @@ namespace winrt::BrightnessApp::implementation
         });
     }
 
+    void SettingsWindow::EnsureTrayTabLoaded()
+    {
+        if (m_trayTabLoaded) return;
+        m_trayTabLoaded = true;
+
+        if (TrayFontComboBox().Items().Size() == 0)
+        {
+            TrayFontComboBox().Items().Append(box_value(L"Segoe UI Variable Text"));
+            TrayFontComboBox().Items().Append(box_value(L"Segoe UI Variable Small"));
+            TrayFontComboBox().Items().Append(box_value(L"Segoe UI Variable Display"));
+            TrayFontComboBox().Items().Append(box_value(L"Segoe UI"));
+            TrayFontComboBox().Items().Append(box_value(L"Segoe UI Semibold"));
+            TrayFontComboBox().Items().Append(box_value(L"Trebuchet MS"));
+            TrayFontComboBox().Items().Append(box_value(L"Arial"));
+            TrayFontComboBox().Items().Append(box_value(L"Consolas"));
+            TrayFontComboBox().Items().Append(box_value(L"Tahoma"));
+            TrayFontComboBox().Items().Append(box_value(L"Verdana"));
+        }
+
+        // Sync font selection to settings
+        std::wstring curFont = g_Settings.trayFont;
+        int foundFontIdx = -1;
+        for (uint32_t i = 0; i < TrayFontComboBox().Items().Size(); ++i)
+        {
+            auto itemStr = unbox_value<hstring>(TrayFontComboBox().Items().GetAt(i));
+            if (itemStr == curFont)
+            {
+                foundFontIdx = static_cast<int>(i);
+                break;
+            }
+        }
+        if (foundFontIdx >= 0)
+        {
+            TrayFontComboBox().SelectedIndex(foundFontIdx);
+        }
+        else
+        {
+            TrayFontComboBox().Items().Append(box_value(curFont));
+            TrayFontComboBox().SelectedIndex(static_cast<int>(TrayFontComboBox().Items().Size() - 1));
+        }
+    }
+
+    void SettingsWindow::EnsureAboutTabLoaded()
+    {
+        if (m_aboutTabLoaded) return;
+        m_aboutTabLoaded = true;
+
+        try
+        {
+            HICON hApp = (HICON)::LoadImageW(::GetModuleHandleW(NULL), MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON, 48, 48, LR_DEFAULTCOLOR);
+            if (!hApp)
+            {
+                hApp = (HICON)::LoadImageW(::GetModuleHandleW(NULL), MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE);
+            }
+            if (!hApp)
+            {
+                wchar_t exePath[MAX_PATH];
+                if (GetModuleFileNameW(NULL, exePath, MAX_PATH))
+                {
+                    std::filesystem::path dir = std::filesystem::path(exePath).parent_path();
+                    std::filesystem::path icoPath = dir / L"resources" / L"program.ico";
+                    if (std::filesystem::exists(icoPath))
+                    {
+                        hApp = (HICON)::LoadImageW(NULL, icoPath.c_str(), IMAGE_ICON, 48, 48, LR_LOADFROMFILE);
+                    }
+                }
+            }
+            if (hApp)
+            {
+                auto wbApp = HIconToWriteableBitmap(hApp, 48, 48);
+                if (wbApp)
+                {
+                    AboutAppIconImage().Source(wbApp);
+                }
+                DestroyIcon(hApp);
+            }
+        }
+        catch (...) {}
+    }
+
     void SettingsWindow::ShowWindow()
     {
         LoadSettingsToUI();
@@ -2380,25 +2417,28 @@ namespace winrt::BrightnessApp::implementation
         TrayTypographyPanel().Visibility(g_Settings.trayShowPercentage ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
 
         // Tray Font
-        std::wstring curFont = g_Settings.trayFont;
-        int foundFontIdx = -1;
-        for (uint32_t i = 0; i < TrayFontComboBox().Items().Size(); ++i)
+        if (m_trayTabLoaded)
         {
-            auto itemStr = unbox_value<hstring>(TrayFontComboBox().Items().GetAt(i));
-            if (itemStr == curFont)
+            std::wstring curFont = g_Settings.trayFont;
+            int foundFontIdx = -1;
+            for (uint32_t i = 0; i < TrayFontComboBox().Items().Size(); ++i)
             {
-                foundFontIdx = static_cast<int>(i);
-                break;
+                auto itemStr = unbox_value<hstring>(TrayFontComboBox().Items().GetAt(i));
+                if (itemStr == curFont)
+                {
+                    foundFontIdx = static_cast<int>(i);
+                    break;
+                }
             }
-        }
-        if (foundFontIdx >= 0)
-        {
-            TrayFontComboBox().SelectedIndex(foundFontIdx);
-        }
-        else
-        {
-            TrayFontComboBox().Items().Append(box_value(curFont));
-            TrayFontComboBox().SelectedIndex(static_cast<int>(TrayFontComboBox().Items().Size() - 1));
+            if (foundFontIdx >= 0)
+            {
+                TrayFontComboBox().SelectedIndex(foundFontIdx);
+            }
+            else
+            {
+                TrayFontComboBox().Items().Append(box_value(curFont));
+                TrayFontComboBox().SelectedIndex(static_cast<int>(TrayFontComboBox().Items().Size() - 1));
+            }
         }
 
         // Font sizes

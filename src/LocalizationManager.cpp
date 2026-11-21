@@ -15,6 +15,7 @@ LocalizationManager& LocalizationManager::GetInstance() {
 
 LocalizationManager::LocalizationManager()
     : m_configuredLang(L"default"), m_effectiveLang(L"en-US") {
+    LoadBuiltInDefaults();
 }
 
 std::wstring LocalizationManager::GetWindowsDisplayLanguage() const {
@@ -41,7 +42,7 @@ std::wstring LocalizationManager::DetectWindowsLanguage() const {
 }
 
 void LocalizationManager::Initialize(const std::wstring& baseDir) {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
 
     if (!baseDir.empty()) {
         m_langDir = baseDir;
@@ -54,7 +55,7 @@ void LocalizationManager::Initialize(const std::wstring& baseDir) {
 
     ScanLanguageFiles();
 
-    // Load en-US as fallback baseline
+    // Load en-US from disk if available to override/update fallback baseline
     fs::path enPath = fs::path(m_langDir) / L"en-US.json";
     std::wstring code, name;
     if (fs::exists(enPath)) {
@@ -219,13 +220,15 @@ void LocalizationManager::SetLanguage(const std::wstring& langCode) {
         fs::path enPath = fs::path(m_langDir) / L"en-US.json";
         if (fs::exists(enPath)) {
             LoadLanguageFile(enPath.wstring(), m_strings, code, name);
-            m_effectiveLang = L"en-US";
+        } else {
+            m_strings = m_fallbackStrings;
         }
+        m_effectiveLang = L"en-US";
     }
 }
 
 std::wstring LocalizationManager::Get(const std::wstring& key, const std::wstring& fallback) const {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
 
     auto it = m_strings.find(key);
     if (it != m_strings.end() && !it->second.empty()) {
@@ -241,16 +244,189 @@ std::wstring LocalizationManager::Get(const std::wstring& key, const std::wstrin
 }
 
 std::wstring LocalizationManager::GetCurrentLanguage() const {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     return m_configuredLang;
 }
 
 std::wstring LocalizationManager::GetEffectiveLanguage() const {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     return m_effectiveLang;
 }
 
 std::vector<LocalizationManager::LanguageItem> LocalizationManager::GetAvailableLanguages() const {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     return m_availableLanguages;
+}
+
+void LocalizationManager::LoadBuiltInDefaults() {
+    m_fallbackStrings = {
+        { L"AppTitle", L"ClickBrightness settings" },
+        { L"Nav_General", L"General" },
+        { L"Nav_Shortcuts", L"Shortcuts" },
+        { L"Nav_OSD", L"On-Screen Display" },
+        { L"Nav_Tray", L"System Tray" },
+        { L"Nav_OverlayTray", L"OSD & Tray" },
+        { L"Nav_FlyoutSlider", L"Flyout Slider" },
+        { L"Nav_About", L"About" },
+        { L"Search_Placeholder", L"Search settings" },
+        { L"Search_NoResults", L"No results found" },
+        { L"General_Title", L"General Settings" },
+        { L"General_Subtitle", L"Windows 11 DDC/CI Hardware Monitor Brightness Control" },
+        { L"Opt_ResetDefaults", L"Reset Settings" },
+        { L"Desc_ResetDefaults", L"Restore all settings to their default values" },
+        { L"Btn_ResetDefaults", L"Reset Defaults" },
+        { L"Confirm_ResetDefaults", L"All settings will be reset. Do you want to continue?" },
+        { L"Btn_ConfirmResetDefaults", L"Yes, reset settings" },
+        { L"Tip_ResetDefaults", L"Reset all settings to default values" },
+        { L"Status_Ready_Title", L"Hardware DDC/CI Ready" },
+        { L"Status_Ready_Msg", L"DDC/CI communication active. Hardware monitor brightness will update directly." },
+        { L"Status_Offline_Title", L"DDC/CI Driver Offline" },
+        { L"Status_Offline_Msg", L"No DDC/CI compatible monitor answered, or driver is still initializing." },
+        { L"Status_Summary_Ready", L"DDC/CI driver active. Hardware brightness control enabled." },
+        { L"Status_Summary_Offline", L"DDC/CI communication unavailable. Using fallback state." },
+        { L"Status_Checking", L"Checking display hardware..." },
+        { L"Sec_Appearance", L"Appearance" },
+        { L"Opt_AppTheme", L"App Theme" },
+        { L"Desc_AppTheme", L"Visual appearance of the settings window" },
+        { L"Theme_FollowWindows", L"Follow Windows (app)" },
+        { L"Theme_Dark", L"Dark" },
+        { L"Theme_Light", L"Light" },
+        { L"Opt_TransparencyEffects", L"Transparency Effects" },
+        { L"Desc_TransparencyEffects", L"Enable Mica and Acrylic backdrop transparency across all app windows" },
+        { L"Opt_Language", L"Language" },
+        { L"Desc_Language", L"Select application display language. If the Windows language is unsupported, English (United States) is used." },
+        { L"Lang_WindowsDefault", L"Follow Windows" },
+        { L"Sec_StartupDisplays", L"Startup & Displays" },
+        { L"Opt_StartWithWindows", L"Start with Windows" },
+        { L"Desc_StartWithWindows", L"Launch ClickBrightness automatically on system logon" },
+        { L"Desc_StartWithWindows_NotInstalled", L"Launch ClickBrightness automatically on system logon (Available when installed in Program Files)" },
+        { L"Opt_PhysicalMonitors", L"Physical Monitors" },
+        { L"Btn_Redetect", L"Re-detect" },
+        { L"Opt_MonitorsToControl", L"Monitors to Control" },
+        { L"Desc_MonitorsToControl", L"Select which monitors have their brightness adjusted" },
+        { L"Monitors_All", L"All Monitors" },
+        { L"Monitors_NoneDetected", L"No DDC/CI monitors detected yet." },
+        { L"Monitors_DisplayFormat", L"Display %s: %s" },
+        { L"PrimaryBadge", L"Primary" },
+        { L"Shortcuts_Title", L"Keyboard Shortcuts" },
+        { L"Sec_ShortcutsAdjust", L"Brightness Stepping Shortcuts" },
+        { L"Opt_HotkeyAdjust", L"Increase & Decrease Shortcuts" },
+        { L"Desc_HotkeyAdjust", L"Enable global keyboard shortcuts to raise and lower brightness" },
+        { L"Opt_KeyUp", L"Increase Brightness" },
+        { L"Desc_KeyUp", L"Global shortcut to raise hardware brightness" },
+        { L"Opt_KeyDown", L"Decrease Brightness" },
+        { L"Desc_KeyDown", L"Global shortcut to lower hardware brightness" },
+        { L"Opt_Step", L"Brightness Step" },
+        { L"Desc_Step", L"Percentage adjustment per hotkey press" },
+        { L"Opt_HotkeyAdjustShowOsd", L"Show OSD Banner" },
+        { L"Desc_HotkeyAdjustShowOsd", L"Display the on-screen brightness banner when pressing stepping hotkeys" },
+        { L"Sec_ShortcutsPresets", L"Preset Shortcuts" },
+        { L"Opt_HotkeyPresets", L"Preset Shortcuts" },
+        { L"Desc_HotkeyPresets", L"Enable global keyboard shortcuts to jump to brightness presets" },
+        { L"Opt_KeyPreset1", L"Preset 1 Shortcut" },
+        { L"Desc_KeyPreset1", L"Global shortcut to set brightness to Preset 1" },
+        { L"Opt_Preset1Brightness", L"Preset 1 Brightness (%)" },
+        { L"Desc_Preset1Brightness", L"Target brightness level applied by the Preset 1 shortcut" },
+        { L"Opt_KeyPreset2", L"Preset 2 Shortcut" },
+        { L"Desc_KeyPreset2", L"Global shortcut to set brightness to Preset 2" },
+        { L"Opt_Preset2Brightness", L"Preset 2 Brightness (%)" },
+        { L"Desc_Preset2Brightness", L"Target brightness level applied by the Preset 2 shortcut" },
+        { L"Opt_HotkeyPresetsShowOsd", L"Show OSD Banner" },
+        { L"Desc_HotkeyPresetsShowOsd", L"Display the on-screen brightness banner when switching presets" },
+        { L"Opt_ResetShortcuts", L"Reset Shortcuts" },
+        { L"Desc_ResetShortcuts", L"Restore hotkeys to defaults (F14, F13, F15, F16)" },
+        { L"Btn_ResetHotkeys", L"Reset Hotkeys" },
+        { L"PressAnyKey", L"Press any key..." },
+        { L"Sec_TimingDelay", L"Timing & Hardware Delay" },
+        { L"Opt_DelayEnabled", L"Delayed Brightness Change" },
+        { L"Desc_DelayEnabled", L"Debounce rapid key presses before hardware adjustments" },
+        { L"Opt_WaitTime", L"Wait Time (ms)" },
+        { L"Desc_WaitTime", L"Hardware debounce delay before updating monitor" },
+        { L"Opt_HoldSpeed", L"Hold Speed (ms)" },
+        { L"Desc_HoldSpeed", L"Key hold interval for smooth stepping (higher = slower)" },
+        { L"OSD_Title", L"On-Screen Display (OSD)" },
+        { L"OverlayTray_Title", L"On-Screen Display (OSD)" },
+        { L"Opt_OverlayTheme", L"OSD Banner Theme" },
+        { L"Desc_OverlayTheme", L"Visual appearance and color theme of the brightness overlay banner" },
+        { L"Theme_FollowWindowsSystem", L"Follow Windows (system)" },
+        { L"Sec_Timing", L"Timing" },
+        { L"Opt_OverlayTimeout", L"Hide Time (ms)" },
+        { L"Desc_OverlayTimeout", L"Duration the brightness overlay stays visible after adjustments" },
+        { L"Sec_OverlayAccent", L"Accent Color" },
+        { L"Opt_OverlayUseWindowsAccent", L"Use Windows Accent Color" },
+        { L"Desc_OverlayUseWindowsAccent", L"Match the on-screen display indicator bar to Windows accent" },
+        { L"Opt_OverlayCustomAccent", L"Custom Accent Color" },
+        { L"Desc_OverlayCustomAccent", L"Fill color for OSD indicator bar (configured when Windows accent is off)" },
+        { L"Tray_Title", L"System Tray Icon" },
+        { L"Sec_TrayAppearance", L"System Tray Icon" },
+        { L"Opt_TrayShowPercentage", L"Show Percentage Icon" },
+        { L"Desc_TrayShowPercentage", L"Display current brightness percentage on the system tray icon" },
+        { L"Sec_TrayTypography", L"System Tray Icon Typography" },
+        { L"Opt_TrayFont", L"Tray Icon Font" },
+        { L"Desc_TrayFont", L"Font family used to render the taskbar tray brightness number" },
+        { L"Opt_TrayFontSize", L"Tray Font Size (%)" },
+        { L"Desc_TrayFontSize", L"Relative scale for 1-2 digits (1%-99%)" },
+        { L"Opt_TrayFontSize100", L"100% Width (%)" },
+        { L"Desc_TrayFontSize100", L"Condensed horizontal scale for 3 digits (100%)" },
+        { L"Opt_TrayYOffset", L"Vertical Offset (px)" },
+        { L"Desc_TrayYOffset", L"Baseline vertical adjustment (e.g. 0.0, -0.5, 1.5)" },
+        { L"Sec_TrayWheel", L"System Tray Mouse Wheel Control" },
+        { L"Opt_TrayWheel", L"Scroll on Tray Icon" },
+        { L"Desc_TrayWheel", L"Adjust brightness by scrolling the mouse wheel directly over the notification tray icon" },
+        { L"Opt_TrayWheelStep", L"Brightness Step" },
+        { L"Desc_TrayWheelStep", L"Percentage adjustment per mouse wheel notch" },
+        { L"Opt_TrayWheelShowOsd", L"Show OSD When Scrolling" },
+        { L"Desc_TrayWheelShowOsd", L"Display the on-screen brightness banner while scrolling over the tray icon" },
+        { L"Opt_TrayWheelDelay", L"Scrolling Hardware Delay" },
+        { L"Desc_TrayWheelDelay", L"Debounce rapid mouse wheel scrolling before updating monitor hardware" },
+        { L"Opt_TrayWheelWaitTime", L"Scrolling Wait Time (ms)" },
+        { L"Desc_TrayWheelWaitTime", L"Delay in milliseconds before sending hardware brightness commands to the display" },
+        { L"Sec_TrayMiddleClick", L"System Tray Middle-Click Action" },
+        { L"Opt_TrayMiddleClick", L"Middle-Click Quick Action" },
+        { L"Desc_TrayMiddleClick", L"Set a specific brightness level when clicking the middle mouse button on the tray icon" },
+        { L"Opt_TrayMiddleClickShowOsd", L"Show OSD On Middle-Click" },
+        { L"Desc_TrayMiddleClickShowOsd", L"Display the on-screen brightness banner when middle-clicking the tray icon" },
+        { L"Opt_TrayMiddleClickBrightness", L"Target Brightness (%)" },
+        { L"Desc_TrayMiddleClickBrightness", L"Brightness percentage applied when middle-clicking the tray icon" },
+        { L"Flyout_Title", L"Flyout Slider" },
+        { L"Opt_FlyoutScrollEnabled", L"Slider Scrolling" },
+        { L"Desc_FlyoutScrollEnabled", L"Adjust brightness by scrolling the mouse wheel over the flyout slider" },
+        { L"Opt_FlyoutScrollStep", L"Scrolling Brightness Step" },
+        { L"Desc_FlyoutScrollStep", L"Percentage adjustment per mouse wheel notch on the flyout slider" },
+        { L"Sec_FlyoutTimingDelay", L"Timing & Hardware Delay" },
+        { L"Opt_FlyoutScrollDelay", L"Slider Scrolling Delay" },
+        { L"Desc_FlyoutScrollDelay", L"Debounce rapid mouse wheel scrolling before hardware adjustments" },
+        { L"Opt_FlyoutScrollWaitTime", L"Scrolling Wait Time (ms)" },
+        { L"Desc_FlyoutScrollWaitTime", L"Hardware debounce delay after scrolling before updating monitor" },
+        { L"Opt_FlyoutButtonDelay", L"Button Clicking Delay" },
+        { L"Desc_FlyoutButtonDelay", L"Debounce rapid preset button clicks before hardware adjustments" },
+        { L"Opt_FlyoutButtonWaitTime", L"Button Wait Time (ms)" },
+        { L"Desc_FlyoutButtonWaitTime", L"Hardware debounce delay after clicking buttons before updating monitor" },
+        { L"Sec_FlyoutAccent", L"Accent Color" },
+        { L"Opt_FlyoutUseWindowsAccent", L"Use Windows Accent Color" },
+        { L"Desc_FlyoutUseWindowsAccent", L"Apply system accent color to the flyout slider filled track" },
+        { L"Opt_FlyoutCustomAccent", L"Custom Accent Color" },
+        { L"Desc_FlyoutCustomAccent", L"Fill color for flyout slider track (configured when Windows accent is off)" },
+        { L"Flyout_Brightness", L"Brightness %d%%" },
+        { L"Tray_Options", L"Options..." },
+        { L"Tray_About", L"ClickBrightness v1.0.5" },
+        { L"Tray_Exit", L"Exit" },
+        { L"Tray_Tooltip", L"Brightness: %d%%" },
+        { L"Shortcuts_Subtitle", L"Global hotkeys for brightness stepping and preset jumping" },
+        { L"OSD_Subtitle", L"Visual overlay popup for real-time brightness adjustments" },
+        { L"Tray_Subtitle", L"Taskbar indicator, live percentage typography, and mouse actions" },
+        { L"FlyoutSlider_Subtitle", L"Hardware brightness slider popup with mouse wheel control" },
+        { L"About_Title", L"About ClickBrightness" },
+        { L"About_Subtitle", L"Lightweight, modern Windows 11 DDC/CI monitor brightness utility" },
+        { L"About_AppInfo", L"ClickBrightness" },
+        { L"About_Version", L"Version 1.0.5 (x64 Release)" },
+        { L"About_AppType", L"Native WinUI 3 / Windows App SDK 2.6 Desktop Application" },
+        { L"About_Copyright", L"Copyright (C) 2026 andris155" },
+        { L"About_DescTitle", L"Description" },
+        { L"About_Description", L"A modern, lightweight Windows 11 utility for controlling hardware monitor brightness via DDC/CI (VCP code 0x10). Supports on-screen display (OSD), system tray live indicator with mouse wheel stepping, and a smooth flyout slider." },
+        { L"About_LicenseTitle", L"License" },
+        { L"About_License", L"Free and Open Source under the MIT License." },
+        { L"Common_On", L"On" },
+        { L"Common_Off", L"Off" }
+    };
 }

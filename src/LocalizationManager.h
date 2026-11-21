@@ -31,8 +31,9 @@ private:
     void ScanLanguageFiles();
     bool LoadLanguageFile(const std::wstring& filePath, std::unordered_map<std::wstring, std::wstring>& targetMap, std::wstring& outCode, std::wstring& outName);
     std::wstring DetectWindowsLanguage() const;
+    void LoadBuiltInDefaults();
 
-    mutable std::mutex m_mutex;
+    mutable std::recursive_mutex m_mutex;
     std::wstring m_langDir;
     std::wstring m_configuredLang; // "default", "en-US", etc.
     std::wstring m_effectiveLang;  // actual loaded lang, e.g. "en-US"

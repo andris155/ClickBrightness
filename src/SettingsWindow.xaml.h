@@ -38,6 +38,9 @@ namespace winrt::BrightnessApp::implementation
         void UpdateMonitorsSelectionUI();
         void UpdateTitleBarDragRegions();
 
+        void EnsureTrayTabLoaded();
+        void EnsureAboutTabLoaded();
+
         static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
         static LRESULT CALLBACK SubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 
@@ -58,6 +61,8 @@ namespace winrt::BrightnessApp::implementation
         bool m_isUpdatingUI{ false };
         bool m_isAppExiting{ false };
         bool m_isClosing{ false };
+        bool m_trayTabLoaded{ false };
+        bool m_aboutTabLoaded{ false };
         std::vector<std::wstring> m_cachedMonitorIds;
 
         winrt::Microsoft::UI::Xaml::Controls::StackPanel m_generalPanel{ nullptr };
