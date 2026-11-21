@@ -12,6 +12,7 @@
 #define ID_HOTKEY_DOWN                  2002
 #define ID_HOTKEY_PRESET1               2003
 #define ID_HOTKEY_PRESET2               2004
+#define ID_HOTKEY_PRESET_TOGGLE         2005
 
 // IPC Event Names
 #define EVENT_NAME_SHOW_SETTINGS        L"ClickBrightness_Event_ShowSettings"
@@ -25,6 +26,7 @@
 #define IDT_MONITOR_RETRY               3003
 #define IDT_GPU_RESET_COOLDOWN          3004
 #define IDT_OVERLAY_UNCLOAK             3005
+#define IDT_PRESET_TOGGLE_RELEASE       3006
 
 // Custom Windows Messages
 #define WM_APP_TRAYMSG                  (WM_APP + 1)

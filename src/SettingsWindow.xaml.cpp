@@ -598,6 +598,11 @@ namespace winrt::BrightnessApp::implementation
                 { g_Loc.Get(L"Opt_KeyPreset2", L"Preset 2 Shortcut").c_str(), catSc, L"preset 2 shortcut hotkey f16", L"Shortcuts", KeyPreset2Button() },
                 { g_Loc.Get(L"Opt_Preset2Brightness", L"Preset 2 Brightness (%)").c_str(), catSc, L"preset 2 brightness target level", L"Shortcuts", Preset2BrightnessSlider() },
                 { g_Loc.Get(L"Opt_HotkeyPresetsShowOsd", L"Show OSD Banner").c_str(), catSc, L"show osd banner preset shortcuts", L"Shortcuts", HotkeyPresetsShowOsdToggle() },
+                { g_Loc.Get(L"Opt_HotkeyPresetToggle", L"Preset Toggle Shortcut").c_str(), catSc, L"enable disable preset toggle shortcut hotkey f17", L"Shortcuts", HotkeyPresetToggleToggle() },
+                { g_Loc.Get(L"Opt_KeyPresetToggle", L"Preset Toggle Shortcut").c_str(), catSc, L"preset toggle shortcut hotkey f17", L"Shortcuts", KeyPresetToggleButton() },
+                { g_Loc.Get(L"Opt_PresetToggle1Brightness", L"Preset 1 Brightness (%)").c_str(), catSc, L"preset toggle 1 brightness target level", L"Shortcuts", PresetToggle1BrightnessSlider() },
+                { g_Loc.Get(L"Opt_PresetToggle2Brightness", L"Preset 2 Brightness (%)").c_str(), catSc, L"preset toggle 2 brightness target level", L"Shortcuts", PresetToggle2BrightnessSlider() },
+                { g_Loc.Get(L"Opt_HotkeyPresetToggleShowOsd", L"Show OSD Banner").c_str(), catSc, L"show osd banner preset toggle shortcut", L"Shortcuts", HotkeyPresetToggleShowOsdToggle() },
                 { g_Loc.Get(L"Opt_ResetShortcuts", L"Reset Shortcuts").c_str(), catSc, L"reset hotkeys shortcuts", L"Shortcuts", ResetHotkeysButton() },
                 { g_Loc.Get(L"Opt_DelayEnabled", L"Delayed Brightness Change").c_str(), catSc, L"delay debounce shortcut", L"Shortcuts", DelayEnabledToggle() },
                 { g_Loc.Get(L"Opt_WaitTime", L"Wait Time (ms)").c_str(), catSc, L"wait time delay ms shortcut", L"Shortcuts", DelaySlider() },
@@ -958,6 +963,90 @@ namespace winrt::BrightnessApp::implementation
             ApplyAndSave();
         });
 
+        // Preset Toggle Shortcut Toggle
+        HotkeyPresetToggleToggle().Toggled([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            bool on = HotkeyPresetToggleToggle().IsOn();
+            g_Settings.hotkeyPresetToggleEnabled = on;
+            HotkeyPresetToggleStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+            PresetToggleKeyCard().Visibility(on ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+            PresetToggle1BrightnessCard().Visibility(on ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+            PresetToggle2BrightnessCard().Visibility(on ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+            HotkeyPresetToggleShowOsdCard().Visibility(on ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+            ApplyAndSave();
+        });
+
+        // Preset Toggle Shortcut Key Button
+        KeyPresetToggleButton().Click([this](auto&&, auto&&)
+        {
+            StartCapture(5);
+        });
+
+        // Preset Toggle 1 Brightness Slider & NumberBox sync
+        PresetToggle1BrightnessSlider().ValueChanged([this](auto&&, winrt::Microsoft::UI::Xaml::Controls::Primitives::RangeBaseValueChangedEventArgs const& e)
+        {
+            if (m_isUpdatingUI) return;
+            int val = static_cast<int>(std::round(e.NewValue()));
+            val = (std::clamp)(val, 0, 100);
+            g_Settings.hotkeyPresetToggle1Brightness = val;
+            m_isUpdatingUI = true;
+            PresetToggle1BrightnessNumberBox().Value(val);
+            m_isUpdatingUI = false;
+            ApplyAndSave();
+        });
+
+        PresetToggle1BrightnessNumberBox().ValueChanged([this](auto&&, winrt::Microsoft::UI::Xaml::Controls::NumberBoxValueChangedEventArgs const& e)
+        {
+            if (m_isUpdatingUI) return;
+            double v = e.NewValue();
+            if (std::isnan(v)) return;
+            int val = static_cast<int>(std::round(v));
+            val = (std::clamp)(val, 0, 100);
+            g_Settings.hotkeyPresetToggle1Brightness = val;
+            m_isUpdatingUI = true;
+            PresetToggle1BrightnessSlider().Value(val);
+            m_isUpdatingUI = false;
+            ApplyAndSave();
+        });
+
+        // Preset Toggle 2 Brightness Slider & NumberBox sync
+        PresetToggle2BrightnessSlider().ValueChanged([this](auto&&, winrt::Microsoft::UI::Xaml::Controls::Primitives::RangeBaseValueChangedEventArgs const& e)
+        {
+            if (m_isUpdatingUI) return;
+            int val = static_cast<int>(std::round(e.NewValue()));
+            val = (std::clamp)(val, 0, 100);
+            g_Settings.hotkeyPresetToggle2Brightness = val;
+            m_isUpdatingUI = true;
+            PresetToggle2BrightnessNumberBox().Value(val);
+            m_isUpdatingUI = false;
+            ApplyAndSave();
+        });
+
+        PresetToggle2BrightnessNumberBox().ValueChanged([this](auto&&, winrt::Microsoft::UI::Xaml::Controls::NumberBoxValueChangedEventArgs const& e)
+        {
+            if (m_isUpdatingUI) return;
+            double v = e.NewValue();
+            if (std::isnan(v)) return;
+            int val = static_cast<int>(std::round(v));
+            val = (std::clamp)(val, 0, 100);
+            g_Settings.hotkeyPresetToggle2Brightness = val;
+            m_isUpdatingUI = true;
+            PresetToggle2BrightnessSlider().Value(val);
+            m_isUpdatingUI = false;
+            ApplyAndSave();
+        });
+
+        // Preset Toggle Show OSD Toggle
+        HotkeyPresetToggleShowOsdToggle().Toggled([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            bool on = HotkeyPresetToggleShowOsdToggle().IsOn();
+            g_Settings.hotkeyPresetToggleShowOsd = on;
+            HotkeyPresetToggleShowOsdStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+            ApplyAndSave();
+        });
+
         // Step ComboBox
         StepComboBox().SelectionChanged([this](auto&&, auto&&)
         {
@@ -983,6 +1072,8 @@ namespace winrt::BrightnessApp::implementation
             m_curPreset1Mods = 0;
             m_curPreset2Key = 0x7F; // VK_F16
             m_curPreset2Mods = 0;
+            m_curPresetToggleKey = 0x80; // VK_F17
+            m_curPresetToggleMods = 0;
             g_Settings.hotkeyUpKey = m_curUpKey;
             g_Settings.hotkeyUpMods = m_curUpMods;
             g_Settings.hotkeyDownKey = m_curDownKey;
@@ -991,16 +1082,28 @@ namespace winrt::BrightnessApp::implementation
             g_Settings.hotkeyPreset1Mods = m_curPreset1Mods;
             g_Settings.hotkeyPreset2Key = m_curPreset2Key;
             g_Settings.hotkeyPreset2Mods = m_curPreset2Mods;
+            g_Settings.hotkeyPresetToggleKey = m_curPresetToggleKey;
+            g_Settings.hotkeyPresetToggleMods = m_curPresetToggleMods;
+            g_Settings.hotkeyPresetToggle1Brightness = 30;
+            g_Settings.hotkeyPresetToggle2Brightness = 80;
             g_Settings.hotkeyAdjustShowOsd = true;
             g_Settings.hotkeyPresetsShowOsd = true;
+            g_Settings.hotkeyPresetToggleShowOsd = true;
             HotkeyAdjustShowOsdToggle().IsOn(true);
             HotkeyAdjustShowOsdStatusText().Text(g_Loc.Get(L"Common_On", L"On"));
             HotkeyPresetsShowOsdToggle().IsOn(true);
             HotkeyPresetsShowOsdStatusText().Text(g_Loc.Get(L"Common_On", L"On"));
+            HotkeyPresetToggleShowOsdToggle().IsOn(true);
+            HotkeyPresetToggleShowOsdStatusText().Text(g_Loc.Get(L"Common_On", L"On"));
+            PresetToggle1BrightnessSlider().Value(30);
+            PresetToggle1BrightnessNumberBox().Value(30);
+            PresetToggle2BrightnessSlider().Value(80);
+            PresetToggle2BrightnessNumberBox().Value(80);
             KeyUpButton().Content(box_value(HotkeyManager::FormatHotkey(m_curUpMods, m_curUpKey)));
             KeyDownButton().Content(box_value(HotkeyManager::FormatHotkey(m_curDownMods, m_curDownKey)));
             KeyPreset1Button().Content(box_value(HotkeyManager::FormatHotkey(m_curPreset1Mods, m_curPreset1Key)));
             KeyPreset2Button().Content(box_value(HotkeyManager::FormatHotkey(m_curPreset2Mods, m_curPreset2Key)));
+            KeyPresetToggleButton().Content(box_value(HotkeyManager::FormatHotkey(m_curPresetToggleMods, m_curPresetToggleKey)));
             ApplyAndSave();
         });
 
@@ -1558,6 +1661,12 @@ namespace winrt::BrightnessApp::implementation
             g_Settings.hotkeyPreset2Key = 0x7F; // VK_F16
             g_Settings.hotkeyPreset2Mods = 0;
             g_Settings.hotkeyPreset2Brightness = 80;
+            g_Settings.hotkeyPresetToggleEnabled = false;
+            g_Settings.hotkeyPresetToggleKey = 0x80; // VK_F17
+            g_Settings.hotkeyPresetToggleMods = 0;
+            g_Settings.hotkeyPresetToggleShowOsd = true;
+            g_Settings.hotkeyPresetToggle1Brightness = 30;
+            g_Settings.hotkeyPresetToggle2Brightness = 80;
             g_Settings.hotkeyStep = 5;
             g_Settings.hotkeyDelayEnabled = true;
             g_Settings.hotkeyDelayMs = 1000;
@@ -2011,8 +2120,23 @@ namespace winrt::BrightnessApp::implementation
         HotkeyPresetsShowOsdDescText().Text(g_Loc.Get(L"Desc_HotkeyPresetsShowOsd", L"Display the on-screen brightness banner when switching presets"));
         HotkeyPresetsShowOsdStatusText().Text(HotkeyPresetsShowOsdToggle().IsOn() ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
 
+        // Preset Toggle Shortcut
+        ShortcutsPresetToggleSectionTitle().Text(g_Loc.Get(L"Sec_ShortcutsPresetToggle", L"Preset Toggle Shortcut"));
+        HotkeyPresetToggleTitleText().Text(g_Loc.Get(L"Opt_HotkeyPresetToggle", L"Preset Toggle Shortcut"));
+        HotkeyPresetToggleDescText().Text(g_Loc.Get(L"Desc_HotkeyPresetToggle", L"Toggle between two brightness presets using a single shortcut"));
+        HotkeyPresetToggleStatusText().Text(HotkeyPresetToggleToggle().IsOn() ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+        PresetToggleKeyTitleText().Text(g_Loc.Get(L"Opt_KeyPresetToggle", L"Toggle Shortcut Key"));
+        PresetToggleKeyDescText().Text(g_Loc.Get(L"Desc_KeyPresetToggle", L"Press shortcut to toggle between Preset 1 and Preset 2"));
+        PresetToggle1BrightnessTitleText().Text(g_Loc.Get(L"Opt_PresetToggle1Brightness", L"Preset 1 Brightness (%)"));
+        PresetToggle1BrightnessDescText().Text(g_Loc.Get(L"Desc_PresetToggle1Brightness", L"First target brightness level toggled by the shortcut"));
+        PresetToggle2BrightnessTitleText().Text(g_Loc.Get(L"Opt_PresetToggle2Brightness", L"Preset 2 Brightness (%)"));
+        PresetToggle2BrightnessDescText().Text(g_Loc.Get(L"Desc_PresetToggle2Brightness", L"Second target brightness level toggled by the shortcut"));
+        HotkeyPresetToggleShowOsdTitleText().Text(g_Loc.Get(L"Opt_HotkeyPresetToggleShowOsd", L"Show OSD Banner"));
+        HotkeyPresetToggleShowOsdDescText().Text(g_Loc.Get(L"Desc_HotkeyPresetToggleShowOsd", L"Display the on-screen brightness banner when toggling presets"));
+        HotkeyPresetToggleShowOsdStatusText().Text(HotkeyPresetToggleShowOsdToggle().IsOn() ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+
         ResetShortcutsTitleText().Text(g_Loc.Get(L"Opt_ResetShortcuts", L"Reset Shortcuts"));
-        ResetShortcutsDescText().Text(g_Loc.Get(L"Desc_ResetShortcuts", L"Restore hotkeys to defaults (F14, F13, F15, F16)"));
+        ResetShortcutsDescText().Text(g_Loc.Get(L"Desc_ResetShortcuts", L"Restore hotkeys to defaults (F14, F13, F15, F16, F17)"));
         ResetHotkeysButton().Content(box_value(g_Loc.Get(L"Btn_ResetHotkeys", L"Reset Hotkeys")));
 
         TimingDelaySectionTitle().Text(g_Loc.Get(L"Sec_TimingDelay", L"Timing & Hardware Delay"));
@@ -2125,7 +2249,7 @@ namespace winrt::BrightnessApp::implementation
         AboutHeaderTitle().Text(g_Loc.Get(L"About_Title", L"About ClickBrightness"));
         AboutHeaderSubtitle().Text(g_Loc.Get(L"About_Subtitle", L"Lightweight, modern Windows 11 DDC/CI monitor brightness utility"));
         AboutAppNameText().Text(g_Loc.Get(L"About_AppInfo", L"ClickBrightness"));
-        AboutVersionText().Text(g_Loc.Get(L"About_Version", L"Version 1.0.5 (x64 Release)"));
+        AboutVersionText().Text(g_Loc.Get(L"About_Version", L"Version 1.0.6 (x64 Release)"));
         AboutAppTypeText().Text(g_Loc.Get(L"About_AppType", L"Native WinUI 3 / Windows App SDK 2.6 Desktop Application"));
         AboutCopyrightText().Text(g_Loc.Get(L"About_Copyright", L"Copyright (C) 2026 andris155"));
         AboutDescTitleText().Text(g_Loc.Get(L"About_DescTitle", L"Description"));
@@ -2165,6 +2289,7 @@ namespace winrt::BrightnessApp::implementation
             KeyDownButton().Content(box_value(HotkeyManager::FormatHotkey(m_curDownMods, m_curDownKey)));
             KeyPreset1Button().Content(box_value(HotkeyManager::FormatHotkey(m_curPreset1Mods, m_curPreset1Key)));
             KeyPreset2Button().Content(box_value(HotkeyManager::FormatHotkey(m_curPreset2Mods, m_curPreset2Key)));
+            KeyPresetToggleButton().Content(box_value(HotkeyManager::FormatHotkey(m_curPresetToggleMods, m_curPresetToggleKey)));
         }
         catch (...)
         {
@@ -2190,6 +2315,7 @@ namespace winrt::BrightnessApp::implementation
         else if (m_captureTarget == 2) KeyDownButton().Content(box_value(hint));
         else if (m_captureTarget == 3) KeyPreset1Button().Content(box_value(hint));
         else if (m_captureTarget == 4) KeyPreset2Button().Content(box_value(hint));
+        else if (m_captureTarget == 5) KeyPresetToggleButton().Content(box_value(hint));
     }
 
     void SettingsWindow::HandleCapturedKey(UINT vkCode, UINT mods)
@@ -2229,6 +2355,13 @@ namespace winrt::BrightnessApp::implementation
             m_curPreset2Mods = mods;
             g_Settings.hotkeyPreset2Key = m_curPreset2Key;
             g_Settings.hotkeyPreset2Mods = m_curPreset2Mods;
+        }
+        else if (m_captureTarget == 5)
+        {
+            m_curPresetToggleKey = vkCode;
+            m_curPresetToggleMods = mods;
+            g_Settings.hotkeyPresetToggleKey = m_curPresetToggleKey;
+            g_Settings.hotkeyPresetToggleMods = m_curPresetToggleMods;
         }
 
         StopCapture(true);
@@ -2377,6 +2510,24 @@ namespace winrt::BrightnessApp::implementation
         Preset1BrightnessNumberBox().Value(g_Settings.hotkeyPreset1Brightness);
         Preset2BrightnessSlider().Value(g_Settings.hotkeyPreset2Brightness);
         Preset2BrightnessNumberBox().Value(g_Settings.hotkeyPreset2Brightness);
+
+        // Hotkey Preset Toggle & Cards
+        HotkeyPresetToggleToggle().IsOn(g_Settings.hotkeyPresetToggleEnabled);
+        HotkeyPresetToggleStatusText().Text(g_Settings.hotkeyPresetToggleEnabled ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+        PresetToggleKeyCard().Visibility(g_Settings.hotkeyPresetToggleEnabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        PresetToggle1BrightnessCard().Visibility(g_Settings.hotkeyPresetToggleEnabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        PresetToggle2BrightnessCard().Visibility(g_Settings.hotkeyPresetToggleEnabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        HotkeyPresetToggleShowOsdCard().Visibility(g_Settings.hotkeyPresetToggleEnabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        HotkeyPresetToggleShowOsdToggle().IsOn(g_Settings.hotkeyPresetToggleShowOsd);
+        HotkeyPresetToggleShowOsdStatusText().Text(g_Settings.hotkeyPresetToggleShowOsd ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+
+        m_curPresetToggleKey = g_Settings.hotkeyPresetToggleKey;
+        m_curPresetToggleMods = g_Settings.hotkeyPresetToggleMods;
+        KeyPresetToggleButton().Content(box_value(HotkeyManager::FormatHotkey(m_curPresetToggleMods, m_curPresetToggleKey)));
+        PresetToggle1BrightnessSlider().Value(g_Settings.hotkeyPresetToggle1Brightness);
+        PresetToggle1BrightnessNumberBox().Value(g_Settings.hotkeyPresetToggle1Brightness);
+        PresetToggle2BrightnessSlider().Value(g_Settings.hotkeyPresetToggle2Brightness);
+        PresetToggle2BrightnessNumberBox().Value(g_Settings.hotkeyPresetToggle2Brightness);
 
         // Step ComboBox (1, 2, 5, 10, 15, 20)
         int stepIdx = 2; // default 5%
@@ -2655,7 +2806,7 @@ void TrimProcessWorkingSetAsync()
 {
     std::thread([]()
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(600));
+        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
         SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
     }).detach();
 }

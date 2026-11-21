@@ -81,6 +81,15 @@ void AppSettings::Load() {
     hotkeyPreset2Brightness = GetPrivateProfileIntW(L"Hotkeys", L"Preset2Brightness", 80, ini.c_str());
     if (hotkeyPreset2Brightness < 0 || hotkeyPreset2Brightness > 100) hotkeyPreset2Brightness = 80;
 
+    hotkeyPresetToggleEnabled = (GetPrivateProfileIntW(L"Hotkeys", L"PresetToggleEnabled", 0, ini.c_str()) != 0);
+    hotkeyPresetToggleShowOsd = (GetPrivateProfileIntW(L"Hotkeys", L"PresetToggleShowOsd", 1, ini.c_str()) != 0);
+    hotkeyPresetToggleKey = GetPrivateProfileIntW(L"Hotkeys", L"KeyPresetToggle", VK_F17, ini.c_str());
+    hotkeyPresetToggleMods = GetPrivateProfileIntW(L"Hotkeys", L"ModsPresetToggle", 0, ini.c_str());
+    hotkeyPresetToggle1Brightness = GetPrivateProfileIntW(L"Hotkeys", L"PresetToggle1Brightness", 30, ini.c_str());
+    if (hotkeyPresetToggle1Brightness < 0 || hotkeyPresetToggle1Brightness > 100) hotkeyPresetToggle1Brightness = 30;
+    hotkeyPresetToggle2Brightness = GetPrivateProfileIntW(L"Hotkeys", L"PresetToggle2Brightness", 80, ini.c_str());
+    if (hotkeyPresetToggle2Brightness < 0 || hotkeyPresetToggle2Brightness > 100) hotkeyPresetToggle2Brightness = 80;
+
     hotkeyStep = GetPrivateProfileIntW(L"Hotkeys", L"Step", 5, ini.c_str());
     if (hotkeyStep < 1 || hotkeyStep > 50) hotkeyStep = 5;
 
@@ -225,6 +234,12 @@ void AppSettings::Save() const {
     WritePrivateProfileStringW(L"Hotkeys", L"KeyPreset2", std::to_wstring(hotkeyPreset2Key).c_str(), ini.c_str());
     WritePrivateProfileStringW(L"Hotkeys", L"ModsPreset2", std::to_wstring(hotkeyPreset2Mods).c_str(), ini.c_str());
     WritePrivateProfileStringW(L"Hotkeys", L"Preset2Brightness", std::to_wstring(hotkeyPreset2Brightness).c_str(), ini.c_str());
+    WritePrivateProfileStringW(L"Hotkeys", L"PresetToggleEnabled", hotkeyPresetToggleEnabled ? L"1" : L"0", ini.c_str());
+    WritePrivateProfileStringW(L"Hotkeys", L"PresetToggleShowOsd", hotkeyPresetToggleShowOsd ? L"1" : L"0", ini.c_str());
+    WritePrivateProfileStringW(L"Hotkeys", L"KeyPresetToggle", std::to_wstring(hotkeyPresetToggleKey).c_str(), ini.c_str());
+    WritePrivateProfileStringW(L"Hotkeys", L"ModsPresetToggle", std::to_wstring(hotkeyPresetToggleMods).c_str(), ini.c_str());
+    WritePrivateProfileStringW(L"Hotkeys", L"PresetToggle1Brightness", std::to_wstring(hotkeyPresetToggle1Brightness).c_str(), ini.c_str());
+    WritePrivateProfileStringW(L"Hotkeys", L"PresetToggle2Brightness", std::to_wstring(hotkeyPresetToggle2Brightness).c_str(), ini.c_str());
     WritePrivateProfileStringW(L"Hotkeys", L"Step", std::to_wstring(hotkeyStep).c_str(), ini.c_str());
     WritePrivateProfileStringW(L"Hotkeys", L"RepeatIntervalMs", std::to_wstring(hotkeyRepeatIntervalMs).c_str(), ini.c_str());
 

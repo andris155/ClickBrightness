@@ -6,8 +6,8 @@ IDI_APP_ICON ICON "program.ico"
 
 // Version Information
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION     1,0,5,0
-PRODUCTVERSION  1,0,5,0
+FILEVERSION     1,0,6,0
+PRODUCTVERSION  1,0,6,0
 FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
 #ifdef _DEBUG
 FILEFLAGS       VS_FF_DEBUG
@@ -24,11 +24,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      "andris155"
             VALUE "FileDescription",  "ClickBrightness"
-            VALUE "FileVersion",      "1.0.5.0"
+            VALUE "FileVersion",      "1.0.6.0"
             VALUE "InternalName",     "ClickBrightness"
             VALUE "OriginalFilename", "ClickBrightness.exe"
             VALUE "ProductName",      "ClickBrightness"
-            VALUE "ProductVersion",   "v1.0.5"
+            VALUE "ProductVersion",   "v1.0.6"
             VALUE "LegalCopyright",   "Copyright (C) 2026"
         END
     END

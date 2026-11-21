@@ -52,9 +52,21 @@ bool HotkeyManager::RegisterAll(HWND hwnd) {
         }
     }
 
+    // Register Hotkey Preset Toggle (if preset toggle shortcut enabled)
+    UINT ptMods = g_Settings.hotkeyPresetToggleMods;
+    UINT ptKey = g_Settings.hotkeyPresetToggleKey;
+    BOOL bPT = FALSE;
+
+    if (g_Settings.hotkeyPresetToggleEnabled) {
+        if (ptKey != 0) {
+            bPT = RegisterHotKey(hwnd, ID_HOTKEY_PRESET_TOGGLE, ptMods, ptKey);
+        }
+    }
+
     bool adjustOk = (!g_Settings.hotkeyAdjustEnabled) || ((upKey == 0 || bUp) && (downKey == 0 || bDown));
     bool presetsOk = (!g_Settings.hotkeyPresetsEnabled) || ((p1Key == 0 || bP1) && (p2Key == 0 || bP2));
-    m_registered = adjustOk && presetsOk;
+    bool toggleOk = (!g_Settings.hotkeyPresetToggleEnabled) || (ptKey == 0 || bPT);
+    m_registered = adjustOk && presetsOk && toggleOk;
     return m_registered;
 }
 
@@ -63,6 +75,7 @@ void HotkeyManager::UnregisterAll(HWND hwnd) {
     UnregisterHotKey(hwnd, ID_HOTKEY_DOWN);
     UnregisterHotKey(hwnd, ID_HOTKEY_PRESET1);
     UnregisterHotKey(hwnd, ID_HOTKEY_PRESET2);
+    UnregisterHotKey(hwnd, ID_HOTKEY_PRESET_TOGGLE);
     m_registered = false;
 }
 

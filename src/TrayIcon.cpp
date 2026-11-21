@@ -184,7 +184,7 @@ void TrayIcon::OnLanguageChanged() {
                 optItem.Text(g_Loc.Get(L"Tray_Options", L"Options..."));
             }
             if (auto aboutItem = items.GetAt(2).try_as<winrt::Microsoft::UI::Xaml::Controls::MenuFlyoutItem>()) {
-                aboutItem.Text(g_Loc.Get(L"Tray_About", L"ClickBrightness v1.0.5"));
+                aboutItem.Text(g_Loc.Get(L"Tray_About", L"ClickBrightness v1.0.6"));
             }
             if (auto exitItem = items.GetAt(3).try_as<winrt::Microsoft::UI::Xaml::Controls::MenuFlyoutItem>()) {
                 exitItem.Text(g_Loc.Get(L"Tray_Exit", L"Exit"));
@@ -537,9 +537,9 @@ static void InitTrayMenu()
         // Separator
         s_trayMenuFlyout.Items().Append(winrt::Microsoft::UI::Xaml::Controls::MenuFlyoutSeparator());
 
-        // 2. ClickBrightness v1.0.5 (About info)
+        // 2. ClickBrightness v1.0.6 (About info)
         auto aboutItem = winrt::Microsoft::UI::Xaml::Controls::MenuFlyoutItem();
-        aboutItem.Text(g_Loc.Get(L"Tray_About", L"ClickBrightness v1.0.5"));
+        aboutItem.Text(g_Loc.Get(L"Tray_About", L"ClickBrightness v1.0.6"));
         aboutItem.Height(32.0);
         aboutItem.Padding({ 11.0, 4.0, 11.0, 5.0 });
         auto iconInfo = winrt::Microsoft::UI::Xaml::Controls::FontIcon();
@@ -725,19 +725,72 @@ void TrayIcon::ShowContextMenu() {
             s_trayMenuFlyout.MenuFlyoutPresenterStyle(presenterStyle);
         }
 
-        // Detect taskbar orientation (top vs bottom) supporting both single and multi-monitor setups
-        bool isTopTaskbar = (iconY < 100);
+        // Detect taskbar docking edge (supporting Left, Right, Top, Bottom across multi-monitors)
+        enum class TaskbarEdge { Bottom, Top, Left, Right };
+        TaskbarEdge edge = TaskbarEdge::Bottom;
+
         POINT ptIcon = { iconCenterX, iconY };
         HMONITOR hMon = MonitorFromPoint(ptIcon, MONITOR_DEFAULTTONEAREST);
         MONITORINFO mi = { sizeof(mi) };
         if (GetMonitorInfoW(hMon, &mi))
         {
-            isTopTaskbar = (iconY - mi.rcMonitor.top < 100);
+            int diffLeft = mi.rcWork.left - mi.rcMonitor.left;
+            int diffRight = mi.rcMonitor.right - mi.rcWork.right;
+            int diffTop = mi.rcWork.top - mi.rcMonitor.top;
+            int diffBottom = mi.rcMonitor.bottom - mi.rcWork.bottom;
+
+            int maxDiff = diffBottom;
+            if (diffTop > maxDiff) { maxDiff = diffTop; edge = TaskbarEdge::Top; }
+            if (diffLeft > maxDiff) { maxDiff = diffLeft; edge = TaskbarEdge::Left; }
+            if (diffRight > maxDiff) { maxDiff = diffRight; edge = TaskbarEdge::Right; }
+
+            if (maxDiff <= 4)
+            {
+                int distLeft = abs(iconCenterX - mi.rcMonitor.left);
+                int distRight = abs(mi.rcMonitor.right - iconCenterX);
+                int distTop = abs(iconY - mi.rcMonitor.top);
+                int distBottom = abs(mi.rcMonitor.bottom - iconY);
+
+                int minDist = distBottom;
+                edge = TaskbarEdge::Bottom;
+                if (distTop < minDist) { minDist = distTop; edge = TaskbarEdge::Top; }
+                if (distLeft < minDist) { minDist = distLeft; edge = TaskbarEdge::Left; }
+                if (distRight < minDist) { minDist = distRight; edge = TaskbarEdge::Right; }
+            }
         }
 
         // Position 1x1 anchor window just outside the tray icon boundary so it never covers the icon
-        int anchorY = isTopTaskbar ? (iconY + iconH + 1) : (iconY - 1);
-        SetWindowPos(s_hTrayMenuWnd, HWND_TOPMOST, iconCenterX, anchorY, 1, 1, SWP_SHOWWINDOW);
+        int anchorX = iconCenterX;
+        int anchorY = iconY - 1;
+        winrt::Microsoft::UI::Xaml::Controls::Primitives::FlyoutPlacementMode placement =
+            winrt::Microsoft::UI::Xaml::Controls::Primitives::FlyoutPlacementMode::Top;
+
+        switch (edge)
+        {
+        case TaskbarEdge::Left:
+            anchorX = iconX + iconW + 1;
+            anchorY = iconY + iconH / 2;
+            placement = winrt::Microsoft::UI::Xaml::Controls::Primitives::FlyoutPlacementMode::Right;
+            break;
+        case TaskbarEdge::Right:
+            anchorX = iconX - 1;
+            anchorY = iconY + iconH / 2;
+            placement = winrt::Microsoft::UI::Xaml::Controls::Primitives::FlyoutPlacementMode::Left;
+            break;
+        case TaskbarEdge::Top:
+            anchorX = iconCenterX;
+            anchorY = iconY + iconH + 1;
+            placement = winrt::Microsoft::UI::Xaml::Controls::Primitives::FlyoutPlacementMode::Bottom;
+            break;
+        case TaskbarEdge::Bottom:
+        default:
+            anchorX = iconCenterX;
+            anchorY = iconY - 1;
+            placement = winrt::Microsoft::UI::Xaml::Controls::Primitives::FlyoutPlacementMode::Top;
+            break;
+        }
+
+        SetWindowPos(s_hTrayMenuWnd, HWND_TOPMOST, anchorX, anchorY, 1, 1, SWP_SHOWWINDOW);
         ShowWindow(s_hTrayMenuWnd, SW_SHOW);
 
         SetForegroundWindow(s_hTrayMenuWnd);
@@ -752,7 +805,7 @@ void TrayIcon::ShowContextMenu() {
             }
             if (auto aboutItem = menuItems.GetAt(2).try_as<winrt::Microsoft::UI::Xaml::Controls::MenuFlyoutItem>())
             {
-                aboutItem.Text(g_Loc.Get(L"Tray_About", L"ClickBrightness v1.0.5"));
+                aboutItem.Text(g_Loc.Get(L"Tray_About", L"ClickBrightness v1.0.6"));
             }
             if (auto exitItem = menuItems.GetAt(3).try_as<winrt::Microsoft::UI::Xaml::Controls::MenuFlyoutItem>())
             {
@@ -761,14 +814,7 @@ void TrayIcon::ShowContextMenu() {
         }
 
         winrt::Microsoft::UI::Xaml::Controls::Primitives::FlyoutShowOptions options;
-        if (isTopTaskbar)
-        {
-            options.Placement(winrt::Microsoft::UI::Xaml::Controls::Primitives::FlyoutPlacementMode::Bottom);
-        }
-        else
-        {
-            options.Placement(winrt::Microsoft::UI::Xaml::Controls::Primitives::FlyoutPlacementMode::Top);
-        }
+        options.Placement(placement);
         options.ShowMode(winrt::Microsoft::UI::Xaml::Controls::Primitives::FlyoutShowMode::Standard);
         s_trayMenuFlyout.ShowAt(s_trayMenuRoot, options);
         s_isMenuOpen = true;

@@ -549,6 +549,116 @@
                                 </Grid>
                             </Border>
 
+                            <!-- Preset Toggle Shortcut Section -->
+                            <TextBlock x:Name="ShortcutsPresetToggleSectionTitle" Text="Preset Toggle Shortcut" FontSize="14" FontWeight="SemiBold" Margin="0,18,0,6"/>
+
+                            <!-- Enable Preset Toggle Shortcut Toggle -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE8AB;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="HotkeyPresetToggleTitleText" Text="Preset Toggle Shortcut" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="HotkeyPresetToggleDescText" Text="Toggle between two brightness presets using a single shortcut" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <TextBlock x:Name="HotkeyPresetToggleStatusText" Text="Off" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                                        <ToggleSwitch x:Name="HotkeyPresetToggleToggle" MinWidth="0" OnContent="" OffContent="" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Preset Toggle Shortcut Key -->
+                            <Border x:Name="PresetToggleKeyCard" Visibility="Collapsed" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE734;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="PresetToggleKeyTitleText" Text="Preset Toggle Shortcut" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="PresetToggleKeyDescText" Text="Global shortcut to toggle between Preset 1 and Preset 2" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <Button x:Name="KeyPresetToggleButton" Grid.Column="2" Content="F17" MinWidth="140" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Preset Toggle 1 Brightness Level -->
+                            <Border x:Name="PresetToggle1BrightnessCard" Visibility="Collapsed" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE706;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="PresetToggle1BrightnessTitleText" Text="Preset 1 Brightness (%)" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="PresetToggle1BrightnessDescText" Text="First target brightness level toggled by the shortcut" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Slider x:Name="PresetToggle1BrightnessSlider" Minimum="0" Maximum="100" StepFrequency="1" Width="160" VerticalAlignment="Center"/>
+                                        <NumberBox x:Name="PresetToggle1BrightnessNumberBox" Minimum="0" Maximum="100" Width="90" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Preset Toggle 2 Brightness Level -->
+                            <Border x:Name="PresetToggle2BrightnessCard" Visibility="Collapsed" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE706;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="PresetToggle2BrightnessTitleText" Text="Preset 2 Brightness (%)" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="PresetToggle2BrightnessDescText" Text="Second target brightness level toggled by the shortcut" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Slider x:Name="PresetToggle2BrightnessSlider" Minimum="0" Maximum="100" StepFrequency="1" Width="160" VerticalAlignment="Center"/>
+                                        <NumberBox x:Name="PresetToggle2BrightnessNumberBox" Minimum="0" Maximum="100" Width="90" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Show OSD for Preset Toggle Shortcut Toggle -->
+                            <Border x:Name="HotkeyPresetToggleShowOsdCard" Visibility="Collapsed" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE7F4;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="HotkeyPresetToggleShowOsdTitleText" Text="Show OSD Banner" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="HotkeyPresetToggleShowOsdDescText" Text="Display the on-screen brightness banner when toggling presets" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <TextBlock x:Name="HotkeyPresetToggleShowOsdStatusText" Text="On" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                                        <ToggleSwitch x:Name="HotkeyPresetToggleShowOsdToggle" MinWidth="0" OnContent="" OffContent="" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
                             <!-- Reset Hotkeys -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
@@ -1340,7 +1450,7 @@
                                     <Image x:Name="AboutAppIconImage" Width="48" Height="48" VerticalAlignment="Center" Margin="0,0,16,0"/>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                         <TextBlock x:Name="AboutAppNameText" Text="ClickBrightness" FontSize="15" FontWeight="SemiBold"/>
-                                        <TextBlock x:Name="AboutVersionText" Text="Version 1.0.5 (x64 Release)" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                        <TextBlock x:Name="AboutVersionText" Text="Version 1.0.6 (x64 Release)" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                         <TextBlock x:Name="AboutAppTypeText" Text="Native WinUI 3 / Windows App SDK 2.6 Desktop Application" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,2,0,0"/>
                                         <TextBlock x:Name="AboutCopyrightText" Text="Copyright (C) 2026 andris155" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,2,0,0"/>
                                     </StackPanel>

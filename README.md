@@ -121,8 +121,8 @@ Built with **C++/WinRT** and **WinUI 3** (Windows App SDK), ClickBrightness feat
 
 ### Option 1: Windows Installer (MSI)
 Download the latest installer matching your CPU architecture from the releases:
-- **x64**: `ClickBrightness-1.0.5-x64.msi`
-- **ARM64**: `ClickBrightness-1.0.5-arm64.msi`
+- **x64**: `ClickBrightness-1.0.6-x64.msi`
+- **ARM64**: `ClickBrightness-1.0.6-arm64.msi`
 
 The installer includes:
 - Per-machine installation in `Program Files\ClickBrightness`.

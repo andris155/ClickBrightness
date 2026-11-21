@@ -30,6 +30,7 @@ namespace winrt::BrightnessApp::implementation
         void DetachBackdrop();
         void InitializeButtons();
         void SetBrightnessVisual(int val);
+        void ApplySliderBrushes();
         void CommitHardwareBrightness(int val);
         void ScheduleDebounce(int val, int delayMs);
         void OnScrollAdjust(int val);

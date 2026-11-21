@@ -49,6 +49,9 @@ public:
     void OnDisplayChanged();
     void OnPowerSuspend();
     void OnPowerResume();
+    void OnDisplayPowerOff();
+    void OnDisplayPowerOn();
+    bool IsDisplayPoweredOn() const { return m_displayPoweredOn.load(); }
 
 private:
     void EnumMonitorsInternal();
@@ -61,6 +64,8 @@ private:
     std::vector<PhysicalMonitorInfo> m_monitors;
     int m_cachedBrightness;
     std::atomic<bool> m_driverAvailable;
+    std::atomic<bool> m_displayPoweredOn;
+    std::atomic<int> m_consecutiveFailures;
     ULONGLONG m_lastEnumTick;
 
     // Async worker thread state

@@ -29,6 +29,16 @@ struct AppSettings {
     UINT hotkeyPreset2Key = VK_F16;    // Default F16
     int hotkeyPreset2Brightness = 80;  // Default: 80%
 
+    // Hotkey Preset Toggle Enabled
+    bool hotkeyPresetToggleEnabled = false; // Default: OFF
+    bool hotkeyPresetToggleShowOsd = true;  // Default: ON (Show OSD banner on preset toggle shortcut)
+
+    // Hotkey Preset Toggle
+    UINT hotkeyPresetToggleMods = 0;        // 0 = none
+    UINT hotkeyPresetToggleKey = VK_F17;    // Default F17
+    int hotkeyPresetToggle1Brightness = 30; // Default: 30%
+    int hotkeyPresetToggle2Brightness = 80; // Default: 80%
+
     // Hotkey Step
     int hotkeyStep = 5;                // Default 5%
 

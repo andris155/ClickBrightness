@@ -49,7 +49,7 @@ namespace winrt::BrightnessApp::implementation
         HICON m_hIconBig{ nullptr };
         HICON m_hIconSmall{ nullptr };
 
-        int m_captureTarget{ 0 }; // 0 = None, 1 = Up, 2 = Down, 3 = Preset1, 4 = Preset2
+        int m_captureTarget{ 0 }; // 0 = None, 1 = Up, 2 = Down, 3 = Preset1, 4 = Preset2, 5 = PresetToggle
         UINT m_curUpKey{ 0x7D }; // VK_F14
         UINT m_curUpMods{ 0 };
         UINT m_curDownKey{ 0x7C }; // VK_F13
@@ -58,6 +58,8 @@ namespace winrt::BrightnessApp::implementation
         UINT m_curPreset1Mods{ 0 };
         UINT m_curPreset2Key{ 0x7F }; // VK_F16
         UINT m_curPreset2Mods{ 0 };
+        UINT m_curPresetToggleKey{ 0x80 }; // VK_F17
+        UINT m_curPresetToggleMods{ 0 };
         bool m_isUpdatingUI{ false };
         bool m_isAppExiting{ false };
         bool m_isClosing{ false };

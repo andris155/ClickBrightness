@@ -109,7 +109,7 @@ static BOOL CALLBACK MonitorEnumCallback(HMONITOR hMonitor, HDC hdcMonitor, LPRE
 }
 
 MonitorManager::MonitorManager()
-    : m_cachedBrightness(45), m_driverAvailable(false), m_lastEnumTick(0),
+    : m_cachedBrightness(45), m_driverAvailable(false), m_displayPoweredOn(true), m_consecutiveFailures(0), m_lastEnumTick(0),
       m_pendingTargetBrightness(-1), m_pendingReinit(false), m_stopWorker(false) {
 }
 
@@ -195,9 +195,11 @@ void MonitorManager::EnumMonitorsInternal() {
         if (hMain) {
             PostMessageW(hMain, WM_APP_BRIGHTNESS_UPDATED, m_cachedBrightness, 0);
         }
+        m_consecutiveFailures = 0;
     } else {
         m_driverAvailable = false;
     }
+    m_consecutiveFailures = 0;
     m_lastEnumTick = GetTickCount64();
 }
 
@@ -361,6 +363,9 @@ void MonitorManager::WorkerLoop() {
         }
 
         if (targetBrightness != -1) {
+            if (!m_displayPoweredOn.load()) {
+                continue;
+            }
             struct MonTarget {
                 HANDLE hPhysical;
                 DWORD targetVal;
@@ -418,7 +423,14 @@ void MonitorManager::WorkerLoop() {
                     break;
                 }
 
-                if (SetMonitorBrightness(tgt.hPhysical, tgt.targetVal)) {
+                bool ok = (SetMonitorBrightness(tgt.hPhysical, tgt.targetVal) != FALSE);
+                if (!ok) {
+                    // Retry once after a brief micro-sleep in case of transient I2C bus contention
+                    Sleep(25);
+                    ok = (SetMonitorBrightness(tgt.hPhysical, tgt.targetVal) != FALSE);
+                }
+
+                if (ok) {
                     std::lock_guard<std::mutex> lock(m_mutex);
                     for (auto& mon : m_monitors) {
                         if (mon.hPhysical == tgt.hPhysical) {
@@ -431,9 +443,17 @@ void MonitorManager::WorkerLoop() {
                 }
             }
 
-            if (!allSuccess && !targets.empty()) {
-                std::lock_guard<std::mutex> lock(m_mutex);
-                m_driverAvailable = false;
+            if (!targets.empty()) {
+                if (allSuccess) {
+                    m_consecutiveFailures = 0;
+                } else {
+                    int fails = ++m_consecutiveFailures;
+                    // Require 3 consecutive failed operations before declaring hardware/driver unavailable
+                    if (fails >= 3) {
+                        std::lock_guard<std::mutex> lock(m_mutex);
+                        m_driverAvailable = false;
+                    }
+                }
             }
         }
     }
@@ -468,4 +488,19 @@ void MonitorManager::OnPowerResume() {
         m_pendingReinit = true;
     }
     m_workerCv.notify_one();
+}
+
+void MonitorManager::OnDisplayPowerOff() {
+    m_displayPoweredOn = false;
+    std::lock_guard<std::mutex> lock(m_workerMutex);
+    m_pendingTargetBrightness = -1;
+}
+
+void MonitorManager::OnDisplayPowerOn() {
+    if (!m_displayPoweredOn.load()) {
+        m_displayPoweredOn = true;
+        std::lock_guard<std::mutex> lock(m_workerMutex);
+        m_pendingReinit = true;
+        m_workerCv.notify_one();
+    }
 }
