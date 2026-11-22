@@ -176,7 +176,7 @@
   "Flyout_Brightness": "Fényerő %d%%",
 
   "Tray_Options": "Beállítások...",
-  "Tray_About": "ClickBrightness v1.0.6",
+  "Tray_About": "ClickBrightness v1.0.7",
   "Tray_Exit": "Kilépés",
   "Tray_Tooltip": "Fényerő: %d%%",
 
@@ -188,7 +188,7 @@
   "About_Title": "A ClickBrightness névjegye",
   "About_Subtitle": "Könnyűsúlyú, modern Windows 11 DDC/CI monitor fényerőszabályzó segédprogram",
   "About_AppInfo": "ClickBrightness",
-  "About_Version": "Verzió 1.0.6 (x64 Release)",
+  "About_Version": "Verzió 1.0.7 (x64 Release)",
   "About_AppType": "Natív WinUI 3 / Windows App SDK 2.6 asztali alkalmazás",
   "About_Copyright": "Copyright (C) 2026 andris155",
   "About_DescTitle": "Leírás",

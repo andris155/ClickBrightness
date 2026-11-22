@@ -2249,7 +2249,7 @@ namespace winrt::BrightnessApp::implementation
         AboutHeaderTitle().Text(g_Loc.Get(L"About_Title", L"About ClickBrightness"));
         AboutHeaderSubtitle().Text(g_Loc.Get(L"About_Subtitle", L"Lightweight, modern Windows 11 DDC/CI monitor brightness utility"));
         AboutAppNameText().Text(g_Loc.Get(L"About_AppInfo", L"ClickBrightness"));
-        AboutVersionText().Text(g_Loc.Get(L"About_Version", L"Version 1.0.6 (x64 Release)"));
+        AboutVersionText().Text(g_Loc.Get(L"About_Version", L"Version 1.0.7 (x64 Release)"));
         AboutAppTypeText().Text(g_Loc.Get(L"About_AppType", L"Native WinUI 3 / Windows App SDK 2.6 Desktop Application"));
         AboutCopyrightText().Text(g_Loc.Get(L"About_Copyright", L"Copyright (C) 2026 andris155"));
         AboutDescTitleText().Text(g_Loc.Get(L"About_DescTitle", L"Description"));

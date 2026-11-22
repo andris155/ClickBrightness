@@ -184,7 +184,7 @@ void TrayIcon::OnLanguageChanged() {
                 optItem.Text(g_Loc.Get(L"Tray_Options", L"Options..."));
             }
             if (auto aboutItem = items.GetAt(2).try_as<winrt::Microsoft::UI::Xaml::Controls::MenuFlyoutItem>()) {
-                aboutItem.Text(g_Loc.Get(L"Tray_About", L"ClickBrightness v1.0.6"));
+                aboutItem.Text(g_Loc.Get(L"Tray_About", L"ClickBrightness v1.0.7"));
             }
             if (auto exitItem = items.GetAt(3).try_as<winrt::Microsoft::UI::Xaml::Controls::MenuFlyoutItem>()) {
                 exitItem.Text(g_Loc.Get(L"Tray_Exit", L"Exit"));
@@ -548,9 +548,9 @@ static void InitTrayMenu()
         // Separator
         s_trayMenuFlyout.Items().Append(winrt::Microsoft::UI::Xaml::Controls::MenuFlyoutSeparator());
 
-        // 2. ClickBrightness v1.0.6 (About info)
+        // 2. ClickBrightness v1.0.7 (About info)
         auto aboutItem = winrt::Microsoft::UI::Xaml::Controls::MenuFlyoutItem();
-        aboutItem.Text(g_Loc.Get(L"Tray_About", L"ClickBrightness v1.0.6"));
+        aboutItem.Text(g_Loc.Get(L"Tray_About", L"ClickBrightness v1.0.7"));
         aboutItem.Height(32.0);
         aboutItem.Padding({ 11.0, 4.0, 11.0, 5.0 });
         auto iconInfo = winrt::Microsoft::UI::Xaml::Controls::FontIcon();
@@ -821,7 +821,7 @@ void TrayIcon::ShowContextMenu() {
             }
             if (auto aboutItem = menuItems.GetAt(2).try_as<winrt::Microsoft::UI::Xaml::Controls::MenuFlyoutItem>())
             {
-                aboutItem.Text(g_Loc.Get(L"Tray_About", L"ClickBrightness v1.0.6"));
+                aboutItem.Text(g_Loc.Get(L"Tray_About", L"ClickBrightness v1.0.7"));
             }
             if (auto exitItem = menuItems.GetAt(3).try_as<winrt::Microsoft::UI::Xaml::Controls::MenuFlyoutItem>())
             {
