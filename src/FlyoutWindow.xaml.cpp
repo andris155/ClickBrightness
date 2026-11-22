@@ -669,8 +669,19 @@ namespace winrt::BrightnessApp::implementation
         }
         RECT rcOverflow = { 0 };
         bool isFromOverflow = false;
-        if (hOverflow && ::IsWindowVisible(hOverflow) && GetWindowRect(hOverflow, &rcOverflow))
+        if (hOverflow && ::IsWindowVisible(hOverflow))
         {
+            RECT rcFrame = { 0 };
+            if (SUCCEEDED(DwmGetWindowAttribute(hOverflow, DWMWA_EXTENDED_FRAME_BOUNDS, &rcFrame, sizeof(rcFrame))) &&
+                (rcFrame.right > rcFrame.left) && (rcFrame.bottom > rcFrame.top))
+            {
+                rcOverflow = rcFrame;
+            }
+            else
+            {
+                GetWindowRect(hOverflow, &rcOverflow);
+            }
+
             if (pt.x >= rcOverflow.left && pt.x <= rcOverflow.right &&
                 pt.y >= rcOverflow.top && pt.y <= rcOverflow.bottom)
             {
@@ -738,32 +749,32 @@ namespace winrt::BrightnessApp::implementation
             switch (edge)
             {
             case TaskbarEdge::Left:
-                x = rcOverflow.right + DpiHelper::Scale(8, dpi);
+                x = rcOverflow.right + DpiHelper::Scale(2, dpi);
                 y = rcOverflow.bottom - height;
                 break;
             case TaskbarEdge::Right:
-                x = rcOverflow.left - width - DpiHelper::Scale(8, dpi);
+                x = rcOverflow.left - width - DpiHelper::Scale(2, dpi);
                 y = rcOverflow.bottom - height;
                 break;
             case TaskbarEdge::Top:
                 x = pt.x - width / 2;
-                y = rcOverflow.bottom + DpiHelper::Scale(8, dpi);
+                y = rcOverflow.bottom + DpiHelper::Scale(2, dpi);
                 break;
             case TaskbarEdge::Bottom:
             default:
                 x = pt.x - width / 2;
-                y = rcOverflow.top - height - DpiHelper::Scale(8, dpi);
+                y = rcOverflow.top - height - DpiHelper::Scale(2, dpi);
                 if (y < mi.rcWork.top)
                 {
                     // If it does not fit vertically above the overflow window, position to its left
-                    if (rcOverflow.left - width - DpiHelper::Scale(8, dpi) >= mi.rcWork.left)
+                    if (rcOverflow.left - width - DpiHelper::Scale(2, dpi) >= mi.rcWork.left)
                     {
-                        x = rcOverflow.left - width - DpiHelper::Scale(8, dpi);
+                        x = rcOverflow.left - width - DpiHelper::Scale(2, dpi);
                         y = mi.rcWork.bottom - height - DpiHelper::Scale(14, dpi);
                     }
                     else
                     {
-                        y = mi.rcWork.top + DpiHelper::Scale(8, dpi);
+                        y = mi.rcWork.top + DpiHelper::Scale(2, dpi);
                     }
                 }
                 break;
