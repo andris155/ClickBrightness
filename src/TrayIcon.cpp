@@ -504,18 +504,29 @@ static void InitTrayMenu()
 
             LONG_PTR exStyle = GetWindowLongPtrW(s_hTrayMenuWnd, GWL_EXSTYLE);
             exStyle &= ~(WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE | WS_EX_DLGMODALFRAME);
-            exStyle |= WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE;
+            exStyle |= WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_LAYERED;
             SetWindowLongPtrW(s_hTrayMenuWnd, GWL_EXSTYLE, exStyle);
+            SetLayeredWindowAttributes(s_hTrayMenuWnd, 0, 0, LWA_ALPHA);
 
             COLORREF borderColor = DWMWA_COLOR_NONE;
             DwmSetWindowAttribute(s_hTrayMenuWnd, DWMWA_BORDER_COLOR, &borderColor, sizeof(borderColor));
 
             DWM_WINDOW_CORNER_PREFERENCE cornerPref = DWMWCP_DONOTROUND;
             DwmSetWindowAttribute(s_hTrayMenuWnd, DWMWA_WINDOW_CORNER_PREFERENCE, &cornerPref, sizeof(cornerPref));
+
+            int ncPolicy = DWMNCRP_DISABLED;
+            DwmSetWindowAttribute(s_hTrayMenuWnd, DWMWA_NCRENDERING_POLICY, &ncPolicy, sizeof(ncPolicy));
+
+            BOOL forceDisableTransitions = TRUE;
+            DwmSetWindowAttribute(s_hTrayMenuWnd, DWMWA_TRANSITIONS_FORCEDISABLED, &forceDisableTransitions, sizeof(forceDisableTransitions));
+
+            HRGN hEmptyRgn = CreateRectRgn(0, 0, 0, 0);
+            SetWindowRgn(s_hTrayMenuWnd, hEmptyRgn, TRUE);
         }
 
         s_trayMenuRoot = winrt::Microsoft::UI::Xaml::Controls::Grid();
         s_trayMenuRoot.Background(winrt::Microsoft::UI::Xaml::Media::SolidColorBrush(winrt::Microsoft::UI::Colors::Transparent()));
+        s_trayMenuRoot.Opacity(0.0);
         s_trayMenuWindow.Content(s_trayMenuRoot);
 
         s_trayMenuFlyout = winrt::Microsoft::UI::Xaml::Controls::MenuFlyout();
@@ -785,13 +796,18 @@ void TrayIcon::ShowContextMenu() {
         case TaskbarEdge::Bottom:
         default:
             anchorX = iconCenterX;
-            anchorY = iconY - 1;
+            anchorY = iconY;
             placement = winrt::Microsoft::UI::Xaml::Controls::Primitives::FlyoutPlacementMode::Top;
             break;
         }
 
-        SetWindowPos(s_hTrayMenuWnd, HWND_TOPMOST, anchorX, anchorY, 1, 1, SWP_SHOWWINDOW);
-        ShowWindow(s_hTrayMenuWnd, SW_SHOW);
+        SetWindowPos(s_hTrayMenuWnd, HWND_TOPMOST, anchorX, anchorY, 1, 1, SWP_SHOWWINDOW | SWP_NOACTIVATE);
+        ShowWindow(s_hTrayMenuWnd, SW_SHOWNOACTIVATE);
+
+        // Ensure anchor window remains 100% invisible without rendering a pixel/dot
+        HRGN hRgn = CreateRectRgn(0, 0, 0, 0);
+        SetWindowRgn(s_hTrayMenuWnd, hRgn, TRUE);
+        SetLayeredWindowAttributes(s_hTrayMenuWnd, 0, 0, LWA_ALPHA);
 
         SetForegroundWindow(s_hTrayMenuWnd);
 
