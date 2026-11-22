@@ -145,12 +145,70 @@ The installer includes:
 | **Decrease Brightness** | `F13` | Decreases brightness by configurable step (default: -5%). |
 | **Preset 1 (Dim)** | `F15` | Instantly sets brightness to Preset 1 (default: 30%). |
 | **Preset 2 (Bright)** | `F16` | Instantly sets brightness to Preset 2 (default: 80%). |
+| **Preset Toggle** | `F17` | Toggles between Preset 1 and Preset 2 brightness levels. |
 | **Tray Scroll** | `Mouse Wheel` over Tray Icon | Increases/decreases brightness directly from the taskbar. |
 | **Tray Middle-Click** | `Middle-Click` on Tray Icon | Instantly jumps to the middle-click target level (default: 50%). |
 | **Open Quick Flyout** | `Left-Click` on Tray Icon | Opens the Windows 11 brightness slider flyout. |
 | **Open Settings** | `Right-Click` Tray Icon → *Settings* | Opens the full configuration window. |
 
 *(All hotkeys and gestures can be remapped or toggled on/off in the Settings window.)*
+
+---
+
+## 💻 Command-Line Interface (CLI)
+
+ClickBrightness features a fast, low-overhead CLI with single-instance Inter-Process Communication (IPC). You can easily integrate ClickBrightness into scripts, batch files, Task Scheduler, Stream Deck keys, or terminal workflows:
+
+- If ClickBrightness is **already running**, CLI commands signal the background instance instantly without launching duplicate processes.
+- If ClickBrightness is **not running**, standalone commands (`--get`, `--monitors`, `--help`) execute and exit cleanly without starting a background service, while adjustment commands launch the service directly into the system tray.
+
+### Command Reference
+
+| Command | Short Flag | Description |
+| :--- | :--- | :--- |
+| `--set <0-100>` | `-b <0-100>`, `--brightness <0-100>` | Set hardware brightness to an exact percentage (e.g. `--set 65`). |
+| `--up [step]` | — | Increase brightness by `step`% (or configured step if omitted). |
+| `--down [step]` | — | Decrease brightness by `step`% (or configured step if omitted). |
+| `--toggle` | `-t` | Toggle between Preset 1 and Preset 2 brightness levels. |
+| `--preset <1\|2>` | `-p <1\|2>`, `--preset1`, `--preset2` | Jump directly to Preset 1 or Preset 2 brightness level. |
+| `--get` | `-g` | Query and print current monitor brightness percentage to the console. |
+| `--monitors` | `-m` | List all detected DDC/CI physical displays, friendly names, and ranges. |
+| `--flyout` | `-f` | Open the Windows 11 brightness slider flyout popup near the tray. |
+| `--settings` | `-s` | Open or bring the Settings window to the front. |
+| `--exit` | `-e` | Cleanly terminate the running background application. |
+| `--help` | `-h`, `/?` | Display command-line usage and examples. |
+
+### Options & Modifiers
+
+| Option | Description |
+| :--- | :--- |
+| `--osd` | Display the on-screen brightness banner during adjustment (default). |
+| `--no-osd` | Suppress the on-screen display banner (silent hardware adjustment). |
+
+### CLI Examples
+
+```cmd
+:: Set brightness to 75%
+ClickBrightness.exe --set 75
+
+:: Silent brightness change without showing the OSD overlay
+ClickBrightness.exe --set 30 --no-osd
+
+:: Increase brightness by 10%
+ClickBrightness.exe --up 10
+
+:: Toggle between configured day/night presets
+ClickBrightness.exe --toggle
+
+:: Query current brightness
+ClickBrightness.exe --get
+
+:: List all connected DDC/CI displays
+ClickBrightness.exe --monitors
+
+:: Open flyout slider
+ClickBrightness.exe --flyout
+```
 
 ---
 

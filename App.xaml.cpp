@@ -24,6 +24,7 @@
 #include "SettingsWindow.xaml.h"
 #include "HotkeyManager.h"
 #include "ThemeHelper.h"
+#include "CliParser.h"
 #include "resource.h"
 
 #include <strsafe.h>
@@ -56,6 +57,86 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
 
     switch (uMsg)
     {
+    case WM_COPYDATA:
+    {
+        PCOPYDATASTRUCT pcds = (PCOPYDATASTRUCT)lParam;
+        if (pcds && pcds->lpData && pcds->dwData == 0xCB01)
+        {
+            std::wstring cmdStr = (const wchar_t*)pcds->lpData;
+            CliCommand cmd = ParseCommandLine(cmdStr);
+            switch (cmd.action)
+            {
+            case CliAction::GetBrightness:
+            {
+                int b = g_MonitorManager.GetCachedBrightness();
+                return (LRESULT)(b + 1); // +1 offset so 0% brightness returns non-zero
+            }
+            case CliAction::SetBrightness:
+            {
+                if (cmd.value >= 0 && cmd.value <= 100)
+                {
+                    g_OverlayWindow.TriggerBrightnessSet(cmd.value, cmd.showOsd);
+                }
+                return 1;
+            }
+            case CliAction::StepUp:
+            {
+                int delta = (cmd.value > 0) ? cmd.value : g_Settings.hotkeyStep;
+                g_OverlayWindow.TriggerBrightnessDelta(+delta, cmd.showOsd);
+                return 1;
+            }
+            case CliAction::StepDown:
+            {
+                int delta = (cmd.value > 0) ? cmd.value : g_Settings.hotkeyStep;
+                g_OverlayWindow.TriggerBrightnessDelta(-delta, cmd.showOsd);
+                return 1;
+            }
+            case CliAction::Preset1:
+            {
+                g_OverlayWindow.TriggerBrightnessSet(g_Settings.hotkeyPreset1Brightness, cmd.showOsd);
+                return 1;
+            }
+            case CliAction::Preset2:
+            {
+                g_OverlayWindow.TriggerBrightnessSet(g_Settings.hotkeyPreset2Brightness, cmd.showOsd);
+                return 1;
+            }
+            case CliAction::Toggle:
+            {
+                int curB = g_MonitorManager.GetCachedBrightness();
+                int p1 = g_Settings.hotkeyPresetToggle1Brightness;
+                int p2 = g_Settings.hotkeyPresetToggle2Brightness;
+                int target = (curB == p1) ? p2 : ((curB == p2) ? p1 : (abs(curB - p1) < abs(curB - p2) ? p2 : p1));
+                g_OverlayWindow.TriggerBrightnessSet(target, cmd.showOsd);
+                return 1;
+            }
+            case CliAction::ShowFlyout:
+            {
+                POINT pt;
+                GetCursorPos(&pt);
+                g_FlyoutWindow.Show(&pt);
+                return 1;
+            }
+            case CliAction::ShowSettings:
+            {
+                ShowSettingsWindow();
+                return 1;
+            }
+            case CliAction::Exit:
+            {
+                PostMessageW(hwnd, WM_COMMAND, MAKEWPARAM(IDM_TRAY_EXIT, 0), 0);
+                return 1;
+            }
+            default:
+            {
+                ShowSettingsWindow();
+                return 1;
+            }
+            }
+        }
+        return 0;
+    }
+
     case WM_APP_BRIGHTNESS_UPDATED:
     {
         g_TrayIcon.UpdateBrightness((int)wParam);
@@ -514,6 +595,7 @@ namespace winrt::BrightnessApp::implementation
             // Register display standby notification to prevent waking sleeping monitors
             if (g_hMainWnd)
             {
+                ChangeWindowMessageFilterEx(g_hMainWnd, WM_COPYDATA, MSGFLT_ALLOW, NULL);
                 s_hPowerNotify = RegisterPowerSettingNotification(g_hMainWnd, &GUID_MONITOR_POWER_ON, DEVICE_NOTIFY_WINDOW_HANDLE);
             }
 
@@ -577,17 +659,71 @@ namespace winrt::BrightnessApp::implementation
                 }
             });
 
-            // Check command line for --settings / -s
+            // Check command line for initial actions
             LPWSTR cmdLine = GetCommandLineW();
-            bool openSettings = (cmdLine && (wcsstr(cmdLine, L"--settings") || wcsstr(cmdLine, L"-s")));
+            CliCommand cmd = ParseCommandLine(cmdLine ? cmdLine : L"");
 
-            if (openSettings)
+            switch (cmd.action)
             {
+            case CliAction::ShowSettings:
                 ShowSettingsWindow();
-            }
-            else
+                break;
+            case CliAction::ShowFlyout:
             {
+                POINT pt;
+                GetCursorPos(&pt);
+                g_FlyoutWindow.Show(&pt);
+                break;
+            }
+            case CliAction::SetBrightness:
+                if (cmd.value >= 0 && cmd.value <= 100)
+                {
+                    g_OverlayWindow.TriggerBrightnessSet(cmd.value, cmd.showOsd);
+                }
                 TrimProcessWorkingSetAsync();
+                break;
+            case CliAction::StepUp:
+            {
+                int delta = (cmd.value > 0) ? cmd.value : g_Settings.hotkeyStep;
+                g_OverlayWindow.TriggerBrightnessDelta(+delta, cmd.showOsd);
+                TrimProcessWorkingSetAsync();
+                break;
+            }
+            case CliAction::StepDown:
+            {
+                int delta = (cmd.value > 0) ? cmd.value : g_Settings.hotkeyStep;
+                g_OverlayWindow.TriggerBrightnessDelta(-delta, cmd.showOsd);
+                TrimProcessWorkingSetAsync();
+                break;
+            }
+            case CliAction::Preset1:
+                g_OverlayWindow.TriggerBrightnessSet(g_Settings.hotkeyPreset1Brightness, cmd.showOsd);
+                TrimProcessWorkingSetAsync();
+                break;
+            case CliAction::Preset2:
+                g_OverlayWindow.TriggerBrightnessSet(g_Settings.hotkeyPreset2Brightness, cmd.showOsd);
+                TrimProcessWorkingSetAsync();
+                break;
+            case CliAction::Toggle:
+            {
+                int curB = g_MonitorManager.GetCachedBrightness();
+                int p1 = g_Settings.hotkeyPresetToggle1Brightness;
+                int p2 = g_Settings.hotkeyPresetToggle2Brightness;
+                int target = (curB == p1) ? p2 : ((curB == p2) ? p1 : (abs(curB - p1) < abs(curB - p2) ? p2 : p1));
+                g_OverlayWindow.TriggerBrightnessSet(target, cmd.showOsd);
+                TrimProcessWorkingSetAsync();
+                break;
+            }
+            default:
+                if (cmdLine && (wcsstr(cmdLine, L"--settings") || wcsstr(cmdLine, L"-s")))
+                {
+                    ShowSettingsWindow();
+                }
+                else
+                {
+                    TrimProcessWorkingSetAsync();
+                }
+                break;
             }
         }
         catch (...)

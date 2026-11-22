@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "App.xaml.h"
 #include "resource.h"
+#include "CliParser.h"
+#include "MonitorManager.h"
 
 #pragma comment(lib, "dwmapi.lib")
 #pragma comment(lib, "dxva2.lib")
@@ -21,65 +23,109 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     HANDLE hMutex = CreateMutexW(NULL, TRUE, L"ClickBrightness_v1.0.6_SingleInstance_Mutex");
     if (GetLastError() == ERROR_ALREADY_EXISTS)
     {
-        const wchar_t* targetEvent = nullptr;
-        if (pCmdLine && (wcsstr(pCmdLine, L"--exit") || wcsstr(pCmdLine, L"-e")))
+        std::wstring fullCmd = (pCmdLine ? pCmdLine : L"");
+        CliCommand cmd = ParseCommandLine(fullCmd);
+
+        if (cmd.action == CliAction::Help)
         {
-            targetEvent = EVENT_NAME_EXIT;
+            PrintToConsole(GetHelpText());
+            if (hMutex) CloseHandle(hMutex);
+            return 0;
         }
-        else if (pCmdLine && (wcsstr(pCmdLine, L"--settings") || wcsstr(pCmdLine, L"-s")))
+
+        if (cmd.action == CliAction::ListMonitors)
         {
-            targetEvent = EVENT_NAME_SHOW_SETTINGS;
+            MonitorManager monMgr;
+            monMgr.Initialize();
+            PrintToConsole(GetMonitorsText(monMgr));
+            monMgr.Cleanup();
+            if (hMutex) CloseHandle(hMutex);
+            return 0;
         }
-        else if (pCmdLine && wcsstr(pCmdLine, L"--up"))
+
+        HWND hExisting = FindWindowW(L"ClickBrightness_MessageWndClass", L"ClickBrightness_HiddenMsgWindow");
+        if (!hExisting)
         {
-            targetEvent = EVENT_NAME_BRIGHTNESS_UP;
+            hExisting = FindWindowW(L"ClickBrightness_MessageWndClass", NULL);
         }
-        else if (pCmdLine && wcsstr(pCmdLine, L"--down"))
+
+        if (hExisting)
         {
-            targetEvent = EVENT_NAME_BRIGHTNESS_DOWN;
+            COPYDATASTRUCT cds;
+            cds.dwData = 0xCB01;
+            cds.cbData = (DWORD)((fullCmd.length() + 1) * sizeof(wchar_t));
+            cds.lpData = (PVOID)fullCmd.c_str();
+
+            LRESULT lr = SendMessageW(hExisting, WM_COPYDATA, (WPARAM)NULL, (LPARAM)&cds);
+
+            if (cmd.action == CliAction::GetBrightness)
+            {
+                if (lr > 0)
+                {
+                    int b = (int)lr - 1;
+                    PrintToConsole(L"Current Brightness: " + std::to_wstring(b) + L"%\r\n");
+                    if (hMutex) CloseHandle(hMutex);
+                    return b;
+                }
+            }
         }
         else
         {
-            targetEvent = EVENT_NAME_SHOW_SETTINGS;
-        }
+            // Fallback: signal named IPC event (cross-desktop compatible)
+            const wchar_t* targetEvent = nullptr;
+            if (cmd.action == CliAction::Exit) targetEvent = EVENT_NAME_EXIT;
+            else if (cmd.action == CliAction::StepUp) targetEvent = EVENT_NAME_BRIGHTNESS_UP;
+            else if (cmd.action == CliAction::StepDown) targetEvent = EVENT_NAME_BRIGHTNESS_DOWN;
+            else targetEvent = EVENT_NAME_SHOW_SETTINGS;
 
-        if (targetEvent)
-        {
-            // 1. Signal named IPC event (cross-desktop compatible)
             HANDLE hEvt = OpenEventW(EVENT_MODIFY_STATE, FALSE, targetEvent);
             if (hEvt)
             {
                 SetEvent(hEvt);
                 CloseHandle(hEvt);
             }
-
-            // 2. Fallback: post message to hidden window if on the same desktop
-            HWND hExisting = FindWindowW(L"ClickBrightness_MessageWndClass", L"ClickBrightness_HiddenMsgWindow");
-            if (!hExisting)
-            {
-                hExisting = FindWindowW(L"ClickBrightness_MessageWndClass", NULL);
-            }
-            if (hExisting)
-            {
-                if (targetEvent == EVENT_NAME_EXIT)
-                {
-                    PostMessageW(hExisting, WM_COMMAND, MAKEWPARAM(IDM_TRAY_EXIT, 0), 0);
-                }
-                else if (targetEvent == EVENT_NAME_BRIGHTNESS_UP)
-                {
-                    PostMessageW(hExisting, WM_HOTKEY, ID_HOTKEY_UP, 0);
-                }
-                else if (targetEvent == EVENT_NAME_BRIGHTNESS_DOWN)
-                {
-                    PostMessageW(hExisting, WM_HOTKEY, ID_HOTKEY_DOWN, 0);
-                }
-                else if (targetEvent == EVENT_NAME_SHOW_SETTINGS)
-                {
-                    PostMessageW(hExisting, WM_COMMAND, MAKEWPARAM(IDM_TRAY_OPTIONS, 0), 0);
-                }
-            }
         }
+
         if (hMutex) CloseHandle(hMutex);
+        return 0;
+    }
+
+    // App is NOT running: handle standalone CLI-only requests before starting GUI
+    std::wstring fullCmd = (pCmdLine ? pCmdLine : L"");
+    CliCommand cmd = ParseCommandLine(fullCmd);
+
+    if (cmd.action == CliAction::Help)
+    {
+        PrintToConsole(GetHelpText());
+        if (hMutex) { ReleaseMutex(hMutex); CloseHandle(hMutex); }
+        return 0;
+    }
+
+    if (cmd.action == CliAction::GetBrightness)
+    {
+        MonitorManager monMgr;
+        monMgr.Initialize();
+        int b = monMgr.GetCurrentBrightness();
+        PrintToConsole(L"Current Brightness: " + std::to_wstring(b) + L"%\r\n");
+        monMgr.Cleanup();
+        if (hMutex) { ReleaseMutex(hMutex); CloseHandle(hMutex); }
+        return b;
+    }
+
+    if (cmd.action == CliAction::ListMonitors)
+    {
+        MonitorManager monMgr;
+        monMgr.Initialize();
+        PrintToConsole(GetMonitorsText(monMgr));
+        monMgr.Cleanup();
+        if (hMutex) { ReleaseMutex(hMutex); CloseHandle(hMutex); }
+        return 0;
+    }
+
+    if (cmd.action == CliAction::Exit)
+    {
+        PrintToConsole(L"ClickBrightness is not running.\r\n");
+        if (hMutex) { ReleaseMutex(hMutex); CloseHandle(hMutex); }
         return 0;
     }
 
