@@ -770,7 +770,7 @@ namespace winrt::BrightnessApp::implementation
                     if (rcOverflow.left - width - DpiHelper::Scale(2, dpi) >= mi.rcWork.left)
                     {
                         x = rcOverflow.left - width - DpiHelper::Scale(2, dpi);
-                        y = mi.rcWork.bottom - height - DpiHelper::Scale(14, dpi);
+                        y = mi.rcWork.bottom - height - DpiHelper::Scale(12, dpi);
                     }
                     else
                     {
@@ -785,40 +785,40 @@ namespace winrt::BrightnessApp::implementation
             switch (edge)
             {
             case TaskbarEdge::Left:
-                x = (rcIcon.right > rcIcon.left) ? (rcIcon.right + DpiHelper::Scale(8, dpi)) : (mi.rcWork.left + DpiHelper::Scale(8, dpi));
+                x = mi.rcWork.left + DpiHelper::Scale(12, dpi);
                 y = (rcIcon.bottom > rcIcon.top) ? (rcIcon.bottom - height) : (pt.y - height / 2);
                 break;
             case TaskbarEdge::Right:
-                x = (rcIcon.right > rcIcon.left) ? (rcIcon.left - width - DpiHelper::Scale(8, dpi)) : (mi.rcWork.right - width - DpiHelper::Scale(8, dpi));
+                x = mi.rcWork.right - width - DpiHelper::Scale(12, dpi);
                 y = (rcIcon.bottom > rcIcon.top) ? (rcIcon.bottom - height) : (pt.y - height / 2);
                 break;
             case TaskbarEdge::Top:
                 x = pt.x - width / 2;
-                y = mi.rcWork.top + DpiHelper::Scale(8, dpi);
+                y = mi.rcWork.top + DpiHelper::Scale(12, dpi);
                 break;
             case TaskbarEdge::Bottom:
             default:
                 x = pt.x - width / 2;
-                y = mi.rcWork.bottom - height - DpiHelper::Scale(14, dpi);
+                y = mi.rcWork.bottom - height - DpiHelper::Scale(12, dpi);
                 break;
             }
         }
 
         if (x + width > mi.rcWork.right)
         {
-            x = mi.rcWork.right - width - DpiHelper::Scale(8, dpi);
+            x = mi.rcWork.right - width - DpiHelper::Scale(12, dpi);
         }
         if (x < mi.rcWork.left)
         {
-            x = mi.rcWork.left + DpiHelper::Scale(8, dpi);
+            x = mi.rcWork.left + DpiHelper::Scale(12, dpi);
         }
         if (y + height > mi.rcWork.bottom)
         {
-            y = mi.rcWork.bottom - height - DpiHelper::Scale(14, dpi);
+            y = mi.rcWork.bottom - height - DpiHelper::Scale(12, dpi);
         }
         if (y < mi.rcWork.top)
         {
-            y = mi.rcWork.top + DpiHelper::Scale(8, dpi);
+            y = mi.rcWork.top + DpiHelper::Scale(12, dpi);
         }
 
         m_showTick = GetTickCount64();
