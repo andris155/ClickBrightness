@@ -794,12 +794,12 @@ namespace winrt::BrightnessApp::implementation
                 break;
             case TaskbarEdge::Top:
                 x = pt.x - width / 2;
-                y = (rcIcon.bottom > rcIcon.top) ? (rcIcon.bottom + DpiHelper::Scale(8, dpi)) : (mi.rcWork.top + DpiHelper::Scale(8, dpi));
+                y = mi.rcWork.top + DpiHelper::Scale(8, dpi);
                 break;
             case TaskbarEdge::Bottom:
             default:
                 x = pt.x - width / 2;
-                y = (rcIcon.bottom > rcIcon.top) ? (rcIcon.top - height - DpiHelper::Scale(8, dpi)) : (mi.rcWork.bottom - height - DpiHelper::Scale(14, dpi));
+                y = mi.rcWork.bottom - height - DpiHelper::Scale(14, dpi);
                 break;
             }
         }
