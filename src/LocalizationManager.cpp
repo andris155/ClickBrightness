@@ -404,6 +404,8 @@ void LocalizationManager::LoadBuiltInDefaults() {
         { L"Desc_FlyoutScrollEnabled", L"Adjust brightness by scrolling the mouse wheel over the flyout slider" },
         { L"Opt_FlyoutScrollStep", L"Scrolling Brightness Step" },
         { L"Desc_FlyoutScrollStep", L"Percentage adjustment per mouse wheel notch on the flyout slider" },
+        { L"Opt_FlyoutKeyboardEnabled", L"Keyboard Controls" },
+        { L"Desc_FlyoutKeyboardEnabled", L"Adjust brightness using keyboard arrow keys, Page Up/Down, and Home/End" },
         { L"Sec_FlyoutTimingDelay", L"Timing & Hardware Delay" },
         { L"Opt_FlyoutScrollDelay", L"Slider Scrolling Delay" },
         { L"Desc_FlyoutScrollDelay", L"Debounce rapid mouse wheel scrolling before hardware adjustments" },

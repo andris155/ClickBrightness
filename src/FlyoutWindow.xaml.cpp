@@ -70,13 +70,31 @@ namespace winrt::BrightnessApp::implementation
         RootGrid().KeyDown([this](auto&&, winrt::Microsoft::UI::Xaml::Input::KeyRoutedEventArgs const& e)
         {
             auto key = e.Key();
-            int step = g_Settings.flyoutScrollStep > 0 ? g_Settings.flyoutScrollStep : 5;
             if (key == winrt::Windows::System::VirtualKey::Escape)
             {
                 HideWindow();
                 e.Handled(true);
+                return;
             }
-            else if (key == winrt::Windows::System::VirtualKey::Up || key == winrt::Windows::System::VirtualKey::Right)
+
+            if (!g_Settings.flyoutKeyboardEnabled)
+            {
+                if (key == winrt::Windows::System::VirtualKey::Up ||
+                    key == winrt::Windows::System::VirtualKey::Down ||
+                    key == winrt::Windows::System::VirtualKey::Left ||
+                    key == winrt::Windows::System::VirtualKey::Right ||
+                    key == winrt::Windows::System::VirtualKey::PageUp ||
+                    key == winrt::Windows::System::VirtualKey::PageDown ||
+                    key == winrt::Windows::System::VirtualKey::Home ||
+                    key == winrt::Windows::System::VirtualKey::End)
+                {
+                    e.Handled(true);
+                }
+                return;
+            }
+
+            int step = g_Settings.flyoutScrollStep > 0 ? g_Settings.flyoutScrollStep : 5;
+            if (key == winrt::Windows::System::VirtualKey::Up || key == winrt::Windows::System::VirtualKey::Right)
             {
                 OnScrollAdjust(m_brightness + step);
                 e.Handled(true);
@@ -105,6 +123,26 @@ namespace winrt::BrightnessApp::implementation
             {
                 OnButtonClicked(100);
                 e.Handled(true);
+            }
+        });
+
+        // Intercept keys on the slider before it handles them internally
+        BrightnessSlider().PreviewKeyDown([this](auto&&, winrt::Microsoft::UI::Xaml::Input::KeyRoutedEventArgs const& e)
+        {
+            if (!g_Settings.flyoutKeyboardEnabled)
+            {
+                auto key = e.Key();
+                if (key == winrt::Windows::System::VirtualKey::Up ||
+                    key == winrt::Windows::System::VirtualKey::Down ||
+                    key == winrt::Windows::System::VirtualKey::Left ||
+                    key == winrt::Windows::System::VirtualKey::Right ||
+                    key == winrt::Windows::System::VirtualKey::PageUp ||
+                    key == winrt::Windows::System::VirtualKey::PageDown ||
+                    key == winrt::Windows::System::VirtualKey::Home ||
+                    key == winrt::Windows::System::VirtualKey::End)
+                {
+                    e.Handled(true);
+                }
             }
         });
 
@@ -841,7 +879,11 @@ namespace winrt::BrightnessApp::implementation
             SetFocus(m_hwnd);
             try
             {
-                BrightnessSlider().Focus(winrt::Microsoft::UI::Xaml::FocusState::Programmatic);
+                BrightnessSlider().IsTabStop(g_Settings.flyoutKeyboardEnabled);
+                if (g_Settings.flyoutKeyboardEnabled)
+                {
+                    BrightnessSlider().Focus(winrt::Microsoft::UI::Xaml::FocusState::Programmatic);
+                }
             }
             catch (...) {}
         }
@@ -910,12 +952,32 @@ namespace winrt::BrightnessApp::implementation
 
         if (uMsg == WM_KEYDOWN)
         {
+            if (wParam == VK_ESCAPE)
+            {
+                pThis->HideWindow();
+                return 0;
+            }
+
+            if (!g_Settings.flyoutKeyboardEnabled)
+            {
+                switch (wParam)
+                {
+                case VK_UP:
+                case VK_RIGHT:
+                case VK_DOWN:
+                case VK_LEFT:
+                case VK_PRIOR:
+                case VK_NEXT:
+                case VK_HOME:
+                case VK_END:
+                    return 0;
+                }
+                return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+            }
+
             int step = g_Settings.flyoutScrollStep > 0 ? g_Settings.flyoutScrollStep : 5;
             switch (wParam)
             {
-            case VK_ESCAPE:
-                pThis->HideWindow();
-                return 0;
             case VK_UP:
             case VK_RIGHT:
                 pThis->OnScrollAdjust(pThis->m_brightness + step);

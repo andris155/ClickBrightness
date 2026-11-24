@@ -92,6 +92,7 @@ struct AppSettings {
     COLORREF flyoutAccentColor = RGB(0, 120, 212);  // Default: #0078D4
     bool flyoutScrollEnabled = true;         // Default: ON
     int flyoutScrollStep = 5;                // Default: 5%
+    bool flyoutKeyboardEnabled = false;      // Default: OFF (Keyboard buttons support: Up/Down arrow, Page Up/Down, Home/End)
     bool flyoutScrollDelayEnabled = true;    // Default: ON
     int flyoutScrollDelayMs = 1000;          // Default: 1000 ms (1 second)
     bool flyoutButtonDelayEnabled = false;   // Default: OFF

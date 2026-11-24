@@ -167,6 +167,8 @@ void AppSettings::Load() {
     flyoutScrollStep = GetPrivateProfileIntW(L"Flyout", L"ScrollStep", 5, ini.c_str());
     if (flyoutScrollStep < 1 || flyoutScrollStep > 50) flyoutScrollStep = 5;
 
+    flyoutKeyboardEnabled = (GetPrivateProfileIntW(L"Flyout", L"KeyboardEnabled", 0, ini.c_str()) != 0);
+
     flyoutScrollDelayEnabled = (GetPrivateProfileIntW(L"Flyout", L"ScrollDelayEnabled", GetPrivateProfileIntW(L"Flyout", L"DelayEnabled", 1, ini.c_str()), ini.c_str()) != 0);
     flyoutScrollDelayMs = GetPrivateProfileIntW(L"Flyout", L"ScrollWaitTimeMs", GetPrivateProfileIntW(L"Flyout", L"WaitTimeMs", 1000, ini.c_str()), ini.c_str());
     if (flyoutScrollDelayMs < 100 || flyoutScrollDelayMs > 3000) flyoutScrollDelayMs = 1000;
@@ -270,6 +272,7 @@ void AppSettings::Save() const {
     WritePrivateProfileStringW(L"Flyout", L"AccentColor", FormatColor(flyoutAccentColor).c_str(), ini.c_str());
     WritePrivateProfileStringW(L"Flyout", L"ScrollEnabled", flyoutScrollEnabled ? L"1" : L"0", ini.c_str());
     WritePrivateProfileStringW(L"Flyout", L"ScrollStep", std::to_wstring(flyoutScrollStep).c_str(), ini.c_str());
+    WritePrivateProfileStringW(L"Flyout", L"KeyboardEnabled", flyoutKeyboardEnabled ? L"1" : L"0", ini.c_str());
     WritePrivateProfileStringW(L"Flyout", L"ScrollDelayEnabled", flyoutScrollDelayEnabled ? L"1" : L"0", ini.c_str());
     WritePrivateProfileStringW(L"Flyout", L"ScrollWaitTimeMs", std::to_wstring(flyoutScrollDelayMs).c_str(), ini.c_str());
     WritePrivateProfileStringW(L"Flyout", L"ButtonDelayEnabled", flyoutButtonDelayEnabled ? L"1" : L"0", ini.c_str());

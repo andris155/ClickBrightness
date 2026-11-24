@@ -632,6 +632,7 @@ namespace winrt::BrightnessApp::implementation
                 // Flyout Slider
                 { g_Loc.Get(L"Opt_FlyoutScrollEnabled", L"Slider Scrolling").c_str(), catFlyout, L"flyout slider scroll wheel mouse enable", L"FlyoutSlider", FlyoutScrollEnabledToggle() },
                 { g_Loc.Get(L"Opt_FlyoutScrollStep", L"Scrolling Brightness Step").c_str(), catFlyout, L"flyout slider scroll step percentage", L"FlyoutSlider", FlyoutScrollStepComboBox() },
+                { g_Loc.Get(L"Opt_FlyoutKeyboardEnabled", L"Keyboard Controls").c_str(), catFlyout, L"flyout keyboard arrow keys buttons navigation", L"FlyoutSlider", FlyoutKeyboardEnabledToggle() },
                 { g_Loc.Get(L"Opt_FlyoutScrollDelay", L"Slider Scrolling Delay").c_str(), catFlyout, L"flyout slider scroll delay debounce", L"FlyoutSlider", FlyoutScrollDelayToggle() },
                 { g_Loc.Get(L"Opt_FlyoutScrollWaitTime", L"Scrolling Wait Time (ms)").c_str(), catFlyout, L"flyout slider scroll wait time ms", L"FlyoutSlider", FlyoutScrollDelaySlider() },
                 { g_Loc.Get(L"Opt_FlyoutButtonDelay", L"Button Clicking Delay").c_str(), catFlyout, L"flyout button click delay debounce", L"FlyoutSlider", FlyoutButtonDelayToggle() },
@@ -1502,6 +1503,16 @@ namespace winrt::BrightnessApp::implementation
             }
         });
 
+        // Flyout Keyboard Enabled Toggle
+        FlyoutKeyboardEnabledToggle().Toggled([this](auto&&, auto&&)
+        {
+            bool on = FlyoutKeyboardEnabledToggle().IsOn();
+            FlyoutKeyboardEnabledStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+            if (m_isUpdatingUI) return;
+            g_Settings.flyoutKeyboardEnabled = on;
+            ApplyAndSave();
+        });
+
         // Flyout Scroll Delay Toggle
         FlyoutScrollDelayToggle().Toggled([this](auto&&, auto&&)
         {
@@ -1679,6 +1690,7 @@ namespace winrt::BrightnessApp::implementation
             g_Settings.flyoutAccentColor = RGB(0, 120, 212);
             g_Settings.flyoutScrollEnabled = true;
             g_Settings.flyoutScrollStep = 5;
+            g_Settings.flyoutKeyboardEnabled = false;
             g_Settings.flyoutScrollDelayEnabled = true;
             g_Settings.flyoutScrollDelayMs = 1000;
             g_Settings.flyoutButtonDelayEnabled = false;
@@ -2224,6 +2236,9 @@ namespace winrt::BrightnessApp::implementation
         FlyoutScrollEnabledStatusText().Text(FlyoutScrollEnabledToggle().IsOn() ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
         FlyoutScrollStepTitleText().Text(g_Loc.Get(L"Opt_FlyoutScrollStep", L"Scrolling Brightness Step"));
         FlyoutScrollStepDescText().Text(g_Loc.Get(L"Desc_FlyoutScrollStep", L"Percentage adjustment per mouse wheel notch on the flyout slider"));
+        FlyoutKeyboardEnabledTitleText().Text(g_Loc.Get(L"Opt_FlyoutKeyboardEnabled", L"Keyboard Controls"));
+        FlyoutKeyboardEnabledDescText().Text(g_Loc.Get(L"Desc_FlyoutKeyboardEnabled", L"Adjust brightness using keyboard arrow keys, Page Up/Down, and Home/End"));
+        FlyoutKeyboardEnabledStatusText().Text(FlyoutKeyboardEnabledToggle().IsOn() ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
         FlyoutTimingDelaySectionTitle().Text(g_Loc.Get(L"Sec_FlyoutTimingDelay", L"Timing & Hardware Delay"));
 
         FlyoutScrollDelayTitleText().Text(g_Loc.Get(L"Opt_FlyoutScrollDelay", L"Slider Scrolling Delay"));
@@ -2676,6 +2691,9 @@ namespace winrt::BrightnessApp::implementation
         FlyoutScrollDelayCard().Visibility(g_Settings.flyoutScrollEnabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
 
         FlyoutScrollStepComboBox().SelectedIndex(stepToIndex(g_Settings.flyoutScrollStep));
+
+        FlyoutKeyboardEnabledToggle().IsOn(g_Settings.flyoutKeyboardEnabled);
+        FlyoutKeyboardEnabledStatusText().Text(g_Settings.flyoutKeyboardEnabled ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
 
         FlyoutScrollDelayToggle().IsOn(g_Settings.flyoutScrollDelayEnabled);
         FlyoutScrollDelayStatusText().Text(g_Settings.flyoutScrollDelayEnabled ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));

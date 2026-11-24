@@ -159,6 +159,8 @@
   "Desc_FlyoutScrollEnabled": "Fényerő szabályozása az egérgörgő görgetésével a felugró csúszka felett",
   "Opt_FlyoutScrollStep": "Görgetési fényerőlépés",
   "Desc_FlyoutScrollStep": "Százalékos módosítás egérgörgő-fokonként a felugró csúszkán",
+  "Opt_FlyoutKeyboardEnabled": "Billentyűzetes vezérlés",
+  "Desc_FlyoutKeyboardEnabled": "Fényerő módosítása nyilakkal, Page Up/Down és Home/End gombokkal",
   "Sec_FlyoutTimingDelay": "Időzítés és hardveres késleltetés",
   "Opt_FlyoutScrollDelay": "Csúszka görgetési késleltetés",
   "Desc_FlyoutScrollDelay": "Gyors egérgörgetések pufferelése a hardveres módosítások előtt",

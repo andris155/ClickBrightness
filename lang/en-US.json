@@ -159,6 +159,8 @@
   "Desc_FlyoutScrollEnabled": "Adjust brightness by scrolling the mouse wheel over the flyout slider",
   "Opt_FlyoutScrollStep": "Scrolling Brightness Step",
   "Desc_FlyoutScrollStep": "Percentage adjustment per mouse wheel notch on the flyout slider",
+  "Opt_FlyoutKeyboardEnabled": "Keyboard Controls",
+  "Desc_FlyoutKeyboardEnabled": "Adjust brightness using keyboard arrow keys, Page Up/Down, and Home/End",
   "Sec_FlyoutTimingDelay": "Timing & Hardware Delay",
   "Opt_FlyoutScrollDelay": "Slider Scrolling Delay",
   "Desc_FlyoutScrollDelay": "Debounce rapid mouse wheel scrolling before hardware adjustments",
