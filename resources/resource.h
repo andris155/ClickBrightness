@@ -27,6 +27,7 @@
 #define IDT_GPU_RESET_COOLDOWN          3004
 #define IDT_OVERLAY_UNCLOAK             3005
 #define IDT_PRESET_TOGGLE_RELEASE       3006
+#define IDT_OVERLAY_ANIM                3007
 
 // Custom Windows Messages
 #define WM_APP_TRAYMSG                  (WM_APP + 1)

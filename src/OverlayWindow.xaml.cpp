@@ -20,6 +20,7 @@
 #include <dwmapi.h>
 #include <commctrl.h>
 #include <algorithm>
+#include <cmath>
 
 namespace winrt::BrightnessApp::implementation
 {
@@ -100,7 +101,7 @@ namespace winrt::BrightnessApp::implementation
 
             // 2. Window styles: toolwindow, topmost, noactivate, no edges
             LONG_PTR exStyle = GetWindowLongPtrW(m_hwnd, GWL_EXSTYLE);
-            exStyle &= ~(WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE | WS_EX_DLGMODALFRAME);
+            exStyle &= ~(WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE | WS_EX_DLGMODALFRAME | WS_EX_LAYERED);
             exStyle |= WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE;
             SetWindowLongPtrW(m_hwnd, GWL_EXSTYLE, exStyle);
 
@@ -343,10 +344,34 @@ namespace winrt::BrightnessApp::implementation
         if (dpi == 0) dpi = 96;
         int width = DpiHelper::Scale(194, dpi);
         int height = DpiHelper::Scale(47, dpi);
+        int marginBottom = DpiHelper::Scale(16, dpi);
+        m_slideOffset = height + marginBottom;
 
         int workW = mi.rcWork.right - mi.rcWork.left;
         int targetX = mi.rcWork.left + (workW - width) / 2;
-        int targetY = mi.rcWork.bottom - height - DpiHelper::Scale(60, dpi);
+        int targetY = mi.rcWork.bottom - height - marginBottom;
+
+        // Place right behind the monitor's taskbar in topmost Z-order so it emerges from under it
+        HWND hInsertAfter = HWND_TOPMOST;
+        HWND hTray = FindWindowW(L"Shell_TrayWnd", NULL);
+        if (hTray && MonitorFromWindow(hTray, MONITOR_DEFAULTTONEAREST) == hMon &&
+            (GetWindowLongPtrW(hTray, GWL_EXSTYLE) & WS_EX_TOPMOST))
+        {
+            hInsertAfter = hTray;
+        }
+        else
+        {
+            HWND hSecTray = NULL;
+            while ((hSecTray = FindWindowExW(NULL, hSecTray, L"Shell_SecondaryTrayWnd", NULL)) != NULL)
+            {
+                if (MonitorFromWindow(hSecTray, MONITOR_DEFAULTTONEAREST) == hMon &&
+                    (GetWindowLongPtrW(hSecTray, GWL_EXSTYLE) & WS_EX_TOPMOST))
+                {
+                    hInsertAfter = hSecTray;
+                    break;
+                }
+            }
+        }
 
         bool sizeChanged = (m_lastW != width || m_lastH != height);
         bool posChanged = (m_lastX != targetX || m_lastY != targetY || sizeChanged);
@@ -366,14 +391,33 @@ namespace winrt::BrightnessApp::implementation
             SetupBackdrop();
             BOOL cloak = TRUE;
             DwmSetWindowAttribute(m_hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
-            SetWindowPos(m_hwnd, HWND_TOPMOST, targetX, targetY, width, height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            m_currentY = targetY + m_slideOffset;
+            SetWindowPos(m_hwnd, hInsertAfter, targetX, m_currentY, width, height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
             RootGrid().UpdateLayout();
             SetTimer(m_hwnd, IDT_OVERLAY_UNCLOAK, 16, NULL);
             m_isVisible = true;
+            m_animState = AnimState::Showing;
+        }
+        else if (m_animState == AnimState::Hiding)
+        {
+            if (posChanged)
+            {
+                SetWindowPos(m_hwnd, hInsertAfter, targetX, m_currentY, width, height, swpFlags);
+            }
+            StartShowAnimation();
+        }
+        else if (m_animState == AnimState::Showing)
+        {
+            if (posChanged)
+            {
+                m_animEndY = targetY;
+                SetWindowPos(m_hwnd, hInsertAfter, targetX, m_currentY, width, height, swpFlags);
+            }
         }
         else if (posChanged)
         {
-            SetWindowPos(m_hwnd, HWND_TOPMOST, targetX, targetY, width, height, swpFlags | SWP_NOZORDER);
+            m_currentY = targetY;
+            SetWindowPos(m_hwnd, hInsertAfter, targetX, targetY, width, height, swpFlags);
         }
     }
 
@@ -542,6 +586,117 @@ namespace winrt::BrightnessApp::implementation
         }
     }
 
+    void OverlayWindow::StopAnimation()
+    {
+        if (m_renderingToken.value != 0)
+        {
+            try
+            {
+                winrt::Microsoft::UI::Xaml::Media::CompositionTarget::Rendering(m_renderingToken);
+            }
+            catch (...) {}
+            m_renderingToken = {};
+        }
+    }
+
+    void OverlayWindow::StartShowAnimation()
+    {
+        if (!m_hwnd) return;
+        m_animState = AnimState::Showing;
+        m_animStartY = m_currentY;
+        m_animEndY = m_lastY;
+        m_animDurationMs = 180.0;
+        QueryPerformanceCounter(&m_animStartQpc);
+        if (m_renderingToken.value == 0)
+        {
+            m_renderingToken = winrt::Microsoft::UI::Xaml::Media::CompositionTarget::Rendering(
+                [this](auto&&, auto&&) { UpdateAnimation(); });
+        }
+    }
+
+    void OverlayWindow::StartHideAnimation()
+    {
+        if (!m_hwnd || !m_isVisible) return;
+        if (m_animState == AnimState::Hiding) return;
+        m_animState = AnimState::Hiding;
+        m_animStartY = m_currentY;
+        m_animEndY = m_lastY + m_slideOffset;
+        m_animDurationMs = 150.0;
+        QueryPerformanceCounter(&m_animStartQpc);
+        if (m_renderingToken.value == 0)
+        {
+            m_renderingToken = winrt::Microsoft::UI::Xaml::Media::CompositionTarget::Rendering(
+                [this](auto&&, auto&&) { UpdateAnimation(); });
+        }
+    }
+
+    void OverlayWindow::UpdateAnimation()
+    {
+        if (!m_hwnd || m_animState == AnimState::None)
+        {
+            StopAnimation();
+            return;
+        }
+
+        static LARGE_INTEGER s_freq = []() {
+            LARGE_INTEGER f{};
+            QueryPerformanceFrequency(&f);
+            return f;
+        }();
+
+        LARGE_INTEGER now;
+        QueryPerformanceCounter(&now);
+        double elapsedMs = (double)(now.QuadPart - m_animStartQpc.QuadPart) * 1000.0 / (double)s_freq.QuadPart;
+        double t = (m_animDurationMs > 0.0) ? (elapsedMs / m_animDurationMs) : 1.0;
+        if (t < 0.0) t = 0.0;
+        if (t >= 1.0) t = 1.0;
+
+        double eased = (m_animState == AnimState::Showing)
+            ? (1.0 - std::pow(1.0 - t, 3.0))
+            : (t * t);
+
+        int newY = m_animStartY + static_cast<int>(std::round((m_animEndY - m_animStartY) * eased));
+        if (newY != m_currentY)
+        {
+            m_currentY = newY;
+            SetWindowPos(m_hwnd, NULL, m_lastX, m_currentY, 0, 0,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOSENDCHANGING | SWP_NOCOPYBITS | SWP_DEFERERASE);
+        }
+
+        if (t >= 1.0)
+        {
+            StopAnimation();
+            if (m_animState == AnimState::Hiding)
+            {
+                FinishHide();
+            }
+            else
+            {
+                m_animState = AnimState::None;
+            }
+        }
+    }
+
+    void OverlayWindow::FinishHide()
+    {
+        StopAnimation();
+        if (m_hwnd)
+        {
+            KillTimer(m_hwnd, IDT_OVERLAY_UNCLOAK);
+        }
+        m_animState = AnimState::None;
+        m_isVisible = false;
+        m_hideAfterTick = 0;
+        m_lastX = -999999;
+        m_lastY = -999999;
+        if (m_hwnd)
+        {
+            BOOL cloak = TRUE;
+            DwmSetWindowAttribute(m_hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
+            ::ShowWindow(m_hwnd, SW_HIDE);
+        }
+    }
+
     void OverlayWindow::HideWindow()
     {
         if (m_hwnd)
@@ -553,21 +708,13 @@ namespace winrt::BrightnessApp::implementation
 
         if (m_isVisible)
         {
-            m_isVisible = false;
-            m_hideAfterTick = 0;
-            m_lastX = -999999;
-            m_lastY = -999999;
-            if (m_hwnd)
-            {
-                BOOL cloak = TRUE;
-                DwmSetWindowAttribute(m_hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
-                ::ShowWindow(m_hwnd, SW_HIDE);
-            }
+            StartHideAnimation();
         }
     }
 
     void OverlayWindow::DestroyWindow()
     {
+        StopAnimation();
         ApplyPendingBrightness();
         HWND h = m_hwnd;
         m_hwnd = NULL;
@@ -630,6 +777,7 @@ namespace winrt::BrightnessApp::implementation
                 {
                     BOOL cloak = FALSE;
                     DwmSetWindowAttribute(hWnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
+                    pThis->StartShowAnimation();
                 }
                 return 0;
             }
