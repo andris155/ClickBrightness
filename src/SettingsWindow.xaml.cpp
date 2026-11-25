@@ -615,8 +615,12 @@ namespace winrt::BrightnessApp::implementation
                 { g_Loc.Get(L"Opt_OverlayCustomAccent", L"Custom Accent Color").c_str(), catOsd, L"osd overlay custom accent color picker", L"OSD", OverlayAccentColorPickerButton() },
 
                 // System Tray
-                { g_Loc.Get(L"Opt_TrayShowPercentage", L"Show Percentage Icon").c_str(), catTray, L"tray percentage icon show disable font number live", L"Tray", TrayShowPercentageToggle() },
+                { g_Loc.Get(L"Opt_TrayShowPercentage", L"Percentage Icon").c_str(), catTray, L"tray percentage icon show disable colored follow windows font number live", L"Tray", TrayPercentageModeComboBox() },
+                { g_Loc.Get(L"Opt_TrayIconColor", L"Icon Color").c_str(), catTray, L"tray icon percentage custom color picker light mode", L"Tray", TrayIconColorPickerButton() },
+                { g_Loc.Get(L"Opt_TrayIconDualColor", L"Separate Dark & Light Colors").c_str(), catTray, L"tray icon percentage dual separate dark light color", L"Tray", TrayIconDualColorToggle() },
+                { g_Loc.Get(L"Opt_TrayIconColorDark", L"Dark Mode Color").c_str(), catTray, L"tray icon percentage custom dark mode color picker", L"Tray", TrayIconDarkColorPickerButton() },
                 { g_Loc.Get(L"Opt_TrayFont", L"Tray Icon Font").c_str(), catTray, L"tray font family typography", L"Tray", TrayFontComboBox() },
+                { g_Loc.Get(L"Opt_TrayFontWeight", L"Font Weight").c_str(), catTray, L"tray font weight bold light semilight thin", L"Tray", TrayFontWeightSlider() },
                 { g_Loc.Get(L"Opt_TrayFontSize", L"Tray Font Size (%)").c_str(), catTray, L"tray font size scale", L"Tray", TrayFontSizeSlider() },
                 { g_Loc.Get(L"Opt_TrayFontSize100", L"100% Width (%)").c_str(), catTray, L"tray 100 width scale", L"Tray", TrayFontSize100Slider() },
                 { g_Loc.Get(L"Opt_TrayYOffset", L"Vertical Offset (px)").c_str(), catTray, L"tray vertical offset y baseline", L"Tray", TrayYOffsetSlider() },
@@ -1221,14 +1225,32 @@ namespace winrt::BrightnessApp::implementation
             g_OverlayWindow.OnThemeChanged();
         });
 
-        // Tray Show Percentage Toggle
-        TrayShowPercentageToggle().Toggled([this](auto&&, auto&&)
+        // Tray Percentage Icon Mode ComboBox (0 = Follow Windows, 1 = Colored, 2 = Disabled)
+        TrayPercentageModeComboBox().SelectionChanged([this](auto&&, auto&&)
         {
             if (m_isUpdatingUI) return;
-            bool on = TrayShowPercentageToggle().IsOn();
-            g_Settings.trayShowPercentage = on;
-            TrayShowPercentageStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
-            TrayTypographyPanel().Visibility(on ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+            int idx = TrayPercentageModeComboBox().SelectedIndex();
+            if (idx >= 0 && idx <= 2)
+            {
+                g_Settings.trayPercentageMode = idx;
+                TrayIconColorCard().Visibility(idx == 1 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+                TrayIconDualColorCard().Visibility(idx == 1 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+                TrayIconDarkColorCard().Visibility((idx == 1 && g_Settings.trayIconUseDualColors) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+                TrayTypographyPanel().Visibility(idx != 2 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+                g_TrayIcon.OnThemeChanged();
+                ApplyAndSave();
+            }
+        });
+
+        // Tray Icon Separate Dark & Light Colors Toggle
+        TrayIconDualColorToggle().Toggled([this](auto&&, auto&&)
+        {
+            bool on = TrayIconDualColorToggle().IsOn();
+            TrayIconDualColorStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+            TrayIconColorTitleText().Text(on ? g_Loc.Get(L"Opt_TrayIconColorLight", L"Light Mode Color") : g_Loc.Get(L"Opt_TrayIconColor", L"Icon Color"));
+            if (m_isUpdatingUI) return;
+            g_Settings.trayIconUseDualColors = on;
+            TrayIconDarkColorCard().Visibility((g_Settings.trayPercentageMode == 1 && on) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
             g_TrayIcon.OnThemeChanged();
             ApplyAndSave();
         });
@@ -1244,6 +1266,33 @@ namespace winrt::BrightnessApp::implementation
                 g_TrayIcon.OnThemeChanged();
                 ApplyAndSave();
             }
+        });
+
+        // Tray Font Weight Slider <-> NumberBox synchronization
+        TrayFontWeightSlider().ValueChanged([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            int val = (std::clamp)(static_cast<int>(std::round(TrayFontWeightSlider().Value())), 100, 900);
+            m_isUpdatingUI = true;
+            TrayFontWeightNumberBox().Value(val);
+            m_isUpdatingUI = false;
+            g_Settings.trayFontWeight = val;
+            g_TrayIcon.OnThemeChanged();
+            ApplyAndSave();
+        });
+
+        TrayFontWeightNumberBox().ValueChanged([this](auto&&, winrt::Microsoft::UI::Xaml::Controls::NumberBoxValueChangedEventArgs const& e)
+        {
+            if (m_isUpdatingUI) return;
+            double v = e.NewValue();
+            if (std::isnan(v)) return;
+            int val = (std::clamp)(static_cast<int>(std::round(v)), 100, 900);
+            m_isUpdatingUI = true;
+            TrayFontWeightSlider().Value(val);
+            m_isUpdatingUI = false;
+            g_Settings.trayFontWeight = val;
+            g_TrayIcon.OnThemeChanged();
+            ApplyAndSave();
         });
 
         // Tray Font Size Slider <-> NumberBox synchronization
@@ -1645,6 +1694,16 @@ namespace winrt::BrightnessApp::implementation
             g_FlyoutWindow.OnThemeChanged();
         });
 
+        // Tray Icon Color (Light / Default)
+        setupColorControl(TrayIconColorPicker(), TrayIconColorTextBox(), TrayIconColorPreview(), g_Settings.trayIconColor, []() {
+            g_TrayIcon.OnThemeChanged();
+        });
+
+        // Tray Icon Dark Mode Color
+        setupColorControl(TrayIconDarkColorPicker(), TrayIconDarkColorTextBox(), TrayIconDarkColorPreview(), g_Settings.trayIconColorDark, []() {
+            g_TrayIcon.OnThemeChanged();
+        });
+
         // Re-detect monitors
         RedetectMonitorsButton().Click([this](auto&&, auto&&)
         {
@@ -1695,8 +1754,12 @@ namespace winrt::BrightnessApp::implementation
             g_Settings.flyoutScrollDelayMs = 1000;
             g_Settings.flyoutButtonDelayEnabled = false;
             g_Settings.flyoutButtonDelayMs = 500;
-            g_Settings.trayShowPercentage = true;
+            g_Settings.trayPercentageMode = 0;
+            g_Settings.trayIconColor = RGB(0, 120, 212);
+            g_Settings.trayIconUseDualColors = false;
+            g_Settings.trayIconColorDark = RGB(96, 205, 255);
             g_Settings.trayFont = L"Segoe UI Variable Text";
+            g_Settings.trayFontWeight = 375;
             g_Settings.trayFontSize = 102;
             g_Settings.trayFontSize100 = 63;
             g_Settings.trayYOffset = -0.5f;
@@ -1740,7 +1803,6 @@ namespace winrt::BrightnessApp::implementation
             TrayFontComboBox().Items().Append(box_value(L"Segoe UI Variable Small"));
             TrayFontComboBox().Items().Append(box_value(L"Segoe UI Variable Display"));
             TrayFontComboBox().Items().Append(box_value(L"Segoe UI"));
-            TrayFontComboBox().Items().Append(box_value(L"Segoe UI Semibold"));
             TrayFontComboBox().Items().Append(box_value(L"Trebuchet MS"));
             TrayFontComboBox().Items().Append(box_value(L"Arial"));
             TrayFontComboBox().Items().Append(box_value(L"Consolas"));
@@ -2190,12 +2252,23 @@ namespace winrt::BrightnessApp::implementation
         TrayHeaderTitle().Text(g_Loc.Get(L"Tray_Title", L"System Tray Icon"));
         TrayHeaderSubtitle().Text(g_Loc.Get(L"Tray_Subtitle", L"Taskbar indicator, live percentage typography, and mouse actions"));
         TrayAppearanceSectionTitle().Text(g_Loc.Get(L"Sec_TrayAppearance", L"System Tray Icon"));
-        TrayShowPercentageTitleText().Text(g_Loc.Get(L"Opt_TrayShowPercentage", L"Show Percentage Icon"));
-        TrayShowPercentageDescText().Text(g_Loc.Get(L"Desc_TrayShowPercentage", L"Display current brightness percentage on the system tray icon"));
-        TrayShowPercentageStatusText().Text(TrayShowPercentageToggle().IsOn() ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+        TrayShowPercentageTitleText().Text(g_Loc.Get(L"Opt_TrayShowPercentage", L"Percentage Icon"));
+        TrayShowPercentageDescText().Text(g_Loc.Get(L"Desc_TrayShowPercentage", L"Choose how the brightness percentage is displayed on the system tray icon"));
+        TrayPctFollowWindowsItem().Content(box_value(g_Loc.Get(L"Opt_TrayPctFollowWindows", L"Follow Windows")));
+        TrayPctColoredItem().Content(box_value(g_Loc.Get(L"Opt_TrayPctColored", L"Colored")));
+        TrayPctDisabledItem().Content(box_value(g_Loc.Get(L"Opt_TrayPctDisabled", L"Disabled")));
+        TrayIconColorTitleText().Text(TrayIconDualColorToggle().IsOn() ? g_Loc.Get(L"Opt_TrayIconColorLight", L"Light Mode Color") : g_Loc.Get(L"Opt_TrayIconColor", L"Icon Color"));
+        TrayIconColorDescText().Text(g_Loc.Get(L"Desc_TrayIconColor", L"Custom color for the system tray percentage text"));
+        TrayIconDualColorTitleText().Text(g_Loc.Get(L"Opt_TrayIconDualColor", L"Separate Dark & Light Colors"));
+        TrayIconDualColorDescText().Text(g_Loc.Get(L"Desc_TrayIconDualColor", L"Use a different percentage icon color when Windows is in dark mode"));
+        TrayIconDualColorStatusText().Text(TrayIconDualColorToggle().IsOn() ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+        TrayIconDarkColorTitleText().Text(g_Loc.Get(L"Opt_TrayIconColorDark", L"Dark Mode Color"));
+        TrayIconDarkColorDescText().Text(g_Loc.Get(L"Desc_TrayIconColorDark", L"Custom color for the system tray percentage text in dark mode"));
         TrayTypographySectionTitle().Text(g_Loc.Get(L"Sec_TrayTypography", L"System Tray Icon Typography"));
         TrayFontTitleText().Text(g_Loc.Get(L"Opt_TrayFont", L"Number Font"));
         TrayFontDescText().Text(g_Loc.Get(L"Desc_TrayFont", L"DirectWrite rendered font for tray icon"));
+        TrayFontWeightTitleText().Text(g_Loc.Get(L"Opt_TrayFontWeight", L"Font Weight"));
+        TrayFontWeightDescText().Text(g_Loc.Get(L"Desc_TrayFontWeight", L"Stroke thickness from 100 to 900 (e.g. 300 Light, 350 Semilight, 400 Regular)"));
         TrayFontSizeTitleText().Text(g_Loc.Get(L"Opt_TrayFontSize", L"Font Size (%)"));
         TrayFontSizeDescText().Text(g_Loc.Get(L"Desc_TrayFontSize", L"Scale for 1-2 digits (0-99%)"));
         TrayFontSize100TitleText().Text(g_Loc.Get(L"Opt_TrayFontSize100", L"100% Width (%)"));
@@ -2577,10 +2650,21 @@ namespace winrt::BrightnessApp::implementation
         OverlayUseWindowsAccentStatusText().Text(g_Settings.overlayUseWindowsAccent ? L"On" : L"Off");
         OverlayAccentColorCard().Visibility(g_Settings.overlayUseWindowsAccent ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible);
 
-        // Tray Percentage Icon
-        TrayShowPercentageToggle().IsOn(g_Settings.trayShowPercentage);
-        TrayShowPercentageStatusText().Text(g_Settings.trayShowPercentage ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
-        TrayTypographyPanel().Visibility(g_Settings.trayShowPercentage ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        // Tray Percentage Icon Mode
+        int pctMode = (g_Settings.trayPercentageMode >= 0 && g_Settings.trayPercentageMode <= 2) ? g_Settings.trayPercentageMode : 0;
+        TrayPercentageModeComboBox().SelectedIndex(pctMode);
+        TrayIconDualColorToggle().IsOn(g_Settings.trayIconUseDualColors);
+        TrayIconDualColorStatusText().Text(g_Settings.trayIconUseDualColors ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+        TrayIconColorTitleText().Text(g_Settings.trayIconUseDualColors ? g_Loc.Get(L"Opt_TrayIconColorLight", L"Light Mode Color") : g_Loc.Get(L"Opt_TrayIconColor", L"Icon Color"));
+        TrayIconColorCard().Visibility(pctMode == 1 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        TrayIconDualColorCard().Visibility(pctMode == 1 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        TrayIconDarkColorCard().Visibility((pctMode == 1 && g_Settings.trayIconUseDualColors) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        TrayTypographyPanel().Visibility(pctMode != 2 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+
+        // Tray Font Weight
+        int weightVal = (std::clamp)(g_Settings.trayFontWeight, 100, 900);
+        TrayFontWeightSlider().Value(weightVal);
+        TrayFontWeightNumberBox().Value(weightVal);
 
         // Tray Font
         if (m_trayTabLoaded)
@@ -2679,6 +2763,8 @@ namespace winrt::BrightnessApp::implementation
 
         // Accent Colors
         loadColorToUI(OverlayAccentColorPicker(), OverlayAccentColorTextBox(), OverlayAccentColorPreview(), g_Settings.overlayAccentColor);
+        loadColorToUI(TrayIconColorPicker(), TrayIconColorTextBox(), TrayIconColorPreview(), g_Settings.trayIconColor);
+        loadColorToUI(TrayIconDarkColorPicker(), TrayIconDarkColorTextBox(), TrayIconDarkColorPreview(), g_Settings.trayIconColorDark);
 
         FlyoutUseWindowsAccentToggle().IsOn(g_Settings.flyoutUseWindowsAccent);
         FlyoutUseWindowsAccentStatusText().Text(g_Settings.flyoutUseWindowsAccent ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));

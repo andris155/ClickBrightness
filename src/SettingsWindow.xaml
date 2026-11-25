@@ -898,7 +898,7 @@
                             <!-- Appearance Section -->
                             <TextBlock x:Name="TrayAppearanceSectionTitle" Text="System Tray Icon" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,6"/>
 
-                            <!-- Show Percentage Icon Toggle -->
+                            <!-- Percentage Icon Mode ComboBox -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                     BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
@@ -910,12 +910,93 @@
                                     </Grid.ColumnDefinitions>
                                     <FontIcon Glyph="&#xE9D2;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                                        <TextBlock x:Name="TrayShowPercentageTitleText" Text="Show Percentage Icon" FontSize="14" FontWeight="Normal"/>
-                                        <TextBlock x:Name="TrayShowPercentageDescText" Text="Display current brightness percentage on the system tray icon" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="TrayShowPercentageTitleText" Text="Percentage Icon" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="TrayShowPercentageDescText" Text="Choose how the brightness percentage is displayed on the system tray icon" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <ComboBox x:Name="TrayPercentageModeComboBox" Grid.Column="2" Width="210" VerticalAlignment="Center">
+                                        <ComboBoxItem x:Name="TrayPctFollowWindowsItem" Content="Follow Windows"/>
+                                        <ComboBoxItem x:Name="TrayPctColoredItem" Content="Colored"/>
+                                        <ComboBoxItem x:Name="TrayPctDisabledItem" Content="Disabled"/>
+                                    </ComboBox>
+                                </Grid>
+                            </Border>
+
+                            <!-- Custom Tray Icon Color (Shown when Colored is selected) -->
+                            <Border x:Name="TrayIconColorCard" Visibility="Collapsed" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE790;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="TrayIconColorTitleText" Text="Icon Color" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="TrayIconColorDescText" Text="Custom color for the system tray percentage text" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Button x:Name="TrayIconColorPickerButton" Padding="0" Width="32" Height="32" CornerRadius="4" ToolTipService.ToolTip="Choose color">
+                                            <Border x:Name="TrayIconColorPreview" Width="24" Height="24" CornerRadius="3" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"/>
+                                            <Button.Flyout>
+                                                <Flyout Placement="Bottom">
+                                                    <ColorPicker x:Name="TrayIconColorPicker" IsAlphaEnabled="False" IsColorSpectrumVisible="True" IsColorChannelTextInputVisible="False"/>
+                                                </Flyout>
+                                            </Button.Flyout>
+                                        </Button>
+                                        <TextBox x:Name="TrayIconColorTextBox" Width="95" VerticalAlignment="Center" MaxLength="9"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Separate Dark & Light Colors Toggle (Shown when Colored is selected) -->
+                            <Border x:Name="TrayIconDualColorCard" Visibility="Collapsed" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE708;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="TrayIconDualColorTitleText" Text="Separate Dark &amp; Light Colors" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="TrayIconDualColorDescText" Text="Use a different percentage icon color when Windows is in dark mode" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                        <TextBlock x:Name="TrayShowPercentageStatusText" Text="On" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
-                                        <ToggleSwitch x:Name="TrayShowPercentageToggle" MinWidth="0" OnContent="" OffContent="" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                        <TextBlock x:Name="TrayIconDualColorStatusText" Text="Off" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                                        <ToggleSwitch x:Name="TrayIconDualColorToggle" MinWidth="0" OnContent="" OffContent="" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Custom Dark Mode Tray Icon Color (Shown when Colored + Separate Colors are ON) -->
+                            <Border x:Name="TrayIconDarkColorCard" Visibility="Collapsed" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE790;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="TrayIconDarkColorTitleText" Text="Dark Mode Color" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="TrayIconDarkColorDescText" Text="Custom color for the system tray percentage text in dark mode" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Button x:Name="TrayIconDarkColorPickerButton" Padding="0" Width="32" Height="32" CornerRadius="4" ToolTipService.ToolTip="Choose color">
+                                            <Border x:Name="TrayIconDarkColorPreview" Width="24" Height="24" CornerRadius="3" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"/>
+                                            <Button.Flyout>
+                                                <Flyout Placement="Bottom">
+                                                    <ColorPicker x:Name="TrayIconDarkColorPicker" IsAlphaEnabled="False" IsColorSpectrumVisible="True" IsColorChannelTextInputVisible="False"/>
+                                                </Flyout>
+                                            </Button.Flyout>
+                                        </Button>
+                                        <TextBox x:Name="TrayIconDarkColorTextBox" Width="95" VerticalAlignment="Center" MaxLength="9"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -940,6 +1021,28 @@
                                             <TextBlock x:Name="TrayFontDescText" Text="DirectWrite rendered font for tray icon" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                                         </StackPanel>
                                         <ComboBox x:Name="TrayFontComboBox" Grid.Column="2" Width="200" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Font Weight -->
+                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon Glyph="&#xE8D3;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock x:Name="TrayFontWeightTitleText" Text="Font Weight" FontSize="14" FontWeight="Normal"/>
+                                            <TextBlock x:Name="TrayFontWeightDescText" Text="Stroke thickness for the tray icon percentage text" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <Slider x:Name="TrayFontWeightSlider" Minimum="100" Maximum="900" StepFrequency="1" Width="160" VerticalAlignment="Center"/>
+                                            <NumberBox x:Name="TrayFontWeightNumberBox" Minimum="100" Maximum="900" SmallChange="50" LargeChange="100" Width="90" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
+                                        </StackPanel>
                                     </Grid>
                                 </Border>
 

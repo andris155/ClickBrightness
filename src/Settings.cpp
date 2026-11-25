@@ -100,12 +100,48 @@ void AppSettings::Load() {
     hotkeyDelayMs = GetPrivateProfileIntW(L"Delay", L"WaitTimeMs", 1000, ini.c_str());
     if (hotkeyDelayMs < 100 || hotkeyDelayMs > 3000) hotkeyDelayMs = 1000;
 
-    trayShowPercentage = (GetPrivateProfileIntW(L"Tray", L"ShowPercentage", 1, ini.c_str()) != 0);
+    int pctMode = GetPrivateProfileIntW(L"Tray", L"PercentageMode", -1, ini.c_str());
+    if (pctMode == -1) {
+        bool showPct = (GetPrivateProfileIntW(L"Tray", L"ShowPercentage", 1, ini.c_str()) != 0);
+        trayPercentageMode = showPct ? 0 : 2;
+    } else {
+        trayPercentageMode = (pctMode >= 0 && pctMode <= 2) ? pctMode : 0;
+    }
+
+    wchar_t trayColBuf[64] = { 0 };
+    GetPrivateProfileStringW(L"Tray", L"IconColor", L"#0078D4", trayColBuf, 64, ini.c_str());
+    trayIconColor = ParseColor(trayColBuf, RGB(0, 120, 212));
+
+    trayIconUseDualColors = (GetPrivateProfileIntW(L"Tray", L"UseDualColors", 0, ini.c_str()) != 0);
+    GetPrivateProfileStringW(L"Tray", L"IconColorDark", L"#60CDFF", trayColBuf, 64, ini.c_str());
+    trayIconColorDark = ParseColor(trayColBuf, RGB(96, 205, 255));
 
     wchar_t fontBuf[128] = { 0 };
     GetPrivateProfileStringW(L"Tray", L"Font", L"Segoe UI Variable Text", fontBuf, 128, ini.c_str());
     trayFont = fontBuf;
     if (trayFont.empty()) trayFont = L"Segoe UI Variable Text";
+
+    int loadedWeight = GetPrivateProfileIntW(L"Tray", L"FontWeight", -1, ini.c_str());
+    if (loadedWeight == -1) {
+        // Migrate legacy weight suffix embedded in trayFont name
+        trayFontWeight = 375;
+        auto stripSuffix = [&](const wchar_t* suffix, int weight) {
+            size_t pos = trayFont.rfind(suffix);
+            if (pos != std::wstring::npos && pos + wcslen(suffix) == trayFont.length()) {
+                trayFont.erase(pos);
+                trayFontWeight = weight;
+                return true;
+            }
+            return false;
+        };
+        if (!stripSuffix(L" Semilight", 350) && !stripSuffix(L" SemiLight", 350) &&
+            !stripSuffix(L" Light", 300) && !stripSuffix(L" Semibold", 600) &&
+            !stripSuffix(L" SemiBold", 600) && !stripSuffix(L" Medium", 500)) {
+            stripSuffix(L" Bold", 700);
+        }
+    } else {
+        trayFontWeight = (loadedWeight >= 100 && loadedWeight <= 900) ? loadedWeight : 375;
+    }
 
     trayFontSize = GetPrivateProfileIntW(L"Tray", L"FontSize", 102, ini.c_str());
     if (trayFontSize < 40 || trayFontSize > 150) trayFontSize = 102;
@@ -253,8 +289,12 @@ void AppSettings::Save() const {
     WritePrivateProfileStringW(L"Overlay", L"UseWindowsAccent", overlayUseWindowsAccent ? L"1" : L"0", ini.c_str());
     WritePrivateProfileStringW(L"Overlay", L"AccentColor", FormatColor(overlayAccentColor).c_str(), ini.c_str());
 
-    WritePrivateProfileStringW(L"Tray", L"ShowPercentage", trayShowPercentage ? L"1" : L"0", ini.c_str());
+    WritePrivateProfileStringW(L"Tray", L"PercentageMode", std::to_wstring(trayPercentageMode).c_str(), ini.c_str());
+    WritePrivateProfileStringW(L"Tray", L"IconColor", FormatColor(trayIconColor).c_str(), ini.c_str());
+    WritePrivateProfileStringW(L"Tray", L"UseDualColors", trayIconUseDualColors ? L"1" : L"0", ini.c_str());
+    WritePrivateProfileStringW(L"Tray", L"IconColorDark", FormatColor(trayIconColorDark).c_str(), ini.c_str());
     WritePrivateProfileStringW(L"Tray", L"Font", trayFont.c_str(), ini.c_str());
+    WritePrivateProfileStringW(L"Tray", L"FontWeight", std::to_wstring(trayFontWeight).c_str(), ini.c_str());
     WritePrivateProfileStringW(L"Tray", L"FontSize", std::to_wstring(trayFontSize).c_str(), ini.c_str());
     WritePrivateProfileStringW(L"Tray", L"FontSize100", std::to_wstring(trayFontSize100).c_str(), ini.c_str());
     WritePrivateProfileStringW(L"Tray", L"YOffset", FormatYOffset(trayYOffset, trayYOffsetUseComma).c_str(), ini.c_str());

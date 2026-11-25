@@ -86,8 +86,8 @@ void TrayIcon::InitD2D() {
     }
     if (!m_pRenderingParams && m_pDWriteFactory) {
         m_pDWriteFactory->CreateCustomRenderingParams(
-            2.2f, // sRGB Gamma matching Windows 11 DWM
-            1.0f, // Enhanced contrast
+            1.8f, // Gamma matching Windows 11 XAML/clock rendering
+            0.5f, // Enhanced contrast matching Windows 11 default
             0.0f, // ClearType level
             DWRITE_PIXEL_GEOMETRY_FLAT,
             DWRITE_RENDERING_MODE_NATURAL_SYMMETRIC,
@@ -310,15 +310,23 @@ HICON TrayIcon::CreateBrightnessIcon(int brightness) {
 
     std::wstring fontName = !g_Settings.trayFont.empty() ? g_Settings.trayFont : L"Segoe UI Variable Text";
 
-    // Detect weight from font name
-    DWRITE_FONT_WEIGHT fontWeight = DWRITE_FONT_WEIGHT_NORMAL;
-    if (fontName.find(L"Semibold") != std::wstring::npos || fontName.find(L"SemiBold") != std::wstring::npos) {
-        fontWeight = DWRITE_FONT_WEIGHT_SEMI_BOLD;
-    } else if (fontName.find(L"Medium") != std::wstring::npos) {
-        fontWeight = DWRITE_FONT_WEIGHT_MEDIUM;
-    } else if (fontName.find(L"Bold") != std::wstring::npos) {
-        fontWeight = DWRITE_FONT_WEIGHT_BOLD;
-    }
+    int w = (g_Settings.trayFontWeight >= 100 && g_Settings.trayFontWeight <= 900) ? g_Settings.trayFontWeight : 375;
+    DWRITE_FONT_WEIGHT fontWeight = static_cast<DWRITE_FONT_WEIGHT>(w);
+
+    // Fallback: if a legacy font name still has a weight suffix, strip it and apply weight
+    auto stripWeightSuffix = [&fontName](const wchar_t* suffix) {
+        size_t pos = fontName.rfind(suffix);
+        if (pos != std::wstring::npos && pos + wcslen(suffix) == fontName.length()) {
+            fontName.erase(pos);
+            return true;
+        }
+        return false;
+    };
+    if (stripWeightSuffix(L" Semilight") || stripWeightSuffix(L" SemiLight")) fontWeight = DWRITE_FONT_WEIGHT_SEMI_LIGHT;
+    else if (stripWeightSuffix(L" Light")) fontWeight = DWRITE_FONT_WEIGHT_LIGHT;
+    else if (stripWeightSuffix(L" Semibold") || stripWeightSuffix(L" SemiBold")) fontWeight = DWRITE_FONT_WEIGHT_SEMI_BOLD;
+    else if (stripWeightSuffix(L" Medium")) fontWeight = DWRITE_FONT_WEIGHT_MEDIUM;
+    else if (stripWeightSuffix(L" Bold")) fontWeight = DWRITE_FONT_WEIGHT_BOLD;
 
     // Font size calibrated for authentic Windows 11 taskbar typography:
     float scale = (g_Settings.trayFontSize >= 40 && g_Settings.trayFontSize <= 150)
@@ -351,15 +359,35 @@ HICON TrayIcon::CreateBrightnessIcon(int brightness) {
     }
 
     if (pFormat) {
+        Microsoft::WRL::ComPtr<IDWriteTextFormat3> pFormat3;
+        if (SUCCEEDED(pFormat.As(&pFormat3)) && pFormat3) {
+            DWRITE_FONT_AXIS_VALUE axisValue = {};
+            axisValue.axisTag = DWRITE_FONT_AXIS_TAG_WEIGHT;
+            axisValue.value = static_cast<float>(fontWeight);
+            pFormat3->SetFontAxisValues(&axisValue, 1);
+        }
         pFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
         pFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
         pFormat->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
     }
 
-    bool isLight = m_lastTrayWasLight;
-    D2D1_COLOR_F textColor = isLight
-        ? D2D1::ColorF(0.08f, 0.08f, 0.08f, 1.0f)   // Fluent dark charcoal text for light taskbar
-        : D2D1::ColorF(1.0f, 1.0f, 1.0f, 1.0f);     // Crisp white text for dark taskbar
+    D2D1_COLOR_F textColor;
+    if (g_Settings.trayPercentageMode == 1) {
+        COLORREF col = (g_Settings.trayIconUseDualColors && !m_lastTrayWasLight)
+            ? g_Settings.trayIconColorDark
+            : g_Settings.trayIconColor;
+        textColor = D2D1::ColorF(
+            GetRValue(col) / 255.0f,
+            GetGValue(col) / 255.0f,
+            GetBValue(col) / 255.0f,
+            1.0f
+        );
+    } else {
+        bool isLight = m_lastTrayWasLight;
+        textColor = isLight
+            ? D2D1::ColorF(0.08f, 0.08f, 0.08f, 1.0f)   // Fluent dark charcoal text for light taskbar
+            : D2D1::ColorF(1.0f, 1.0f, 1.0f, 1.0f);     // Crisp white text for dark taskbar
+    }
 
     if (m_pBrush) {
         m_pBrush->SetColor(textColor);
@@ -396,6 +424,24 @@ HICON TrayIcon::CreateBrightnessIcon(int brightness) {
 
     SelectObject(hdcMem, hOldBmp);
 
+    // Un-premultiply BGRA pixels: Direct2D DCRenderTarget outputs premultiplied alpha,
+    // while the Windows 11 taskbar HICON pipeline treats 32bpp DIBs as straight alpha
+    // (otherwise bright colors get double-premultiplied at edges, creating a dark outline).
+    if (pBits) {
+        BYTE* px = static_cast<BYTE*>(pBits);
+        int totalPixels = size * size;
+        for (int i = 0; i < totalPixels; ++i) {
+            BYTE a = px[3];
+            if (a > 0 && a < 255) {
+                for (int c = 0; c < 3; ++c) {
+                    int val = (px[c] * 255 + a / 2) / a;
+                    px[c] = static_cast<BYTE>(val > 255 ? 255 : val);
+                }
+            }
+            px += 4;
+        }
+    }
+
     int maskBytes = (size * size + 7) / 8;
     BYTE maskStack[512] = { 0 };
     BYTE* pMaskBits = maskStack;
@@ -428,7 +474,7 @@ bool TrayIcon::UpdateBrightness(int brightness) {
     m_lastBrightness = brightness;
 
     HICON hNewIcon = NULL;
-    if (g_Settings.trayShowPercentage) {
+    if (g_Settings.trayPercentageMode != 2) {
         hNewIcon = m_iconCache[brightness];
         if (!hNewIcon) {
             hNewIcon = CreateBrightnessIcon(brightness);

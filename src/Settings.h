@@ -50,8 +50,12 @@ struct AppSettings {
     int hotkeyRepeatIntervalMs = 90;   // Default: 90 ms (~11 steps/sec, ~1.8s for 0-100% with step=5)
 
     // Tray Appearance
-    bool trayShowPercentage = true;                    // Default: ON (Show live brightness percentage)
+    int trayPercentageMode = 0;                        // 0 = Follow Windows, 1 = Colored, 2 = Disabled
+    COLORREF trayIconColor = RGB(0, 120, 212);         // Default: #0078D4 (used when trayPercentageMode == 1)
+    bool trayIconUseDualColors = false;                // Default: OFF (Separate color for dark taskbar)
+    COLORREF trayIconColorDark = RGB(96, 205, 255);    // Default: #60CDFF (used on dark taskbar when dual colors ON)
     std::wstring trayFont = L"Segoe UI Variable Text"; // Default font: Segoe UI Variable Text
+    int trayFontWeight = 375;                          // Default: 375
     int trayFontSize = 102;                            // Default: 102% (1-2 digits)
     int trayFontSize100 = 63;                          // Default: 63% (3 digits / 100)
     float trayYOffset = -0.5f;                         // Default: -0.5 (px vertical offset, auto-scales with DPI)
