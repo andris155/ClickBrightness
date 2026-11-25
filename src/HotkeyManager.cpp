@@ -1,5 +1,6 @@
 #include "HotkeyManager.h"
 #include "Settings.h"
+#include "MonitorManager.h"
 #include "resource.h"
 
 HotkeyManager g_HotkeyManager;
@@ -18,65 +19,72 @@ bool HotkeyManager::RegisterAll(HWND hwnd) {
     m_hwnd = hwnd;
     UnregisterAll(hwnd);
 
-    // Register Hotkey Up & Down (if adjust hotkeys enabled)
-    UINT upMods = g_Settings.hotkeyUpMods;
-    UINT upKey = g_Settings.hotkeyUpKey;
-    BOOL bUp = FALSE;
-    UINT downMods = g_Settings.hotkeyDownMods;
-    UINT downKey = g_Settings.hotkeyDownKey;
-    BOOL bDown = FALSE;
+    bool allOk = true;
+    int nextId = 2001;
 
-    if (g_Settings.hotkeyAdjustEnabled) {
-        if (upKey != 0) {
-            bUp = RegisterHotKey(hwnd, ID_HOTKEY_UP, upMods, upKey);
+    auto registerGroup = [&](const std::wstring& targetMonId, const MonitorControlConfig& cfg) {
+        auto regOne = [&](int action, UINT mods, UINT vk) {
+            if (vk == 0) return true;
+            int id = nextId++;
+            if (RegisterHotKey(hwnd, id, mods, vk)) {
+                m_bindings.push_back({ id, targetMonId, action, vk });
+                return true;
+            }
+            return false;
+        };
+
+        if (cfg.hotkeyAdjustEnabled) {
+            if (!regOne(0, cfg.hotkeyUpMods, cfg.hotkeyUpKey)) allOk = false;
+            if (!regOne(1, cfg.hotkeyDownMods, cfg.hotkeyDownKey)) allOk = false;
         }
-        if (downKey != 0) {
-            bDown = RegisterHotKey(hwnd, ID_HOTKEY_DOWN, downMods, downKey);
+        if (cfg.hotkeyPresetsEnabled) {
+            if (!regOne(2, cfg.hotkeyPreset1Mods, cfg.hotkeyPreset1Key)) allOk = false;
+            if (!regOne(3, cfg.hotkeyPreset2Mods, cfg.hotkeyPreset2Key)) allOk = false;
         }
-    }
-
-    // Register Hotkey Presets (if preset hotkeys enabled)
-    UINT p1Mods = g_Settings.hotkeyPreset1Mods;
-    UINT p1Key = g_Settings.hotkeyPreset1Key;
-    BOOL bP1 = FALSE;
-    UINT p2Mods = g_Settings.hotkeyPreset2Mods;
-    UINT p2Key = g_Settings.hotkeyPreset2Key;
-    BOOL bP2 = FALSE;
-
-    if (g_Settings.hotkeyPresetsEnabled) {
-        if (p1Key != 0) {
-            bP1 = RegisterHotKey(hwnd, ID_HOTKEY_PRESET1, p1Mods, p1Key);
+        if (cfg.hotkeyPresetToggleEnabled) {
+            if (!regOne(4, cfg.hotkeyPresetToggleMods, cfg.hotkeyPresetToggleKey)) allOk = false;
         }
-        if (p2Key != 0) {
-            bP2 = RegisterHotKey(hwnd, ID_HOTKEY_PRESET2, p2Mods, p2Key);
-        }
-    }
+    };
 
-    // Register Hotkey Preset Toggle (if preset toggle shortcut enabled)
-    UINT ptMods = g_Settings.hotkeyPresetToggleMods;
-    UINT ptKey = g_Settings.hotkeyPresetToggleKey;
-    BOOL bPT = FALSE;
+    // Main/Sync group
+    registerGroup(L"", g_Settings.GetEffectiveMonitorConfig(g_Settings.mainMonitorId));
 
-    if (g_Settings.hotkeyPresetToggleEnabled) {
-        if (ptKey != 0) {
-            bPT = RegisterHotKey(hwnd, ID_HOTKEY_PRESET_TOGGLE, ptMods, ptKey);
+    // Enabled Separate non-main monitors
+    for (const auto& mon : g_MonitorManager.GetMonitors()) {
+        if (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0) continue;
+        const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
+        if (cfg && cfg->enabled && cfg->controlMode == 1) {
+            registerGroup(mon.id, *cfg);
         }
     }
 
-    bool adjustOk = (!g_Settings.hotkeyAdjustEnabled) || ((upKey == 0 || bUp) && (downKey == 0 || bDown));
-    bool presetsOk = (!g_Settings.hotkeyPresetsEnabled) || ((p1Key == 0 || bP1) && (p2Key == 0 || bP2));
-    bool toggleOk = (!g_Settings.hotkeyPresetToggleEnabled) || (ptKey == 0 || bPT);
-    m_registered = adjustOk && presetsOk && toggleOk;
+    m_registered = allOk;
     return m_registered;
 }
 
 void HotkeyManager::UnregisterAll(HWND hwnd) {
+    for (const auto& b : m_bindings) {
+        UnregisterHotKey(hwnd, b.id);
+    }
+    m_bindings.clear();
     UnregisterHotKey(hwnd, ID_HOTKEY_UP);
     UnregisterHotKey(hwnd, ID_HOTKEY_DOWN);
     UnregisterHotKey(hwnd, ID_HOTKEY_PRESET1);
     UnregisterHotKey(hwnd, ID_HOTKEY_PRESET2);
     UnregisterHotKey(hwnd, ID_HOTKEY_PRESET_TOGGLE);
     m_registered = false;
+}
+
+bool HotkeyManager::ResolveHotkey(int id, std::wstring& outTargetMonitorId, int& outAction, UINT& outVkCode) const {
+    for (const auto& b : m_bindings) {
+        if (b.id == id) {
+            outTargetMonitorId = b.targetMonitorId;
+            outAction = b.action;
+            outVkCode = b.vkCode;
+            return true;
+        }
+    }
+    return false;
 }
 
 std::wstring HotkeyManager::GetKeyDisplayName(UINT vkCode) {

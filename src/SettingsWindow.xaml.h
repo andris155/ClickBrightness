@@ -36,6 +36,8 @@ namespace winrt::BrightnessApp::implementation
         void PopulateLanguageList();
         void PopulateMonitorsSelectionList();
         void UpdateMonitorsSelectionUI();
+        void LoadMonitorConfigToUI();
+        void SaveCurrentMonitorConfigFromUI();
         void UpdateTitleBarDragRegions();
 
         void EnsureTrayTabLoaded();
@@ -66,12 +68,11 @@ namespace winrt::BrightnessApp::implementation
         bool m_trayTabLoaded{ false };
         bool m_aboutTabLoaded{ false };
         std::vector<std::wstring> m_cachedMonitorIds;
+        std::wstring m_selectedConfigMonitorId;
 
         winrt::Microsoft::UI::Xaml::Controls::StackPanel m_generalPanel{ nullptr };
-        winrt::Microsoft::UI::Xaml::Controls::StackPanel m_shortcutsPanel{ nullptr };
-        winrt::Microsoft::UI::Xaml::Controls::StackPanel m_osdPanel{ nullptr };
-        winrt::Microsoft::UI::Xaml::Controls::StackPanel m_trayPanel{ nullptr };
-        winrt::Microsoft::UI::Xaml::Controls::StackPanel m_flyoutSliderPanel{ nullptr };
+        winrt::Microsoft::UI::Xaml::Controls::StackPanel m_monitorsPanel{ nullptr };
+        winrt::Microsoft::UI::Xaml::Controls::StackPanel m_timingsPanel{ nullptr };
         winrt::Microsoft::UI::Xaml::Controls::StackPanel m_aboutPanel{ nullptr };
     };
 }

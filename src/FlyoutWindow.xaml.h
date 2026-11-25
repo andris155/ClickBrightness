@@ -12,6 +12,8 @@ namespace winrt::BrightnessApp::implementation
         FlyoutWindow();
         ~FlyoutWindow();
 
+        void SetTargetMonitor(const std::wstring& targetMonitorId) { m_targetMonitorId = targetMonitorId; }
+        const std::wstring& GetTargetMonitor() const { return m_targetMonitorId; }
         void ShowWindow(const POINT* pTrayPos);
         void HideWindow();
         void DestroyWindow();
@@ -19,6 +21,7 @@ namespace winrt::BrightnessApp::implementation
         ULONGLONG GetHideTick() const { return m_hideTick; }
 
         void SetBrightness(int brightness, bool notifyHardware);
+        void SetBrightnessForTarget(const std::wstring& targetMonitorId, int brightness, bool notifyHardware);
         void CommitBrightness(bool immediate = false);
         void ApplyPendingBrightness();
         void UpdateTheme();
@@ -29,8 +32,10 @@ namespace winrt::BrightnessApp::implementation
         void SetupBackdrop();
         void DetachBackdrop();
         void InitializeButtons();
+        void RebuildSyncMonitorsPanel();
         void SetBrightnessVisual(int val);
         void ApplySliderBrushes();
+        void ApplySliderBrushesForControl(winrt::Microsoft::UI::Xaml::Controls::Slider const& slider, const std::wstring& monitorId);
         void CommitHardwareBrightness(int val);
         void ScheduleDebounce(int val, int delayMs);
         void OnScrollAdjust(int val);
@@ -45,6 +50,7 @@ namespace winrt::BrightnessApp::implementation
 
         int m_brightness{ 45 };
         int m_pendingBrightness{ 45 };
+        std::wstring m_targetMonitorId;
         bool m_hasPendingBrightness{ false };
         bool m_isUpdatingSlider{ false };
         bool m_isDraggingSlider{ false };
@@ -57,6 +63,14 @@ namespace winrt::BrightnessApp::implementation
         COLORREF m_lastAccentCol{ 0 };
         int m_lastW{ 0 };
         int m_lastH{ 0 };
+
+        struct SyncSliderEntry
+        {
+            std::wstring monitorId;
+            winrt::Microsoft::UI::Xaml::Controls::TextBlock header{ nullptr };
+            winrt::Microsoft::UI::Xaml::Controls::Slider slider{ nullptr };
+        };
+        std::vector<SyncSliderEntry> m_syncEntries;
     };
 }
 

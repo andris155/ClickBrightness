@@ -37,28 +37,43 @@ bool OverlayWindow::Create()
 
 void OverlayWindow::TriggerBrightnessDelta(int delta, bool showOsd)
 {
-    auto p = GetImpl();
-    if (p)
-    {
-        p->TriggerBrightnessDelta(delta, showOsd);
-    }
+    TriggerBrightnessDeltaForTarget(L"", delta, showOsd);
 }
 
 void OverlayWindow::TriggerTrayWheel(int delta)
 {
-    auto p = GetImpl();
-    if (p)
-    {
-        p->TriggerTrayWheel(delta);
-    }
+    TriggerTrayWheelForTarget(L"", delta);
 }
 
 void OverlayWindow::TriggerBrightnessSet(int target, bool showOsd)
 {
+    TriggerBrightnessSetForTarget(L"", target, showOsd);
+}
+
+void OverlayWindow::TriggerBrightnessDeltaForTarget(const std::wstring& targetMonitorId, int delta, bool showOsd)
+{
     auto p = GetImpl();
     if (p)
     {
-        p->TriggerBrightnessSet(target, showOsd);
+        p->TriggerBrightnessDeltaForTarget(targetMonitorId, delta, showOsd);
+    }
+}
+
+void OverlayWindow::TriggerTrayWheelForTarget(const std::wstring& targetMonitorId, int delta)
+{
+    auto p = GetImpl();
+    if (p)
+    {
+        p->TriggerTrayWheelForTarget(targetMonitorId, delta);
+    }
+}
+
+void OverlayWindow::TriggerBrightnessSetForTarget(const std::wstring& targetMonitorId, int target, bool showOsd)
+{
+    auto p = GetImpl();
+    if (p)
+    {
+        p->TriggerBrightnessSetForTarget(targetMonitorId, target, showOsd);
     }
 }
 

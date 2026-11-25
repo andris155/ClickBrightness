@@ -6,6 +6,19 @@
 #include <d2d1.h>
 #include <dwrite_3.h>
 #include <wrl/client.h>
+#include <string>
+#include <vector>
+
+struct MonitorControlConfig;
+
+struct ExtraTraySlot {
+    UINT uId = 0;
+    std::wstring monitorId;
+    HICON iconCache[101] = { nullptr };
+    int lastBrightness = -1;
+    bool created = false;
+    bool isSyncSlot = false;
+};
 
 class TrayIcon {
 public:
@@ -16,9 +29,14 @@ public:
     void Destroy();
 
     bool UpdateBrightness(int brightness);
-    void ShowContextMenu();
+    bool UpdateBrightnessForTarget(const std::wstring& targetMonitorId, int brightness);
+    void SyncExtraTrayIcons();
+    std::wstring GetTargetMonitorByTrayId(UINT uId) const;
+    const std::vector<ExtraTraySlot>& GetExtraSlots() const { return m_extraSlots; }
+    void ShowContextMenu(UINT uId = 1);
 
     HICON CreateBrightnessIcon(int brightness);
+    HICON CreateBrightnessIconForConfig(int brightness, const MonitorControlConfig& cfg);
     void InvalidateIconCache();
     void OnThemeChanged();
     void OnLanguageChanged();
@@ -39,6 +57,7 @@ private:
     UINT m_uCallbackMsg;
     HICON m_hBaseSunIcon;
     HICON m_iconCache[101];
+    std::vector<ExtraTraySlot> m_extraSlots;
     int m_lastBrightness;
     bool m_created;
     bool m_lastTrayWasLight;

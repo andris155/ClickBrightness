@@ -1,6 +1,7 @@
 #pragma once
 
 #include <windows.h>
+#include <string>
 
 class FlyoutWindow {
 public:
@@ -8,13 +9,14 @@ public:
     ~FlyoutWindow();
 
     bool Create();
-    void Show(const POINT* pTrayPos = nullptr);
+    void Show(const POINT* pTrayPos = nullptr, const std::wstring& targetMonitorId = L"");
     void Hide();
     void Destroy();
     bool IsVisible() const;
     ULONGLONG GetHideTick() const;
 
     void SetBrightness(int brightness, bool notifyHardware);
+    void SetBrightnessForTarget(const std::wstring& targetMonitorId, int brightness, bool notifyHardware);
     void ApplyPendingBrightness();
     void OnThemeChanged();
     void ResetGraphicsResources();

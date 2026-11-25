@@ -2,6 +2,79 @@
 
 #include <windows.h>
 #include <string>
+#include <vector>
+#include <map>
+
+enum class MonitorControlMode {
+    Sync = 0,
+    Separate = 1
+};
+
+struct MonitorControlConfig {
+    bool enabled = true;
+    std::wstring customName;
+    int controlMode = 0; // 0 = Sync, 1 = Separate
+    int offset = 0;      // -100 to +100 relative to Main Display when Sync
+    bool syncZeroWhenMainZero = false; // If true, Sync target 0% sets this monitor to 0% regardless of positive offset
+    bool syncSeparateTrayIcon = false; // If true, Sync monitor also displays its own tray percentage icon
+
+    // Shortcuts (without timings)
+    bool hotkeyAdjustEnabled = false;
+    bool hotkeyAdjustShowOsd = true;
+    UINT hotkeyUpMods = 0;
+    UINT hotkeyUpKey = VK_F14;
+    UINT hotkeyDownMods = 0;
+    UINT hotkeyDownKey = VK_F13;
+
+    bool hotkeyPresetsEnabled = false;
+    bool hotkeyPresetsShowOsd = true;
+    UINT hotkeyPreset1Mods = 0;
+    UINT hotkeyPreset1Key = VK_F15;
+    int hotkeyPreset1Brightness = 30;
+    UINT hotkeyPreset2Mods = 0;
+    UINT hotkeyPreset2Key = VK_F16;
+    int hotkeyPreset2Brightness = 80;
+
+    bool hotkeyPresetToggleEnabled = false;
+    bool hotkeyPresetToggleShowOsd = true;
+    UINT hotkeyPresetToggleMods = 0;
+    UINT hotkeyPresetToggleKey = VK_F17;
+    int hotkeyPresetToggle1Brightness = 30;
+    int hotkeyPresetToggle2Brightness = 80;
+    int hotkeyStep = 5;
+
+    // OSD (without theme/timings)
+    bool overlayUseWindowsAccent = true;
+    COLORREF overlayAccentColor = RGB(0, 120, 212);
+
+    // Tray (without timings)
+    int trayPercentageMode = 0; // 0 = Follow Windows, 1 = Colored, 2 = Disabled
+    COLORREF trayIconColor = RGB(0, 120, 212);
+    bool trayIconUseDualColors = false;
+    COLORREF trayIconColorDark = RGB(96, 205, 255);
+    std::wstring trayFont = L"Segoe UI Variable Text";
+    int trayFontWeight = 375;
+    int trayFontSize = 102;
+    int trayFontSize100 = 63;
+    float trayYOffset = -0.5f;
+    bool trayYOffsetUseComma = false;
+
+    bool trayWheelEnabled = false;
+    int trayWheelStep = 5;
+    bool trayWheelShowOsd = true;
+
+    bool trayMiddleClickEnabled = false;
+    bool trayMiddleClickShowOsd = true;
+    int trayMiddleClickBrightness = 50;
+
+    // Flyout (without timings/keyboard toggle)
+    bool flyoutUseWindowsAccent = true;
+    COLORREF flyoutAccentColor = RGB(0, 120, 212);
+    bool flyoutScrollEnabled = true;
+    int flyoutScrollStep = 5;
+
+    int cachedBrightness = 45;
+};
 
 struct AppSettings {
     // Hotkey Stepping (Up/Down) Enabled
@@ -85,6 +158,11 @@ struct AppSettings {
     // Target Monitors to Control ("all", or semicolon-separated monitor IDs)
     std::wstring selectedMonitors = L"all";
 
+    // Multi-Monitor Sync & Separate Configuration
+    std::wstring mainMonitorId;
+    bool syncExternalWithLaptopFnKeys = false; // Default: OFF
+    std::map<std::wstring, MonitorControlConfig> monitorConfigs;
+
     // OSD & Tray Menu Theme (0 = Follow Windows (system), 1 = Dark, 2 = Light)
     int overlayTheme = 0;
     int overlayTimeoutMs = 2000;             // Default: 2000 ms (2 seconds)
@@ -125,6 +203,14 @@ struct AppSettings {
 
     bool IsMonitorSelected(const std::wstring& monitorId) const;
     void SetMonitorSelected(const std::wstring& monitorId, bool selected, const std::vector<std::wstring>& allIds);
+
+    static std::wstring SanitizeMonitorName(const std::wstring& name, size_t maxLen = 20);
+    static int ComputeSyncedBrightness(int mainBrightness, const MonitorControlConfig& cfg);
+    MonitorControlConfig& GetOrCreateMonitorConfig(const std::wstring& monitorId, const std::wstring& defaultName = L"");
+    const MonitorControlConfig* FindMonitorConfig(const std::wstring& monitorId) const;
+    MonitorControlConfig GetEffectiveMonitorConfig(const std::wstring& monitorId) const;
+    void CopyCustomizationToMonitor(MonitorControlConfig& dst) const;
+    void ApplyMonitorCustomizationToLegacy(const MonitorControlConfig& src);
 };
 
 extern AppSettings g_Settings;

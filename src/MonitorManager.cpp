@@ -377,6 +377,18 @@ void MonitorManager::StopWorkerThread() {
 }
 
 void MonitorManager::Cleanup() {
+    m_fnSyncRunning = false;
+    if (m_fnSyncStopEvent) {
+        SetEvent(m_fnSyncStopEvent);
+    }
+    if (m_fnSyncThread.joinable()) {
+        m_fnSyncThread.join();
+    }
+    if (m_fnSyncStopEvent) {
+        CloseHandle(m_fnSyncStopEvent);
+        m_fnSyncStopEvent = NULL;
+    }
+
     StopWorkerThread();
 
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -413,16 +425,38 @@ void MonitorManager::EnumMonitorsInternal() {
 
     if (!m_monitors.empty()) {
         m_driverAvailable = true;
-        // Prioritize primary monitor for cached brightness
-        bool foundPrimary = false;
+
+        // Ensure every detected monitor has a MonitorControlConfig entry
+        bool mainConnected = false;
         for (const auto& mon : m_monitors) {
-            if (mon.isPrimary) {
+            g_Settings.GetOrCreateMonitorConfig(mon.id, mon.friendlyName);
+            if (!g_Settings.mainMonitorId.empty() && _wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0) {
+                mainConnected = true;
+            }
+        }
+        if (!mainConnected) {
+            for (const auto& mon : m_monitors) {
+                if (mon.isPrimary) {
+                    g_Settings.mainMonitorId = mon.id;
+                    mainConnected = true;
+                    break;
+                }
+            }
+            if (!mainConnected) {
+                g_Settings.mainMonitorId = m_monitors[0].id;
+            }
+        }
+
+        // Prioritize Main Display for cached brightness
+        bool foundMain = false;
+        for (const auto& mon : m_monitors) {
+            if (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0) {
                 m_cachedBrightness = SafeCalcBrightnessPercent(mon.currentBrightness, mon.minBrightness, mon.maxBrightness);
-                foundPrimary = true;
+                foundMain = true;
                 break;
             }
         }
-        if (!foundPrimary) {
+        if (!foundMain) {
             const auto& mon = m_monitors[0];
             m_cachedBrightness = SafeCalcBrightnessPercent(mon.currentBrightness, mon.minBrightness, mon.maxBrightness);
         }
@@ -538,20 +572,123 @@ int MonitorManager::GetCurrentBrightness() {
 }
 
 bool MonitorManager::SetBrightness(int brightness, bool async) {
+    return SetMonitorBrightnessTarget(L"", brightness, async);
+}
+
+int MonitorManager::GetMonitorBrightnessById(const std::wstring& monitorId) {
+    if (monitorId.empty() || _wcsicmp(monitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0) {
+        return GetCurrentBrightness();
+    }
+    {
+        std::lock_guard<std::mutex> wlock(m_workerMutex);
+        if (m_pendingTargetBrightness != -1) {
+            if (_wcsicmp(m_pendingTargetMonitorId.c_str(), monitorId.c_str()) == 0) {
+                return m_pendingTargetBrightness;
+            }
+            if (m_pendingTargetMonitorId.empty()) {
+                const auto* cfg = g_Settings.FindMonitorConfig(monitorId);
+                if (!cfg || cfg->controlMode == 0) {
+                    return cfg ? AppSettings::ComputeSyncedBrightness(m_pendingTargetBrightness, *cfg) : m_pendingTargetBrightness;
+                }
+            }
+        }
+    }
+    std::lock_guard<std::mutex> lock(m_mutex);
+    for (auto& mon : m_monitors) {
+        if (_wcsicmp(mon.id.c_str(), monitorId.c_str()) == 0) {
+            DWORD minB = 0, curB = 0, maxB = 100;
+            bool ok = mon.isInternal
+                ? GetInternalBrightnessWmi(mon.wmiInstanceName, curB)
+                : (GetMonitorBrightness(mon.hPhysical, &minB, &curB, &maxB) != FALSE);
+            if (ok) {
+                mon.currentBrightness = curB;
+                if (!mon.isInternal) {
+                    mon.minBrightness = minB;
+                    mon.maxBrightness = maxB;
+                }
+                int pct = SafeCalcBrightnessPercent(curB, mon.minBrightness, mon.maxBrightness);
+                auto* cfg = const_cast<MonitorControlConfig*>(g_Settings.FindMonitorConfig(mon.id));
+                if (cfg) cfg->cachedBrightness = pct;
+                return pct;
+            }
+            const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
+            return cfg ? cfg->cachedBrightness : m_cachedBrightness;
+        }
+    }
+    return m_cachedBrightness;
+}
+
+std::vector<BrightnessChangeEntry> MonitorManager::GetChangedMonitorsForTarget(const std::wstring& targetMonitorId, int targetBrightness) const {
+    std::vector<BrightnessChangeEntry> result;
+    targetBrightness = (std::clamp)(targetBrightness, 0, 100);
+
+    std::lock_guard<std::mutex> lock(m_mutex);
+    bool isSyncTarget = targetMonitorId.empty() || _wcsicmp(targetMonitorId.c_str(), L"__SYNC__") == 0;
+    if (!isSyncTarget && _wcsicmp(targetMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0) {
+        const auto* mainCfg = g_Settings.FindMonitorConfig(g_Settings.mainMonitorId);
+        if (!mainCfg || mainCfg->controlMode == 0) {
+            isSyncTarget = true;
+        }
+    }
+
+    for (const auto& mon : m_monitors) {
+        const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
+        bool enabled = cfg ? cfg->enabled : true;
+        if (!enabled) continue;
+
+        bool isMain = (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
+        int mode = cfg ? cfg->controlMode : 0;
+
+        if (isSyncTarget) {
+            if (!isMain && mode != 0) continue; // Skip Separate non-main monitors
+            int effB = (!isMain && cfg) ? AppSettings::ComputeSyncedBrightness(targetBrightness, *cfg) : targetBrightness;
+            const auto& effCfg = g_Settings.GetEffectiveMonitorConfig(mon.id);
+            std::wstring dispName = (cfg && !cfg->customName.empty()) ? cfg->customName : AppSettings::SanitizeMonitorName(mon.friendlyName);
+            if (dispName.empty()) dispName = mon.id;
+            result.push_back({ mon.id, dispName, effB, effCfg.overlayUseWindowsAccent, effCfg.overlayAccentColor });
+        } else {
+            if (_wcsicmp(mon.id.c_str(), targetMonitorId.c_str()) != 0) continue;
+            const auto& effCfg = g_Settings.GetEffectiveMonitorConfig(mon.id);
+            std::wstring dispName = (cfg && !cfg->customName.empty()) ? cfg->customName : AppSettings::SanitizeMonitorName(mon.friendlyName);
+            if (dispName.empty()) dispName = mon.id;
+            result.push_back({ mon.id, dispName, targetBrightness, effCfg.overlayUseWindowsAccent, effCfg.overlayAccentColor });
+        }
+    }
+    return result;
+}
+
+bool MonitorManager::SetMonitorBrightnessTarget(const std::wstring& targetMonitorId, int brightness, bool async) {
     if (brightness < 0) brightness = 0;
     if (brightness > 100) brightness = 100;
 
+    bool isSyncTarget = targetMonitorId.empty() || _wcsicmp(targetMonitorId.c_str(), L"__SYNC__") == 0;
+    if (!isSyncTarget && _wcsicmp(targetMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0) {
+        const auto* mainCfg = g_Settings.FindMonitorConfig(g_Settings.mainMonitorId);
+        if (!mainCfg || mainCfg->controlMode == 0) {
+            isSyncTarget = true;
+        }
+    }
+
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        m_cachedBrightness = brightness;
-        g_Settings.cachedBrightness = brightness;
+        if (isSyncTarget) {
+            m_cachedBrightness = brightness;
+            g_Settings.cachedBrightness = brightness;
+            if (!g_Settings.mainMonitorId.empty()) {
+                auto it = g_Settings.monitorConfigs.find(g_Settings.mainMonitorId);
+                if (it != g_Settings.monitorConfigs.end()) it->second.cachedBrightness = brightness;
+            }
+        } else {
+            auto it = g_Settings.monitorConfigs.find(targetMonitorId);
+            if (it != g_Settings.monitorConfigs.end()) it->second.cachedBrightness = brightness;
+        }
     }
 
     if (async) {
-        // Enqueue to worker thread with coalescing
         {
             std::lock_guard<std::mutex> lock(m_workerMutex);
             m_pendingTargetBrightness = brightness;
+            m_pendingTargetMonitorId = isSyncTarget ? L"" : targetMonitorId;
         }
         m_workerCv.notify_one();
         return true;
@@ -571,13 +708,26 @@ bool MonitorManager::SetBrightness(int brightness, bool async) {
 
     bool allSuccess = true;
     for (const auto& mon : m_monitors) {
-        if (!g_Settings.IsMonitorSelected(mon.id)) {
-            continue; // Skip monitors not selected
+        const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
+        if (cfg && !cfg->enabled) continue;
+
+        bool isMain = (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
+        int mode = cfg ? cfg->controlMode : 0;
+        int effB = brightness;
+
+        if (isSyncTarget) {
+            if (!isMain && mode != 0) continue;
+            if (!isMain && cfg) effB = AppSettings::ComputeSyncedBrightness(brightness, *cfg);
+        } else {
+            if (_wcsicmp(mon.id.c_str(), targetMonitorId.c_str()) != 0) continue;
         }
+
         DWORD targetVal = (mon.maxBrightness > mon.minBrightness)
-            ? (mon.minBrightness + (mon.maxBrightness - mon.minBrightness) * brightness / 100)
-            : (DWORD)brightness;
+            ? (mon.minBrightness + (mon.maxBrightness - mon.minBrightness) * effB / 100)
+            : (DWORD)effB;
         if (mon.isInternal) {
+            m_lastAppInternalWriteTick = GetTickCount64();
+            m_lastAppInternalWriteVal = (int)targetVal;
             if (!ConnectWmiServices(pWmiSync) || !SetInternalBrightnessWmi(pWmiSync.Get(), mon.wmiInstanceName, targetVal)) {
                 allSuccess = false;
             }
@@ -601,6 +751,7 @@ void MonitorManager::WorkerLoop() {
 
     while (true) {
         int targetBrightness = -1;
+        std::wstring targetMonitorId;
         bool doReinit = false;
 
         {
@@ -620,13 +771,18 @@ void MonitorManager::WorkerLoop() {
 
             if (m_pendingTargetBrightness != -1) {
                 targetBrightness = m_pendingTargetBrightness;
+                targetMonitorId = m_pendingTargetMonitorId;
                 m_pendingTargetBrightness = -1;
+                m_pendingTargetMonitorId.clear();
             }
         }
 
         if (doReinit) {
-            std::lock_guard<std::mutex> lock(m_mutex);
-            EnumMonitorsInternal();
+            {
+                std::lock_guard<std::mutex> lock(m_mutex);
+                EnumMonitorsInternal();
+            }
+            UpdateFnSyncListener();
         }
 
         if (targetBrightness != -1) {
@@ -647,20 +803,25 @@ void MonitorManager::WorkerLoop() {
                     EnumMonitorsInternal();
                 }
                 if (m_driverAvailable && !m_monitors.empty()) {
-                    bool anySelected = false;
+                    bool isSyncTarget = targetMonitorId.empty();
                     for (const auto& mon : m_monitors) {
-                        if (g_Settings.IsMonitorSelected(mon.id)) {
-                            anySelected = true;
-                            break;
+                        const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
+                        if (cfg && !cfg->enabled) continue;
+
+                        bool isMain = (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
+                        int mode = cfg ? cfg->controlMode : 0;
+                        int effB = targetBrightness;
+
+                        if (isSyncTarget) {
+                            if (!isMain && mode != 0) continue;
+                            if (!isMain && cfg) effB = AppSettings::ComputeSyncedBrightness(targetBrightness, *cfg);
+                        } else {
+                            if (_wcsicmp(mon.id.c_str(), targetMonitorId.c_str()) != 0) continue;
                         }
-                    }
-                    for (const auto& mon : m_monitors) {
-                        if (anySelected && !g_Settings.IsMonitorSelected(mon.id)) {
-                            continue; // Skip monitors not selected
-                        }
+
                         DWORD targetVal = (mon.maxBrightness > mon.minBrightness)
-                            ? (mon.minBrightness + (mon.maxBrightness - mon.minBrightness) * targetBrightness / 100)
-                            : (DWORD)targetBrightness;
+                            ? (mon.minBrightness + (mon.maxBrightness - mon.minBrightness) * effB / 100)
+                            : (DWORD)effB;
                         targets.push_back({ mon.hPhysical, mon.isInternal, mon.wmiInstanceName, targetVal });
                     }
                 }
@@ -695,6 +856,8 @@ void MonitorManager::WorkerLoop() {
 
                 bool ok = false;
                 if (tgt.isInternal) {
+                    m_lastAppInternalWriteTick = GetTickCount64();
+                    m_lastAppInternalWriteVal = (int)tgt.targetVal;
                     if (!ConnectWmiServices(pWmiSvc) || !SetInternalBrightnessWmi(pWmiSvc.Get(), tgt.wmiInstanceName, tgt.targetVal)) {
                         pWmiSvc.Reset();
                         if (ConnectWmiServices(pWmiSvc)) {
@@ -786,4 +949,110 @@ void MonitorManager::OnDisplayPowerOn() {
         m_pendingReinit = true;
         m_workerCv.notify_one();
     }
+}
+
+bool MonitorManager::IsMainDisplayInternal() const {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    for (const auto& mon : m_monitors) {
+        if (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0) {
+            return mon.isInternal;
+        }
+    }
+    return false;
+}
+
+class WmiBrightnessEventSink : public IWbemObjectSink {
+public:
+    WmiBrightnessEventSink(MonitorManager* mgr) : m_refCount(1), m_mgr(mgr) {}
+    virtual ~WmiBrightnessEventSink() = default;
+
+    ULONG STDMETHODCALLTYPE AddRef() override { return InterlockedIncrement(&m_refCount); }
+    ULONG STDMETHODCALLTYPE Release() override {
+        LONG l = InterlockedDecrement(&m_refCount);
+        if (l == 0) delete this;
+        return l;
+    }
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppv) override {
+        if (riid == IID_IUnknown || riid == IID_IWbemObjectSink) {
+            *ppv = static_cast<IWbemObjectSink*>(this);
+            AddRef();
+            return WBEM_S_NO_ERROR;
+        }
+        return E_NOINTERFACE;
+    }
+    HRESULT STDMETHODCALLTYPE Indicate(LONG lObjectCount, IWbemClassObject** apObjArray) override {
+        for (LONG i = 0; i < lObjectCount; ++i) {
+            if (!apObjArray[i]) continue;
+            DWORD b = 0;
+            if (ReadWmiBrightnessVariant(apObjArray[i], L"Brightness", b)) {
+                if (b > 100) b = 100;
+                if (m_mgr) {
+                    m_mgr->HandleWmiBrightnessEvent(static_cast<int>(b));
+                }
+            }
+        }
+        return WBEM_S_NO_ERROR;
+    }
+    HRESULT STDMETHODCALLTYPE SetStatus(LONG, HRESULT, BSTR, IWbemClassObject*) override {
+        return WBEM_S_NO_ERROR;
+    }
+
+private:
+    LONG m_refCount;
+    MonitorManager* m_mgr;
+};
+
+void MonitorManager::HandleWmiBrightnessEvent(int brightness) {
+    if (!g_Settings.syncExternalWithLaptopFnKeys || !IsMainDisplayInternal()) return;
+    brightness = (std::clamp)(brightness, 0, 100);
+    if (GetTickCount64() - m_lastAppInternalWriteTick.load() < 600 && brightness == m_lastAppInternalWriteVal.load()) {
+        return; // Ignore echo from our own WMI write
+    }
+    SetMonitorBrightnessTarget(L"__SYNC__", brightness, true);
+    HWND hMain = FindWindowW(L"ClickBrightness_MessageWndClass", L"ClickBrightness_HiddenMsgWindow");
+    if (!hMain) hMain = FindWindowW(L"ClickBrightness_MessageWndClass", NULL);
+    if (hMain) {
+        PostMessageW(hMain, WM_APP_BRIGHTNESS_UPDATED, (WPARAM)brightness, 0);
+    }
+}
+
+void MonitorManager::UpdateFnSyncListener() {
+    bool shouldRun = g_Settings.syncExternalWithLaptopFnKeys && IsMainDisplayInternal();
+    if (!shouldRun) {
+        if (m_fnSyncRunning.load()) {
+            m_fnSyncRunning = false;
+            if (m_fnSyncStopEvent) SetEvent(m_fnSyncStopEvent);
+            if (m_fnSyncThread.joinable()) m_fnSyncThread.join();
+            if (m_fnSyncStopEvent) { CloseHandle(m_fnSyncStopEvent); m_fnSyncStopEvent = NULL; }
+        }
+        return;
+    }
+
+    if (m_fnSyncRunning.load()) return;
+
+    if (!m_fnSyncStopEvent) {
+        m_fnSyncStopEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
+    } else {
+        ResetEvent(m_fnSyncStopEvent);
+    }
+    m_fnSyncRunning = true;
+    m_fnSyncThread = std::thread([this]() {
+        ScopedComInit com;
+        Microsoft::WRL::ComPtr<IWbemServices> pSvc;
+        if (!ConnectWmiServices(pSvc)) {
+            m_fnSyncRunning = false;
+            return;
+        }
+        Microsoft::WRL::ComPtr<IWbemObjectSink> pSink;
+        pSink.Attach(new WmiBrightnessEventSink(this));
+        ScopedBstr wql(L"WQL");
+        ScopedBstr query(L"SELECT * FROM WmiMonitorBrightnessEvent");
+        if (SUCCEEDED(pSvc->ExecNotificationQueryAsync(wql, query, WBEM_FLAG_SEND_STATUS, NULL, pSink.Get()))) {
+            if (m_fnSyncStopEvent) {
+                WaitForSingleObject(m_fnSyncStopEvent, INFINITE);
+            }
+            pSvc->CancelAsyncCall(pSink.Get());
+        }
+        m_fnSyncRunning = false;
+    });
 }

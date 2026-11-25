@@ -30,9 +30,10 @@
                            Margin="0,0,0,14"
                            HorizontalAlignment="Center"/>
 
-                <!-- Content Grid: 2 columns (Buttons, Slider) -->
+                <!-- Content Grid: 3 columns (Buttons, Main Slider, Extra Sync Sliders) -->
                 <Grid Grid.Row="1" HorizontalAlignment="Center">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
@@ -47,20 +48,39 @@
                         </StackPanel.ChildrenTransitions>
                     </StackPanel>
 
-                    <!-- Column 1: Native WinUI 3 Slider -->
-                    <Slider x:Name="BrightnessSlider"
-                            Grid.Column="1"
-                            Orientation="Vertical"
-                            Minimum="0"
-                            Maximum="100"
-                            StepFrequency="1"
-                            SmallChange="1"
-                            LargeChange="5"
-                            Height="502"
-                            Margin="7,0,0,0"
-                            IsThumbToolTipEnabled="True"
-                            VerticalAlignment="Top"
-                            HorizontalAlignment="Center"/>
+                    <!-- Column 1: Native WinUI 3 Slider (with optional header for multi-sync mode) -->
+                    <StackPanel Grid.Column="1" Margin="7,0,0,0" VerticalAlignment="Top" HorizontalAlignment="Center">
+                        <TextBlock x:Name="MainColumnHeader"
+                                   Visibility="Collapsed"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="12"
+                                   TextAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   MaxWidth="70"
+                                   Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                   Margin="0,0,0,6"
+                                   HorizontalAlignment="Center"/>
+                        <Slider x:Name="BrightnessSlider"
+                                Orientation="Vertical"
+                                Minimum="0"
+                                Maximum="100"
+                                StepFrequency="1"
+                                SmallChange="1"
+                                LargeChange="5"
+                                Height="502"
+                                IsThumbToolTipEnabled="True"
+                                VerticalAlignment="Top"
+                                HorizontalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Column 2: Additional Sync-Mode Monitor Sliders -->
+                    <StackPanel x:Name="SyncMonitorsPanel"
+                                Grid.Column="2"
+                                Orientation="Horizontal"
+                                Spacing="10"
+                                Visibility="Collapsed"
+                                Margin="10,0,0,0"
+                                VerticalAlignment="Top"/>
                 </Grid>
             </Grid>
         </Border>

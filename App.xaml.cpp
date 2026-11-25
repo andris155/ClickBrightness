@@ -42,6 +42,7 @@ static HANDLE s_hEvents[4] = { NULL, NULL, NULL, NULL };
 static std::atomic<bool> s_ipcRunning{ false };
 static std::thread s_ipcThread;
 static bool s_toggleKeyHeld = false;
+static UINT s_toggleHeldVk = 0;
 
 static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -140,6 +141,7 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
     case WM_APP_BRIGHTNESS_UPDATED:
     {
         g_TrayIcon.UpdateBrightness((int)wParam);
+        g_TrayIcon.SyncExtraTrayIcons();
         g_FlyoutWindow.SetBrightness((int)wParam, false);
         return 0;
     }
@@ -147,12 +149,20 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
     case WM_APP_TRAY_WHEEL:
     {
         int step = static_cast<int>(wParam);
-        g_OverlayWindow.TriggerTrayWheel(step);
+        UINT trayId = static_cast<UINT>(lParam);
+        std::wstring targetMonId = g_TrayIcon.GetTargetMonitorByTrayId(trayId);
+        g_OverlayWindow.TriggerTrayWheelForTarget(targetMonId, step);
         return 0;
     }
 
     case WM_APP_TRAYMSG:
     {
+        UINT trayId = (UINT)HIWORD(lParam);
+        if (trayId == 0) trayId = 1;
+        std::wstring targetMonId = g_TrayIcon.GetTargetMonitorByTrayId(trayId);
+        std::wstring effMonId = targetMonId.empty() ? g_Settings.mainMonitorId : targetMonId;
+        const auto& effCfg = g_Settings.GetEffectiveMonitorConfig(effMonId);
+
         UINT event = (UINT)LOWORD(lParam);
         static ULONGLONG s_lastTrayLeftClick = 0;
         static ULONGLONG s_lastTrayRightClick = 0;
@@ -171,10 +181,10 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
                 g_FlyoutWindow.Hide();
             }
 
-            if (g_Settings.trayMiddleClickEnabled)
+            if (effCfg.trayMiddleClickEnabled)
             {
-                int target = (std::clamp)(g_Settings.trayMiddleClickBrightness, 0, 100);
-                g_OverlayWindow.TriggerBrightnessSet(target, g_Settings.trayMiddleClickShowOsd);
+                int target = (std::clamp)(effCfg.trayMiddleClickBrightness, 0, 100);
+                g_OverlayWindow.TriggerBrightnessSetForTarget(targetMonId, target, effCfg.trayMiddleClickShowOsd);
             }
             break;
         }
@@ -195,7 +205,7 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
                 g_OverlayWindow.ApplyPendingBrightness();
                 POINT pt;
                 GetCursorPos(&pt);
-                g_FlyoutWindow.Show(&pt);
+                g_FlyoutWindow.Show(&pt, targetMonId);
             }
             break;
         }
@@ -213,7 +223,7 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
 
             try
             {
-                g_TrayIcon.ShowContextMenu();
+                g_TrayIcon.ShowContextMenu(trayId);
             }
             catch (...)
             {
@@ -236,27 +246,31 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
         static WPARAM s_lastHotkeyId = 0;
         static ULONGLONG s_lastToggleTick = 0;
 
+        std::wstring targetMonId;
+        int action = -1;
+        UINT toggleVk = 0;
+        if (!g_HotkeyManager.ResolveHotkey((int)wParam, targetMonId, action, toggleVk))
+        {
+            return 0;
+        }
+
         ULONGLONG now = GetTickCount64();
 
         // One-shot toggle handling with hold suppression
-        if (wParam == ID_HOTKEY_PRESET_TOGGLE)
+        if (action == 4)
         {
-            // If the key is currently held down from a previous event, suppress all auto-repeats!
             if (s_toggleKeyHeld)
             {
                 return 0;
             }
-
-            // Debounce accidental switch chatter within 300ms
             if (s_lastToggleTick != 0 && (now - s_lastToggleTick) < 300)
             {
                 return 0;
             }
 
             s_toggleKeyHeld = true;
+            s_toggleHeldVk = toggleVk;
             s_lastToggleTick = now;
-
-            // Start a 50ms polling timer to detect when the key is physically released
             SetTimer(hwnd, IDT_PRESET_TOGGLE_RELEASE, 50, NULL);
         }
         else
@@ -270,47 +284,33 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
             s_lastHotkeyId = wParam;
         }
 
-        int step = g_Settings.hotkeyStep;
-        if (wParam == ID_HOTKEY_UP)
+        std::wstring effMonId = targetMonId.empty() ? g_Settings.mainMonitorId : targetMonId;
+        const auto& effCfg = g_Settings.GetEffectiveMonitorConfig(effMonId);
+
+        int step = effCfg.hotkeyStep;
+        if (action == 0 && effCfg.hotkeyAdjustEnabled)
         {
-            if (g_Settings.hotkeyAdjustEnabled)
-            {
-                g_OverlayWindow.TriggerBrightnessDelta(+step, g_Settings.hotkeyAdjustShowOsd);
-            }
+            g_OverlayWindow.TriggerBrightnessDeltaForTarget(targetMonId, +step, effCfg.hotkeyAdjustShowOsd);
         }
-        else if (wParam == ID_HOTKEY_DOWN)
+        else if (action == 1 && effCfg.hotkeyAdjustEnabled)
         {
-            if (g_Settings.hotkeyAdjustEnabled)
-            {
-                g_OverlayWindow.TriggerBrightnessDelta(-step, g_Settings.hotkeyAdjustShowOsd);
-            }
+            g_OverlayWindow.TriggerBrightnessDeltaForTarget(targetMonId, -step, effCfg.hotkeyAdjustShowOsd);
         }
-        else if (wParam == ID_HOTKEY_PRESET1)
+        else if (action == 2 && effCfg.hotkeyPresetsEnabled)
         {
-            if (g_Settings.hotkeyPresetsEnabled)
-            {
-                g_OverlayWindow.TriggerBrightnessSet(g_Settings.hotkeyPreset1Brightness, g_Settings.hotkeyPresetsShowOsd);
-            }
+            g_OverlayWindow.TriggerBrightnessSetForTarget(targetMonId, effCfg.hotkeyPreset1Brightness, effCfg.hotkeyPresetsShowOsd);
         }
-        else if (wParam == ID_HOTKEY_PRESET2)
+        else if (action == 3 && effCfg.hotkeyPresetsEnabled)
         {
-            if (g_Settings.hotkeyPresetsEnabled)
-            {
-                g_OverlayWindow.TriggerBrightnessSet(g_Settings.hotkeyPreset2Brightness, g_Settings.hotkeyPresetsShowOsd);
-            }
+            g_OverlayWindow.TriggerBrightnessSetForTarget(targetMonId, effCfg.hotkeyPreset2Brightness, effCfg.hotkeyPresetsShowOsd);
         }
-        else if (wParam == ID_HOTKEY_PRESET_TOGGLE)
+        else if (action == 4 && effCfg.hotkeyPresetToggleEnabled)
         {
-            if (g_Settings.hotkeyPresetToggleEnabled)
-            {
-                int curB = g_MonitorManager.GetCachedBrightness();
-                int p1 = g_Settings.hotkeyPresetToggle1Brightness;
-                int p2 = g_Settings.hotkeyPresetToggle2Brightness;
-                // Toggle between presets: if currently at p1, switch to p2; if at p2, switch to p1;
-                // otherwise switch to whichever preset is further away (or p2 if closer to p1)
-                int target = (curB == p1) ? p2 : ((curB == p2) ? p1 : (abs(curB - p1) < abs(curB - p2) ? p2 : p1));
-                g_OverlayWindow.TriggerBrightnessSet(target, g_Settings.hotkeyPresetToggleShowOsd);
-            }
+            int curB = g_MonitorManager.GetMonitorBrightnessById(targetMonId);
+            int p1 = effCfg.hotkeyPresetToggle1Brightness;
+            int p2 = effCfg.hotkeyPresetToggle2Brightness;
+            int target = (curB == p1) ? p2 : ((curB == p2) ? p1 : (abs(curB - p1) < abs(curB - p2) ? p2 : p1));
+            g_OverlayWindow.TriggerBrightnessSetForTarget(targetMonId, target, effCfg.hotkeyPresetToggleShowOsd);
         }
         return 0;
     }
@@ -448,12 +448,13 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
         }
         else if (wParam == IDT_PRESET_TOGGLE_RELEASE)
         {
-            UINT vk = g_Settings.hotkeyPresetToggleKey;
+            UINT vk = s_toggleHeldVk ? s_toggleHeldVk : g_Settings.hotkeyPresetToggleKey;
             if (vk == 0 || (GetAsyncKeyState(vk) & 0x8000) == 0)
             {
                 // Key has been physically released! Stop timer and re-arm toggle
                 KillTimer(hwnd, IDT_PRESET_TOGGLE_RELEASE);
                 s_toggleKeyHeld = false;
+                s_toggleHeldVk = 0;
             }
             return 0;
         }

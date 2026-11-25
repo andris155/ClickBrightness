@@ -1,5 +1,6 @@
 #include "TrayIcon.h"
 #include "Settings.h"
+#include "MonitorManager.h"
 #include "LocalizationManager.h"
 #include "ThemeHelper.h"
 #include "App.xaml.h"
@@ -33,30 +34,43 @@ static LRESULT CALLBACK TrayWheelHookProc(int nCode, WPARAM wParam, LPARAM lPara
 {
     if (nCode == HC_ACTION && wParam == WM_MOUSEWHEEL)
     {
-        if (g_Settings.trayWheelEnabled)
+        PMSLLHOOKSTRUCT p = reinterpret_cast<PMSLLHOOKSTRUCT>(lParam);
+        if (p)
         {
-            PMSLLHOOKSTRUCT p = reinterpret_cast<PMSLLHOOKSTRUCT>(lParam);
-            if (p)
+            HWND hOwner = g_TrayIcon.GetOwnerWnd();
+            if (hOwner)
             {
-                HWND hOwner = g_TrayIcon.GetOwnerWnd();
-                if (hOwner)
-                {
+                auto checkSlot = [&](UINT slotId, const std::wstring& targetMonId) -> bool {
+                    std::wstring effId = targetMonId.empty() ? g_Settings.mainMonitorId : targetMonId;
+                    const auto& effCfg = g_Settings.GetEffectiveMonitorConfig(effId);
+                    if (!effCfg.trayWheelEnabled) return false;
+
                     NOTIFYICONIDENTIFIER nid = { sizeof(NOTIFYICONIDENTIFIER) };
                     nid.hWnd = hOwner;
-                    nid.uID = g_TrayIcon.GetId();
+                    nid.uID = slotId;
                     RECT rcIcon = {};
-                    if (SUCCEEDED(Shell_NotifyIconGetRect(&nid, &rcIcon)))
+                    if (SUCCEEDED(Shell_NotifyIconGetRect(&nid, &rcIcon)) && PtInRect(&rcIcon, p->pt))
                     {
-                        if (PtInRect(&rcIcon, p->pt))
+                        short delta = static_cast<short>(HIWORD(p->mouseData));
+                        if (delta != 0)
                         {
-                            short delta = static_cast<short>(HIWORD(p->mouseData));
-                            if (delta != 0)
-                            {
-                                int step = (delta > 0) ? g_Settings.trayWheelStep : -g_Settings.trayWheelStep;
-                                PostMessageW(hOwner, WM_APP_TRAY_WHEEL, static_cast<WPARAM>(step), 0);
-                                return 1;
-                            }
+                            int step = (delta > 0) ? effCfg.trayWheelStep : -effCfg.trayWheelStep;
+                            PostMessageW(hOwner, WM_APP_TRAY_WHEEL, static_cast<WPARAM>(step), static_cast<LPARAM>(slotId));
+                            return true;
                         }
+                    }
+                    return false;
+                };
+
+                if (checkSlot(g_TrayIcon.GetId(), L""))
+                {
+                    return 1;
+                }
+                for (const auto& slot : g_TrayIcon.GetExtraSlots())
+                {
+                    if (slot.created && checkSlot(slot.uId, slot.monitorId))
+                    {
+                        return 1;
                     }
                 }
             }
@@ -145,6 +159,14 @@ void TrayIcon::InvalidateIconCache() {
             m_iconCache[i] = NULL;
         }
     }
+    for (auto& slot : m_extraSlots) {
+        for (int i = 0; i <= 100; ++i) {
+            if (slot.iconCache[i]) {
+                DestroyIcon(slot.iconCache[i]);
+                slot.iconCache[i] = NULL;
+            }
+        }
+    }
 }
 
 void TrayIcon::ResetGraphicsResources() {
@@ -159,6 +181,8 @@ void TrayIcon::OnThemeChanged() {
     if (m_created) {
         int b = (m_lastBrightness >= 0) ? m_lastBrightness : g_Settings.cachedBrightness;
         UpdateBrightness(b);
+        SyncExtraTrayIcons();
+        UpdateWheelHook();
     }
     if (s_trayMenuRoot && s_trayMenuFlyout) {
         bool isDark = ThemeHelper::IsOverlayInDarkMode(g_Settings.overlayTheme);
@@ -232,6 +256,7 @@ bool TrayIcon::Create(HWND hOwnerWnd, UINT uCallbackMsg, UINT uId) {
         nid.uVersion = NOTIFYICON_VERSION_4;
         Shell_NotifyIconW(NIM_SETVERSION, &nid);
         InitTrayMenu();
+        SyncExtraTrayIcons();
         UpdateWheelHook();
         return true;
     }
@@ -243,6 +268,19 @@ void TrayIcon::Destroy() {
         UnhookWindowsHookEx(s_hTrayWheelHook);
         s_hTrayWheelHook = NULL;
     }
+    for (auto& slot : m_extraSlots) {
+        if (slot.created) {
+            NOTIFYICONDATAW nid = { sizeof(NOTIFYICONDATAW) };
+            nid.hWnd = m_hOwnerWnd;
+            nid.uID = slot.uId;
+            Shell_NotifyIconW(NIM_DELETE, &nid);
+            slot.created = false;
+        }
+        for (int i = 0; i <= 100; ++i) {
+            if (slot.iconCache[i]) { DestroyIcon(slot.iconCache[i]); slot.iconCache[i] = NULL; }
+        }
+    }
+    m_extraSlots.clear();
     if (m_created) {
         NOTIFYICONDATAW nid = { sizeof(NOTIFYICONDATAW) };
         nid.hWnd = m_hOwnerWnd;
@@ -260,7 +298,16 @@ void TrayIcon::Destroy() {
 }
 
 void TrayIcon::UpdateWheelHook() {
-    if (g_Settings.trayWheelEnabled && m_created) {
+    bool anyWheel = g_Settings.GetEffectiveMonitorConfig(g_Settings.mainMonitorId).trayWheelEnabled;
+    if (!anyWheel) {
+        for (const auto& slot : m_extraSlots) {
+            if (g_Settings.GetEffectiveMonitorConfig(slot.monitorId).trayWheelEnabled) {
+                anyWheel = true;
+                break;
+            }
+        }
+    }
+    if (anyWheel && m_created) {
         if (!s_hTrayWheelHook) {
             s_hTrayWheelHook = SetWindowsHookExW(WH_MOUSE_LL, TrayWheelHookProc, GetModuleHandleW(NULL), 0);
         }
@@ -272,8 +319,12 @@ void TrayIcon::UpdateWheelHook() {
     }
 }
 
-// Render brightness number onto native-resolution icon using DirectWrite for Start Menu sharpness
 HICON TrayIcon::CreateBrightnessIcon(int brightness) {
+    return CreateBrightnessIconForConfig(brightness, g_Settings.GetEffectiveMonitorConfig(g_Settings.mainMonitorId));
+}
+
+// Render brightness number onto native-resolution icon using DirectWrite for Start Menu sharpness
+HICON TrayIcon::CreateBrightnessIconForConfig(int brightness, const MonitorControlConfig& cfg) {
     InitD2D();
     if (!m_pDCRenderTarget || !m_pDWriteFactory) return NULL;
 
@@ -308,9 +359,9 @@ HICON TrayIcon::CreateBrightnessIcon(int brightness) {
     RECT rc = { 0, 0, size, size };
     m_pDCRenderTarget->BindDC(hdcMem, &rc);
 
-    std::wstring fontName = !g_Settings.trayFont.empty() ? g_Settings.trayFont : L"Segoe UI Variable Text";
+    std::wstring fontName = !cfg.trayFont.empty() ? cfg.trayFont : L"Segoe UI Variable Text";
 
-    int w = (g_Settings.trayFontWeight >= 100 && g_Settings.trayFontWeight <= 900) ? g_Settings.trayFontWeight : 375;
+    int w = (cfg.trayFontWeight >= 100 && cfg.trayFontWeight <= 900) ? cfg.trayFontWeight : 375;
     DWRITE_FONT_WEIGHT fontWeight = static_cast<DWRITE_FONT_WEIGHT>(w);
 
     // Fallback: if a legacy font name still has a weight suffix, strip it and apply weight
@@ -329,8 +380,8 @@ HICON TrayIcon::CreateBrightnessIcon(int brightness) {
     else if (stripWeightSuffix(L" Bold")) fontWeight = DWRITE_FONT_WEIGHT_BOLD;
 
     // Font size calibrated for authentic Windows 11 taskbar typography:
-    float scale = (g_Settings.trayFontSize >= 40 && g_Settings.trayFontSize <= 150)
-        ? (g_Settings.trayFontSize / 100.0f) : 0.88f;
+    float scale = (cfg.trayFontSize >= 40 && cfg.trayFontSize <= 150)
+        ? (cfg.trayFontSize / 100.0f) : 0.88f;
     float fontSize = size * scale;
 
     Microsoft::WRL::ComPtr<IDWriteTextFormat> pFormat;
@@ -372,10 +423,10 @@ HICON TrayIcon::CreateBrightnessIcon(int brightness) {
     }
 
     D2D1_COLOR_F textColor;
-    if (g_Settings.trayPercentageMode == 1) {
-        COLORREF col = (g_Settings.trayIconUseDualColors && !m_lastTrayWasLight)
-            ? g_Settings.trayIconColorDark
-            : g_Settings.trayIconColor;
+    if (cfg.trayPercentageMode == 1) {
+        COLORREF col = (cfg.trayIconUseDualColors && !m_lastTrayWasLight)
+            ? cfg.trayIconColorDark
+            : cfg.trayIconColor;
         textColor = D2D1::ColorF(
             GetRValue(col) / 255.0f,
             GetGValue(col) / 255.0f,
@@ -400,11 +451,11 @@ HICON TrayIcon::CreateBrightnessIcon(int brightness) {
     m_pDCRenderTarget->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
 
     if (pFormat && m_pBrush) {
-        float yOffset = (float)g_Settings.trayYOffset * (size / 16.0f);
+        float yOffset = (float)cfg.trayYOffset * (size / 16.0f);
         if (textLen >= 3) {
             // Restore stretched condensed look for 100%: full height, horizontally condensed
-            float scaleX = (g_Settings.trayFontSize100 >= 30 && g_Settings.trayFontSize100 <= 130)
-                ? (g_Settings.trayFontSize100 / 100.0f) : 0.65f;
+            float scaleX = (cfg.trayFontSize100 >= 30 && cfg.trayFontSize100 <= 130)
+                ? (cfg.trayFontSize100 / 100.0f) : 0.65f;
             float virtualWidth = (float)size / scaleX;
             m_pDCRenderTarget->SetTransform(D2D1::Matrix3x2F::Scale(scaleX, 1.0f, D2D1::Point2F(0.0f, 0.0f)));
             D2D1_RECT_F layoutRect = D2D1::RectF(0.0f, yOffset, virtualWidth, (float)size + yOffset);
@@ -467,49 +518,224 @@ HICON TrayIcon::CreateBrightnessIcon(int brightness) {
 }
 
 bool TrayIcon::UpdateBrightness(int brightness) {
+    return UpdateBrightnessForTarget(L"", brightness);
+}
+
+bool TrayIcon::UpdateBrightnessForTarget(const std::wstring& targetMonitorId, int brightness) {
     if (!m_created) return false;
 
     if (brightness < 0) brightness = 0;
     if (brightness > 100) brightness = 100;
-    m_lastBrightness = brightness;
 
-    HICON hNewIcon = NULL;
-    if (g_Settings.trayPercentageMode != 2) {
-        hNewIcon = m_iconCache[brightness];
-        if (!hNewIcon) {
-            hNewIcon = CreateBrightnessIcon(brightness);
-            m_iconCache[brightness] = hNewIcon;
+    bool isMainOrSync = targetMonitorId.empty() ||
+                        _wcsicmp(targetMonitorId.c_str(), L"__SYNC__") == 0 ||
+                        _wcsicmp(targetMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0;
+
+    if (isMainOrSync) {
+        m_lastBrightness = brightness;
+        const auto& cfg = g_Settings.GetEffectiveMonitorConfig(g_Settings.mainMonitorId);
+
+        HICON hNewIcon = NULL;
+        if (cfg.trayPercentageMode != 2) {
+            hNewIcon = m_iconCache[brightness];
+            if (!hNewIcon) {
+                hNewIcon = CreateBrightnessIconForConfig(brightness, cfg);
+                m_iconCache[brightness] = hNewIcon;
+            }
+        } else {
+            if (!m_hBaseSunIcon) {
+                HWND hTaskbar = FindWindowW(L"Shell_TrayWnd", NULL);
+                UINT dpi = hTaskbar ? GetDpiForWindow(hTaskbar) : GetDpiForSystem();
+                int iconSize = GetSystemMetricsForDpi(SM_CXSMICON, dpi);
+                if (iconSize <= 0) iconSize = 16;
+                m_hBaseSunIcon = (HICON)LoadImageW(
+                    GetModuleHandleW(NULL),
+                    MAKEINTRESOURCEW(IDI_APP_ICON),
+                    IMAGE_ICON,
+                    iconSize,
+                    iconSize,
+                    LR_DEFAULTCOLOR
+                );
+            }
+            hNewIcon = m_hBaseSunIcon ? m_hBaseSunIcon : LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
         }
-    } else {
-        if (!m_hBaseSunIcon) {
-            HWND hTaskbar = FindWindowW(L"Shell_TrayWnd", NULL);
-            UINT dpi = hTaskbar ? GetDpiForWindow(hTaskbar) : GetDpiForSystem();
-            int iconSize = GetSystemMetricsForDpi(SM_CXSMICON, dpi);
-            if (iconSize <= 0) iconSize = 16;
-            m_hBaseSunIcon = (HICON)LoadImageW(
-                GetModuleHandleW(NULL),
-                MAKEINTRESOURCEW(IDI_APP_ICON),
-                IMAGE_ICON,
-                iconSize,
-                iconSize,
-                LR_DEFAULTCOLOR
-            );
+        if (!hNewIcon) return false;
+
+        NOTIFYICONDATAW nid = { sizeof(NOTIFYICONDATAW) };
+        nid.hWnd = m_hOwnerWnd;
+        nid.uID = m_uId;
+        nid.uFlags = NIF_ICON | NIF_TIP | NIF_SHOWTIP;
+        nid.hIcon = hNewIcon;
+        std::wstring tipFmt = g_Loc.Get(L"Tray_Tooltip", L"Brightness: %d%%");
+        StringCchPrintfW(nid.szTip, ARRAYSIZE(nid.szTip), tipFmt.c_str(), brightness);
+        bool ok = (Shell_NotifyIconW(NIM_MODIFY, &nid) == TRUE);
+
+        // Also update any Sync-mode separate tray icons with their offsetted brightness
+        for (auto& slot : m_extraSlots) {
+            if (slot.created && slot.isSyncSlot) {
+                const auto& syncCfg = g_Settings.GetEffectiveMonitorConfig(slot.monitorId);
+                int syncB = AppSettings::ComputeSyncedBrightness(brightness, syncCfg);
+                UpdateBrightnessForTarget(slot.monitorId, syncB);
+            }
         }
-        hNewIcon = m_hBaseSunIcon ? m_hBaseSunIcon : LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
+        return ok;
     }
-    if (!hNewIcon) return false;
 
-    NOTIFYICONDATAW nid = { sizeof(NOTIFYICONDATAW) };
-    nid.hWnd = m_hOwnerWnd;
-    nid.uID = m_uId;
-    nid.uFlags = NIF_ICON | NIF_TIP | NIF_SHOWTIP;
-    nid.hIcon = hNewIcon;
-    std::wstring tipFmt = g_Loc.Get(L"Tray_Tooltip", L"Brightness: %d%%");
-    StringCchPrintfW(nid.szTip, ARRAYSIZE(nid.szTip), tipFmt.c_str(), brightness);
+    for (auto& slot : m_extraSlots) {
+        if (_wcsicmp(slot.monitorId.c_str(), targetMonitorId.c_str()) == 0 && slot.created) {
+            slot.lastBrightness = brightness;
+            const auto& cfg = g_Settings.GetEffectiveMonitorConfig(slot.monitorId);
+            HICON hNewIcon = NULL;
+            if (cfg.trayPercentageMode != 2) {
+                hNewIcon = slot.iconCache[brightness];
+                if (!hNewIcon) {
+                    hNewIcon = CreateBrightnessIconForConfig(brightness, cfg);
+                    slot.iconCache[brightness] = hNewIcon;
+                }
+            } else {
+                hNewIcon = m_hBaseSunIcon ? m_hBaseSunIcon : LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
+            }
+            if (!hNewIcon) return false;
 
-    bool ok = (Shell_NotifyIconW(NIM_MODIFY, &nid) == TRUE);
+            NOTIFYICONDATAW nid = { sizeof(NOTIFYICONDATAW) };
+            nid.hWnd = m_hOwnerWnd;
+            nid.uID = slot.uId;
+            nid.uFlags = NIF_ICON | NIF_TIP | NIF_SHOWTIP;
+            nid.hIcon = hNewIcon;
+            std::wstring name = !cfg.customName.empty() ? cfg.customName : slot.monitorId;
+            StringCchPrintfW(nid.szTip, ARRAYSIZE(nid.szTip), L"%s: %d%%", name.c_str(), brightness);
+            return (Shell_NotifyIconW(NIM_MODIFY, &nid) == TRUE);
+        }
+    }
+    return false;
+}
 
-    return ok;
+void TrayIcon::SyncExtraTrayIcons() {
+    if (!m_created || !m_hOwnerWnd) return;
+
+    struct DesiredSlot {
+        std::wstring id;
+        bool isSyncSlot;
+    };
+    std::vector<DesiredSlot> desired;
+    for (const auto& mon : g_MonitorManager.GetMonitors()) {
+        if (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0) continue;
+        const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
+        if (!cfg || !cfg->enabled) continue;
+        if (cfg->controlMode == 1) {
+            desired.push_back({ mon.id, false });
+        } else if (cfg->controlMode == 0 && cfg->syncSeparateTrayIcon) {
+            desired.push_back({ mon.id, true });
+        }
+    }
+
+    // Remove slots no longer needed
+    for (auto it = m_extraSlots.begin(); it != m_extraSlots.end();) {
+        bool keep = false;
+        for (const auto& d : desired) {
+            if (_wcsicmp(it->monitorId.c_str(), d.id.c_str()) == 0) {
+                it->isSyncSlot = d.isSyncSlot;
+                keep = true;
+                break;
+            }
+        }
+        if (!keep) {
+            if (it->created) {
+                NOTIFYICONDATAW nid = { sizeof(NOTIFYICONDATAW) };
+                nid.hWnd = m_hOwnerWnd;
+                nid.uID = it->uId;
+                Shell_NotifyIconW(NIM_DELETE, &nid);
+            }
+            for (int i = 0; i <= 100; ++i) {
+                if (it->iconCache[i]) { DestroyIcon(it->iconCache[i]); it->iconCache[i] = NULL; }
+            }
+            it = m_extraSlots.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    int mainB = (m_lastBrightness >= 0) ? m_lastBrightness : g_Settings.cachedBrightness;
+
+    // Add missing slots
+    UINT nextId = 2;
+    for (const auto& d : desired) {
+        const std::wstring& id = d.id;
+        bool exists = false;
+        for (const auto& slot : m_extraSlots) {
+            if (_wcsicmp(slot.monitorId.c_str(), id.c_str()) == 0) { exists = true; break; }
+        }
+        if (!exists) {
+            while (true) {
+                bool idUsed = false;
+                for (const auto& slot : m_extraSlots) {
+                    if (slot.uId == nextId) { idUsed = true; break; }
+                }
+                if (!idUsed) break;
+                nextId++;
+            }
+
+            ExtraTraySlot slot;
+            slot.uId = nextId++;
+            slot.monitorId = id;
+            slot.isSyncSlot = d.isSyncSlot;
+            const auto& cfg = g_Settings.GetEffectiveMonitorConfig(id);
+            int b = d.isSyncSlot
+                ? AppSettings::ComputeSyncedBrightness(mainB, cfg)
+                : g_MonitorManager.GetMonitorBrightnessById(id);
+            slot.lastBrightness = b;
+
+            HICON hIcon = (cfg.trayPercentageMode != 2)
+                ? CreateBrightnessIconForConfig(b, cfg)
+                : (m_hBaseSunIcon ? m_hBaseSunIcon : LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION));
+            if (cfg.trayPercentageMode != 2 && hIcon) {
+                slot.iconCache[b] = hIcon;
+            }
+
+            NOTIFYICONDATAW nid = { sizeof(NOTIFYICONDATAW) };
+            nid.hWnd = m_hOwnerWnd;
+            nid.uID = slot.uId;
+            nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP;
+            nid.uCallbackMessage = m_uCallbackMsg;
+            nid.hIcon = hIcon ? hIcon : LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
+            std::wstring name = !cfg.customName.empty() ? cfg.customName : id;
+            StringCchPrintfW(nid.szTip, ARRAYSIZE(nid.szTip), L"%s: %d%%", name.c_str(), b);
+
+            if (Shell_NotifyIconW(NIM_ADD, &nid) == TRUE) {
+                nid.uVersion = NOTIFYICON_VERSION_4;
+                Shell_NotifyIconW(NIM_SETVERSION, &nid);
+                slot.created = true;
+                m_extraSlots.push_back(slot);
+            } else if (hIcon && cfg.trayPercentageMode != 2) {
+                DestroyIcon(hIcon);
+            }
+        }
+    }
+
+    // Refresh icons for all active extra slots
+    for (auto& slot : m_extraSlots) {
+        if (slot.created) {
+            int b = slot.lastBrightness;
+            if (slot.isSyncSlot) {
+                const auto& cfg = g_Settings.GetEffectiveMonitorConfig(slot.monitorId);
+                b = AppSettings::ComputeSyncedBrightness(mainB, cfg);
+            } else if (b < 0) {
+                b = g_MonitorManager.GetMonitorBrightnessById(slot.monitorId);
+            }
+            UpdateBrightnessForTarget(slot.monitorId, b);
+        }
+    }
+    UpdateWheelHook();
+}
+
+std::wstring TrayIcon::GetTargetMonitorByTrayId(UINT uId) const {
+    if (uId == m_uId || uId == 0) return L"";
+    for (const auto& slot : m_extraSlots) {
+        if (slot.uId == uId) {
+            return slot.isSyncSlot ? L"" : slot.monitorId;
+        }
+    }
+    return L"";
 }
 
 static void InitTrayMenu()
@@ -700,7 +926,7 @@ static void InitTrayMenu()
     }
 }
 
-void TrayIcon::ShowContextMenu() {
+void TrayIcon::ShowContextMenu(UINT uId) {
     try
     {
         InitTrayMenu();
@@ -728,7 +954,7 @@ void TrayIcon::ShowContextMenu() {
         RECT rcIcon = { 0 };
         NOTIFYICONIDENTIFIER nii = { sizeof(NOTIFYICONIDENTIFIER) };
         nii.hWnd = m_hOwnerWnd;
-        nii.uID = m_uId;
+        nii.uID = uId;
         HRESULT hr = Shell_NotifyIconGetRect(&nii, &rcIcon);
 
         int iconX = 0, iconY = 0, iconW = 32, iconH = 32;

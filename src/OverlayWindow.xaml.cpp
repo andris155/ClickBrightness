@@ -329,6 +329,142 @@ namespace winrt::BrightnessApp::implementation
         }
     }
 
+    void OverlayWindow::UpdateMultiContent(const std::wstring& targetMonitorId, int brightness)
+    {
+        auto entries = g_MonitorManager.GetChangedMonitorsForTarget(targetMonitorId, brightness);
+        if (entries.empty())
+        {
+            SingleRowGrid().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
+            MultiRowsPanel().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+            m_osdWidthDip = 194;
+            m_osdHeightDip = 47;
+            UpdateContent(brightness);
+            return;
+        }
+
+        // Count enabled monitors total
+        int enabledTotal = 0;
+        for (const auto& mon : g_MonitorManager.GetMonitors())
+        {
+            if (g_Settings.IsMonitorSelected(mon.id)) enabledTotal++;
+        }
+
+        bool isDark = ThemeHelper::IsOverlayInDarkMode(g_Settings.overlayTheme);
+        if (entries.size() == 1 && enabledTotal <= 1)
+        {
+            SingleRowGrid().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
+            MultiRowsPanel().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+            m_osdWidthDip = 194;
+            m_osdHeightDip = 47;
+
+            COLORREF accCol = entries[0].useWindowsAccent
+                ? ThemeHelper::GetAccentColors().GetForTheme(!isDark)
+                : entries[0].accentColor;
+            IndicatorBorder().Background(winrt::Microsoft::UI::Xaml::Media::SolidColorBrush(
+                winrt::Microsoft::UI::ColorHelper::FromArgb(255, GetRValue(accCol), GetGValue(accCol), GetBValue(accCol))));
+            UpdateContent(entries[0].brightness);
+            return;
+        }
+
+        SingleRowGrid().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        MultiRowsPanel().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
+        MultiRowsPanel().Children().Clear();
+
+        winrt::Windows::UI::Color fgColor = isDark
+            ? winrt::Microsoft::UI::Colors::White()
+            : winrt::Microsoft::UI::ColorHelper::FromArgb(255, 28, 28, 28);
+        winrt::Windows::UI::Color secColor = isDark
+            ? winrt::Microsoft::UI::ColorHelper::FromArgb(200, 220, 220, 220)
+            : winrt::Microsoft::UI::ColorHelper::FromArgb(200, 60, 60, 60);
+        winrt::Windows::UI::Color trackBg = isDark
+            ? winrt::Microsoft::UI::ColorHelper::FromArgb(135, 255, 255, 255)
+            : winrt::Microsoft::UI::ColorHelper::FromArgb(120, 0, 0, 0);
+
+        auto fgBrush = winrt::Microsoft::UI::Xaml::Media::SolidColorBrush(fgColor);
+        auto secBrush = winrt::Microsoft::UI::Xaml::Media::SolidColorBrush(secColor);
+        auto trackBrush = winrt::Microsoft::UI::Xaml::Media::SolidColorBrush(trackBg);
+
+        for (const auto& entry : entries)
+        {
+            winrt::Microsoft::UI::Xaml::Controls::StackPanel rowPanel;
+            rowPanel.Spacing(4);
+
+            // Top row: Monitor Name + Brightness %
+            winrt::Microsoft::UI::Xaml::Controls::Grid topGrid;
+            winrt::Microsoft::UI::Xaml::Controls::TextBlock nameText;
+            nameText.Text(entry.displayName);
+            nameText.FontSize(11.5);
+            nameText.Foreground(secBrush);
+            nameText.TextTrimming(winrt::Microsoft::UI::Xaml::TextTrimming::CharacterEllipsis);
+            nameText.MaxWidth(155);
+            nameText.HorizontalAlignment(winrt::Microsoft::UI::Xaml::HorizontalAlignment::Left);
+            nameText.VerticalAlignment(winrt::Microsoft::UI::Xaml::VerticalAlignment::Center);
+
+            winrt::Microsoft::UI::Xaml::Controls::TextBlock pctText;
+            pctText.Text(std::to_wstring(entry.brightness) + L"%");
+            pctText.FontSize(12);
+            pctText.Foreground(fgBrush);
+            pctText.HorizontalAlignment(winrt::Microsoft::UI::Xaml::HorizontalAlignment::Right);
+            pctText.VerticalAlignment(winrt::Microsoft::UI::Xaml::VerticalAlignment::Center);
+
+            topGrid.Children().Append(nameText);
+            topGrid.Children().Append(pctText);
+            rowPanel.Children().Append(topGrid);
+
+            // Bottom row: SunIcon + Bar
+            winrt::Microsoft::UI::Xaml::Controls::Grid barGrid;
+            winrt::Microsoft::UI::Xaml::Controls::FontIcon icon;
+            icon.Glyph(L"\uE706");
+            icon.FontSize(13);
+            icon.Width(14);
+            icon.Height(14);
+            icon.Foreground(fgBrush);
+            icon.HorizontalAlignment(winrt::Microsoft::UI::Xaml::HorizontalAlignment::Left);
+            icon.VerticalAlignment(winrt::Microsoft::UI::Xaml::VerticalAlignment::Center);
+
+            constexpr double trackW = 172.0;
+            winrt::Microsoft::UI::Xaml::Controls::Grid track;
+            track.Width(trackW);
+            track.Height(4);
+            track.CornerRadius({ 2, 2, 2, 2 });
+            track.Background(trackBrush);
+            track.HorizontalAlignment(winrt::Microsoft::UI::Xaml::HorizontalAlignment::Right);
+            track.VerticalAlignment(winrt::Microsoft::UI::Xaml::VerticalAlignment::Center);
+
+            winrt::Microsoft::UI::Xaml::Controls::Border indicator;
+            indicator.Height(4);
+            indicator.CornerRadius({ 2, 2, 2, 2 });
+            indicator.HorizontalAlignment(winrt::Microsoft::UI::Xaml::HorizontalAlignment::Left);
+            COLORREF accCol = entry.useWindowsAccent
+                ? ThemeHelper::GetAccentColors().GetForTheme(!isDark)
+                : entry.accentColor;
+            indicator.Background(winrt::Microsoft::UI::Xaml::Media::SolidColorBrush(
+                winrt::Microsoft::UI::ColorHelper::FromArgb(255, GetRValue(accCol), GetGValue(accCol), GetBValue(accCol))));
+            if (entry.brightness <= 0)
+            {
+                indicator.Width(0.0);
+            }
+            else
+            {
+                double fillW = (entry.brightness / 100.0) * trackW;
+                if (fillW < 4.0) fillW = 4.0;
+                if (fillW > trackW) fillW = trackW;
+                indicator.Width(fillW);
+            }
+            track.Children().Append(indicator);
+
+            barGrid.Children().Append(icon);
+            barGrid.Children().Append(track);
+            rowPanel.Children().Append(barGrid);
+
+            MultiRowsPanel().Children().Append(rowPanel);
+        }
+
+        int n = static_cast<int>(entries.size());
+        m_osdWidthDip = 220;
+        m_osdHeightDip = n * 35 + (n - 1) * 6 + 16;
+    }
+
     void OverlayWindow::PositionWindow()
     {
         if (!m_hwnd || !m_appWindow) return;
@@ -342,8 +478,8 @@ namespace winrt::BrightnessApp::implementation
         UINT dpi = DpiHelper::GetDpiForMonitor(hMon);
         if (dpi == 0) dpi = GetDpiForWindow(m_hwnd);
         if (dpi == 0) dpi = 96;
-        int width = DpiHelper::Scale(194, dpi);
-        int height = DpiHelper::Scale(47, dpi);
+        int width = DpiHelper::Scale(m_osdWidthDip, dpi);
+        int height = DpiHelper::Scale(m_osdHeightDip, dpi);
         int marginBottom = DpiHelper::Scale(16, dpi);
         m_slideOffset = height + marginBottom;
 
@@ -423,8 +559,18 @@ namespace winrt::BrightnessApp::implementation
 
     void OverlayWindow::TriggerBrightnessDelta(int delta, bool showOsd)
     {
+        TriggerBrightnessDeltaForTarget(L"", delta, showOsd);
+    }
+
+    void OverlayWindow::TriggerBrightnessDeltaForTarget(const std::wstring& targetMonitorId, int delta, bool showOsd)
+    {
         g_FlyoutWindow.ApplyPendingBrightness();
-        int cur = m_hasPendingChange ? m_pendingBrightness : g_MonitorManager.GetCachedBrightness();
+        if (m_hasPendingChange && _wcsicmp(m_pendingTargetMonitorId.c_str(), targetMonitorId.c_str()) != 0)
+        {
+            ApplyPendingBrightness();
+        }
+        m_pendingTargetMonitorId = targetMonitorId;
+        int cur = m_hasPendingChange ? m_pendingBrightness : g_MonitorManager.GetMonitorBrightnessById(targetMonitorId);
         int target = (std::clamp)(cur + delta, 0, 100);
         m_displayedBrightness = target;
         m_pendingBrightness = target;
@@ -432,7 +578,7 @@ namespace winrt::BrightnessApp::implementation
 
         if (showOsd)
         {
-            UpdateContent(target);
+            UpdateMultiContent(targetMonitorId, target);
             PositionWindow();
 
             if (m_backdropConfig)
@@ -470,22 +616,36 @@ namespace winrt::BrightnessApp::implementation
             }
         }
 
-        g_TrayIcon.UpdateBrightness(target);
-        g_FlyoutWindow.SetBrightness(target, false);
+        g_TrayIcon.UpdateBrightnessForTarget(targetMonitorId, target);
+        g_FlyoutWindow.SetBrightnessForTarget(targetMonitorId, target, false);
     }
 
     void OverlayWindow::TriggerTrayWheel(int delta)
     {
+        TriggerTrayWheelForTarget(L"", delta);
+    }
+
+    void OverlayWindow::TriggerTrayWheelForTarget(const std::wstring& targetMonitorId, int delta)
+    {
         g_FlyoutWindow.ApplyPendingBrightness();
-        int cur = m_hasPendingChange ? m_pendingBrightness : g_MonitorManager.GetCachedBrightness();
+        if (m_hasPendingChange && _wcsicmp(m_pendingTargetMonitorId.c_str(), targetMonitorId.c_str()) != 0)
+        {
+            ApplyPendingBrightness();
+        }
+        m_pendingTargetMonitorId = targetMonitorId;
+        int cur = m_hasPendingChange ? m_pendingBrightness : g_MonitorManager.GetMonitorBrightnessById(targetMonitorId);
         int target = (std::clamp)(cur + delta, 0, 100);
         m_displayedBrightness = target;
         m_pendingBrightness = target;
         m_hasPendingChange = true;
 
-        if (g_Settings.trayWheelShowOsd)
+        const auto& effCfg = targetMonitorId.empty()
+            ? g_Settings.GetEffectiveMonitorConfig(g_Settings.mainMonitorId)
+            : g_Settings.GetEffectiveMonitorConfig(targetMonitorId);
+
+        if (effCfg.trayWheelShowOsd)
         {
-            UpdateContent(target);
+            UpdateMultiContent(targetMonitorId, target);
             PositionWindow();
 
             if (m_backdropConfig)
@@ -522,15 +682,25 @@ namespace winrt::BrightnessApp::implementation
             }
         }
 
-        g_TrayIcon.UpdateBrightness(target);
-        g_FlyoutWindow.SetBrightness(target, false);
+        g_TrayIcon.UpdateBrightnessForTarget(targetMonitorId, target);
+        g_FlyoutWindow.SetBrightnessForTarget(targetMonitorId, target, false);
     }
 
     void OverlayWindow::TriggerBrightnessSet(int target, bool showOsd)
     {
+        TriggerBrightnessSetForTarget(L"", target, showOsd);
+    }
+
+    void OverlayWindow::TriggerBrightnessSetForTarget(const std::wstring& targetMonitorId, int target, bool showOsd)
+    {
         g_FlyoutWindow.ApplyPendingBrightness();
+        if (m_hasPendingChange && _wcsicmp(m_pendingTargetMonitorId.c_str(), targetMonitorId.c_str()) != 0)
+        {
+            ApplyPendingBrightness();
+        }
+        m_pendingTargetMonitorId = targetMonitorId;
         target = (std::clamp)(target, 0, 100);
-        int cur = g_MonitorManager.GetCachedBrightness();
+        int cur = g_MonitorManager.GetMonitorBrightnessById(targetMonitorId);
         bool changed = (cur != target);
 
         m_displayedBrightness = target;
@@ -539,7 +709,7 @@ namespace winrt::BrightnessApp::implementation
 
         if (showOsd)
         {
-            UpdateContent(target);
+            UpdateMultiContent(targetMonitorId, target);
             PositionWindow();
 
             if (m_backdropConfig)
@@ -566,8 +736,8 @@ namespace winrt::BrightnessApp::implementation
             ApplyPendingBrightness();
         }
 
-        g_TrayIcon.UpdateBrightness(target);
-        g_FlyoutWindow.SetBrightness(target, false);
+        g_TrayIcon.UpdateBrightnessForTarget(targetMonitorId, target);
+        g_FlyoutWindow.SetBrightnessForTarget(targetMonitorId, target, false);
     }
 
     void OverlayWindow::ApplyPendingBrightness()
@@ -579,7 +749,7 @@ namespace winrt::BrightnessApp::implementation
             {
                 KillTimer(m_hwnd, IDT_HOTKEY_DEBOUNCE);
             }
-            g_MonitorManager.SetBrightness(m_pendingBrightness);
+            g_MonitorManager.SetMonitorBrightnessTarget(m_pendingTargetMonitorId, m_pendingBrightness);
             g_FlyoutWindow.SetBrightness(m_pendingBrightness, false);
             g_Settings.cachedBrightness = m_pendingBrightness;
             g_Settings.SaveBrightnessOnly();

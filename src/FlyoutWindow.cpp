@@ -35,11 +35,12 @@ bool FlyoutWindow::Create()
     return (GetImpl() != nullptr);
 }
 
-void FlyoutWindow::Show(const POINT* pTrayPos)
+void FlyoutWindow::Show(const POINT* pTrayPos, const std::wstring& targetMonitorId)
 {
     auto p = GetImpl();
     if (p)
     {
+        p->SetTargetMonitor(targetMonitorId);
         p->ShowWindow(pTrayPos);
     }
 }
@@ -85,10 +86,15 @@ ULONGLONG FlyoutWindow::GetHideTick() const
 
 void FlyoutWindow::SetBrightness(int brightness, bool notifyHardware)
 {
+    SetBrightnessForTarget(L"", brightness, notifyHardware);
+}
+
+void FlyoutWindow::SetBrightnessForTarget(const std::wstring& targetMonitorId, int brightness, bool notifyHardware)
+{
     if (s_flyoutWindow)
     {
         auto p = winrt::get_self<winrt::BrightnessApp::implementation::FlyoutWindow>(s_flyoutWindow);
-        if (p) p->SetBrightness(brightness, notifyHardware);
+        if (p) p->SetBrightnessForTarget(targetMonitorId, brightness, notifyHardware);
     }
 }
 

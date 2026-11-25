@@ -44,7 +44,8 @@ namespace winrt::BrightnessApp::implementation
         // Mouse wheel brightness adjustment anywhere over the flyout
         auto onWheel = [this](auto&&, winrt::Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const& e)
         {
-            if (!g_Settings.flyoutScrollEnabled)
+            const auto& effCfg = g_Settings.GetEffectiveMonitorConfig(m_targetMonitorId.empty() ? g_Settings.mainMonitorId : m_targetMonitorId);
+            if (!effCfg.flyoutScrollEnabled)
             {
                 e.Handled(true);
                 return;
@@ -53,7 +54,7 @@ namespace winrt::BrightnessApp::implementation
             int delta = ptrPt.Properties().MouseWheelDelta();
             if (delta != 0)
             {
-                int step = (delta > 0) ? g_Settings.flyoutScrollStep : -g_Settings.flyoutScrollStep;
+                int step = (delta > 0) ? effCfg.flyoutScrollStep : -effCfg.flyoutScrollStep;
                 OnScrollAdjust(m_brightness + step);
                 e.Handled(true);
             }
@@ -399,11 +400,13 @@ namespace winrt::BrightnessApp::implementation
 
     void FlyoutWindow::UpdateTheme()
     {
+        std::wstring effId = m_targetMonitorId.empty() ? g_Settings.mainMonitorId : m_targetMonitorId;
+        const auto& effCfg = g_Settings.GetEffectiveMonitorConfig(effId);
         bool isDark = ThemeHelper::IsOverlayInDarkMode(g_Settings.overlayTheme);
         int curTrans = g_Settings.transparencyEnabled ? 1 : 0;
-        COLORREF accCol = g_Settings.flyoutUseWindowsAccent
+        COLORREF accCol = effCfg.flyoutUseWindowsAccent
             ? ThemeHelper::GetAccentColors().GetForTheme(!isDark)
-            : g_Settings.flyoutAccentColor;
+            : effCfg.flyoutAccentColor;
 
         if (m_lastTheme == (isDark ? 1 : 0) && m_lastTransparency == curTrans && m_lastAccentCol == accCol)
         {
@@ -490,12 +493,15 @@ namespace winrt::BrightnessApp::implementation
         }
     }
 
-    void FlyoutWindow::ApplySliderBrushes()
+    void FlyoutWindow::ApplySliderBrushesForControl(winrt::Microsoft::UI::Xaml::Controls::Slider const& slider, const std::wstring& monitorId)
     {
+        if (!slider) return;
+        std::wstring effId = monitorId.empty() ? g_Settings.mainMonitorId : monitorId;
+        const auto& effCfg = g_Settings.GetEffectiveMonitorConfig(effId);
         bool isDark = ThemeHelper::IsOverlayInDarkMode(g_Settings.overlayTheme);
-        COLORREF accCol = g_Settings.flyoutUseWindowsAccent
+        COLORREF accCol = effCfg.flyoutUseWindowsAccent
             ? ThemeHelper::GetAccentColors().GetForTheme(!isDark)
-            : g_Settings.flyoutAccentColor;
+            : effCfg.flyoutAccentColor;
 
         winrt::Windows::UI::Color accColor = winrt::Microsoft::UI::ColorHelper::FromArgb(
             255, GetRValue(accCol), GetGValue(accCol), GetBValue(accCol)
@@ -503,18 +509,15 @@ namespace winrt::BrightnessApp::implementation
 
         auto defaultBrush = winrt::Microsoft::UI::Xaml::Media::SolidColorBrush(accColor);
 
-        auto res = BrightnessSlider().Resources();
+        auto res = slider.Resources();
         res.Clear();
-        // Track fill remains constant (like native WinUI 3 Slider)
         res.Insert(winrt::box_value(L"SliderTrackValueFill"), defaultBrush);
         res.Insert(winrt::box_value(L"SliderTrackValueFillPointerOver"), defaultBrush);
         res.Insert(winrt::box_value(L"SliderTrackValueFillPressed"), defaultBrush);
-
         res.Insert(winrt::box_value(L"SliderThumbBackground"), defaultBrush);
 
-        if (!g_Settings.flyoutUseWindowsAccent)
+        if (!effCfg.flyoutUseWindowsAccent)
         {
-            // For custom colors: define WinUI 3 opacity-based hover (0.9) and pressed (0.8) brushes
             auto hoverBrush = winrt::Microsoft::UI::Xaml::Media::SolidColorBrush(accColor);
             hoverBrush.Opacity(0.9f);
 
@@ -524,17 +527,107 @@ namespace winrt::BrightnessApp::implementation
             res.Insert(winrt::box_value(L"SliderThumbBackgroundPointerOver"), hoverBrush);
             res.Insert(winrt::box_value(L"SliderThumbBackgroundPressed"), pressedBrush);
         }
-        // When flyoutUseWindowsAccent is true, omit hover/pressed overrides so WinUI 3 uses
-        // its built-in native {ThemeResource AccentFillColorSecondaryBrush} and AccentFillColorTertiaryBrush default values.
 
-        BrightnessSlider().Foreground(defaultBrush);
+        slider.Foreground(defaultBrush);
+        UpdateSliderVisualElements(slider, defaultBrush, defaultBrush);
+        winrt::Microsoft::UI::Xaml::VisualStateManager::GoToState(slider, L"PointerOver", false);
+        winrt::Microsoft::UI::Xaml::VisualStateManager::GoToState(slider, L"Normal", false);
+    }
 
-        // 1. Directly update visual tree elements (Thumb Background & Value Track Fill)
-        UpdateSliderVisualElements(BrightnessSlider(), defaultBrush, defaultBrush);
+    void FlyoutWindow::ApplySliderBrushes()
+    {
+        ApplySliderBrushesForControl(BrightnessSlider(), m_targetMonitorId);
+        for (const auto& entry : m_syncEntries)
+        {
+            ApplySliderBrushesForControl(entry.slider, entry.monitorId);
+        }
+    }
 
-        // 2. Re-trigger VisualStateManager states to refresh active storyboards
-        winrt::Microsoft::UI::Xaml::VisualStateManager::GoToState(BrightnessSlider(), L"PointerOver", false);
-        winrt::Microsoft::UI::Xaml::VisualStateManager::GoToState(BrightnessSlider(), L"Normal", false);
+    void FlyoutWindow::RebuildSyncMonitorsPanel()
+    {
+        m_syncEntries.clear();
+        SyncMonitorsPanel().Children().Clear();
+
+        bool isSyncGroup = m_targetMonitorId.empty() || _wcsicmp(m_targetMonitorId.c_str(), L"__SYNC__") == 0;
+        if (!isSyncGroup)
+        {
+            TitleText().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
+            MainColumnHeader().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+            SyncMonitorsPanel().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+            return;
+        }
+
+        for (const auto& mon : g_MonitorManager.GetMonitors())
+        {
+            if (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0) continue;
+            const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
+            if (!cfg || !cfg->enabled || cfg->controlMode != 0) continue;
+
+            std::wstring monName = !cfg->customName.empty() ? cfg->customName : AppSettings::SanitizeMonitorName(mon.friendlyName, 20);
+            if (monName.empty()) monName = mon.id;
+            int effB = AppSettings::ComputeSyncedBrightness(m_brightness, *cfg);
+
+            winrt::Microsoft::UI::Xaml::Controls::StackPanel col;
+            col.VerticalAlignment(winrt::Microsoft::UI::Xaml::VerticalAlignment::Top);
+            col.HorizontalAlignment(winrt::Microsoft::UI::Xaml::HorizontalAlignment::Center);
+
+            winrt::Microsoft::UI::Xaml::Controls::TextBlock hdr;
+            hdr.FontFamily(winrt::Microsoft::UI::Xaml::Media::FontFamily(L"Segoe UI Variable Text, Segoe UI"));
+            hdr.FontSize(12);
+            hdr.TextAlignment(winrt::Microsoft::UI::Xaml::TextAlignment::Center);
+            hdr.TextTrimming(winrt::Microsoft::UI::Xaml::TextTrimming::CharacterEllipsis);
+            hdr.MaxWidth(70);
+            hdr.Margin({ 0, 0, 0, 6 });
+            hdr.HorizontalAlignment(winrt::Microsoft::UI::Xaml::HorizontalAlignment::Center);
+            hdr.Text(monName + L"\n" + std::to_wstring(effB) + L"%");
+
+            winrt::Microsoft::UI::Xaml::Controls::Slider sl;
+            sl.Orientation(winrt::Microsoft::UI::Xaml::Controls::Orientation::Vertical);
+            sl.Minimum(0);
+            sl.Maximum(100);
+            sl.StepFrequency(1);
+            sl.SmallChange(1);
+            sl.LargeChange(5);
+            sl.Height(502);
+            sl.IsThumbToolTipEnabled(true);
+            sl.VerticalAlignment(winrt::Microsoft::UI::Xaml::VerticalAlignment::Top);
+            sl.HorizontalAlignment(winrt::Microsoft::UI::Xaml::HorizontalAlignment::Center);
+            sl.Value(effB);
+
+            std::wstring monIdCopy = mon.id;
+            sl.ValueChanged([this, monIdCopy, hdr, monName](auto&&, winrt::Microsoft::UI::Xaml::Controls::Primitives::RangeBaseValueChangedEventArgs const& e)
+            {
+                if (m_isUpdatingSlider) return;
+                int v = (std::clamp)(static_cast<int>(std::round(e.NewValue())), 0, 100);
+                hdr.Text(monName + L"\n" + std::to_wstring(v) + L"%");
+                g_MonitorManager.SetMonitorBrightnessTarget(monIdCopy, v, true);
+                g_TrayIcon.UpdateBrightnessForTarget(monIdCopy, v);
+            });
+
+            sl.Loaded([this, sl, monIdCopy](auto&&, auto&&)
+            {
+                ApplySliderBrushesForControl(sl, monIdCopy);
+            });
+
+            col.Children().Append(hdr);
+            col.Children().Append(sl);
+            SyncMonitorsPanel().Children().Append(col);
+            m_syncEntries.push_back({ mon.id, hdr, sl });
+            ApplySliderBrushesForControl(sl, mon.id);
+        }
+
+        if (!m_syncEntries.empty())
+        {
+            TitleText().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+            MainColumnHeader().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
+            SyncMonitorsPanel().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
+        }
+        else
+        {
+            TitleText().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
+            MainColumnHeader().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+            SyncMonitorsPanel().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        }
     }
 
     void FlyoutWindow::ResetGraphics()
@@ -549,17 +642,48 @@ namespace winrt::BrightnessApp::implementation
     void FlyoutWindow::SetBrightnessVisual(int val)
     {
         m_brightness = (std::clamp)(val, 0, 100);
-        std::wstring fmt = g_Loc.Get(L"Flyout_Brightness", L"Brightness %d%%");
-        wchar_t bbuf[64];
-        swprintf_s(bbuf, fmt.c_str(), m_brightness);
-        TitleText().Text(bbuf);
+        int enabledCount = 0;
+        for (const auto& m : g_MonitorManager.GetMonitors())
+        {
+            if (g_Settings.IsMonitorSelected(m.id)) enabledCount++;
+        }
+
+        std::wstring targetId = m_targetMonitorId.empty() ? g_Settings.mainMonitorId : m_targetMonitorId;
+        const auto* cfg = g_Settings.FindMonitorConfig(targetId);
+        if (enabledCount > 1 && cfg && !cfg->customName.empty())
+        {
+            TitleText().Text(cfg->customName + L" " + std::to_wstring(m_brightness) + L"%");
+        }
+        else
+        {
+            std::wstring fmt = g_Loc.Get(L"Flyout_Brightness", L"Brightness %d%%");
+            wchar_t bbuf[64];
+            swprintf_s(bbuf, fmt.c_str(), m_brightness);
+            TitleText().Text(bbuf);
+        }
 
         m_isUpdatingSlider = true;
         BrightnessSlider().Value(m_brightness);
+        if (!m_syncEntries.empty())
+        {
+            std::wstring mainName = (cfg && !cfg->customName.empty()) ? cfg->customName : g_Loc.Get(L"MainDisplay", L"Main").c_str();
+            MainColumnHeader().Text(mainName + L"\n" + std::to_wstring(m_brightness) + L"%");
+            for (const auto& entry : m_syncEntries)
+            {
+                const auto* sCfg = g_Settings.FindMonitorConfig(entry.monitorId);
+                int effB = sCfg ? AppSettings::ComputeSyncedBrightness(m_brightness, *sCfg) : m_brightness;
+                std::wstring sName = (sCfg && !sCfg->customName.empty()) ? sCfg->customName : entry.monitorId;
+                entry.header.Text(sName + L"\n" + std::to_wstring(effB) + L"%");
+                entry.slider.Value(effB);
+            }
+        }
         m_isUpdatingSlider = false;
 
-        g_TrayIcon.UpdateBrightness(m_brightness);
-        g_Settings.cachedBrightness = m_brightness;
+        g_TrayIcon.UpdateBrightnessForTarget(m_targetMonitorId, m_brightness);
+        if (m_targetMonitorId.empty() || _wcsicmp(m_targetMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0)
+        {
+            g_Settings.cachedBrightness = m_brightness;
+        }
     }
 
     void FlyoutWindow::CommitHardwareBrightness(int val)
@@ -569,8 +693,11 @@ namespace winrt::BrightnessApp::implementation
             KillTimer(m_hwnd, IDT_FLYOUT_DEBOUNCE);
         }
         m_hasPendingBrightness = false;
-        g_MonitorManager.SetBrightness(val);
-        g_Settings.cachedBrightness = val;
+        g_MonitorManager.SetMonitorBrightnessTarget(m_targetMonitorId, val);
+        if (m_targetMonitorId.empty() || _wcsicmp(m_targetMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0)
+        {
+            g_Settings.cachedBrightness = val;
+        }
         g_Settings.SaveBrightnessOnly();
     }
 
@@ -614,8 +741,11 @@ namespace winrt::BrightnessApp::implementation
 
     void FlyoutWindow::CommitBrightness(bool immediate)
     {
-        g_TrayIcon.UpdateBrightness(m_brightness);
-        g_Settings.cachedBrightness = m_brightness;
+        g_TrayIcon.UpdateBrightnessForTarget(m_targetMonitorId, m_brightness);
+        if (m_targetMonitorId.empty() || _wcsicmp(m_targetMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0)
+        {
+            g_Settings.cachedBrightness = m_brightness;
+        }
 
         if (immediate || !g_Settings.flyoutScrollDelayEnabled)
         {
@@ -636,14 +766,27 @@ namespace winrt::BrightnessApp::implementation
         if (m_hasPendingBrightness)
         {
             m_hasPendingBrightness = false;
-            g_MonitorManager.SetBrightness(m_pendingBrightness);
-            g_Settings.cachedBrightness = m_pendingBrightness;
+            g_MonitorManager.SetMonitorBrightnessTarget(m_targetMonitorId, m_pendingBrightness);
+            if (m_targetMonitorId.empty() || _wcsicmp(m_targetMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0)
+            {
+                g_Settings.cachedBrightness = m_pendingBrightness;
+            }
             g_Settings.SaveBrightnessOnly();
         }
     }
 
     void FlyoutWindow::SetBrightness(int brightness, bool notifyHardware)
     {
+        SetBrightnessForTarget(L"", brightness, notifyHardware);
+    }
+
+    void FlyoutWindow::SetBrightnessForTarget(const std::wstring& targetMonitorId, int brightness, bool notifyHardware)
+    {
+        bool match = (targetMonitorId.empty() && m_targetMonitorId.empty()) ||
+                     (!targetMonitorId.empty() && _wcsicmp(targetMonitorId.c_str(), m_targetMonitorId.c_str()) == 0) ||
+                     (m_targetMonitorId.empty() && !targetMonitorId.empty() && _wcsicmp(targetMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
+        if (!match && m_isVisible) return;
+
         SetBrightnessVisual(brightness);
 
         if (notifyHardware)
@@ -664,19 +807,14 @@ namespace winrt::BrightnessApp::implementation
     {
         g_OverlayWindow.ApplyPendingBrightness();
         ApplyPendingBrightness();
-        m_brightness = g_MonitorManager.GetCachedBrightness();
+        m_brightness = g_MonitorManager.GetMonitorBrightnessById(m_targetMonitorId);
         m_pendingBrightness = m_brightness;
         m_hasPendingBrightness = false;
+        RebuildSyncMonitorsPanel();
         UpdateTheme();
         ApplySliderBrushes();
         RootGrid().UpdateLayout();
-        m_isUpdatingSlider = true;
-        BrightnessSlider().Value(m_brightness);
-        m_isUpdatingSlider = false;
-        std::wstring fmt = g_Loc.Get(L"Flyout_Brightness", L"Brightness %d%%");
-        wchar_t bbuf[64];
-        swprintf_s(bbuf, fmt.c_str(), m_brightness);
-        TitleText().Text(bbuf);
+        SetBrightnessVisual(m_brightness);
 
         POINT pt;
         if (pTrayPos)
@@ -696,8 +834,9 @@ namespace winrt::BrightnessApp::implementation
         if (dpi == 0) dpi = GetDpiForWindow(m_hwnd);
         if (dpi == 0) dpi = 96;
 
-        int width = DpiHelper::Scale(131, dpi);
-        int height = DpiHelper::Scale(566, dpi);
+        int extraCols = static_cast<int>(m_syncEntries.size());
+        int width = DpiHelper::Scale(131 + extraCols * 76, dpi);
+        int height = DpiHelper::Scale(extraCols > 0 ? 590 : 566, dpi);
 
         // Check if opened from Windows hidden icons overflow window
         HWND hOverflow = FindWindowW(L"TopLevelWindowForOverflowXamlIsland", NULL);

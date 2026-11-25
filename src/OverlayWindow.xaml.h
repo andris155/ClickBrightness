@@ -2,6 +2,7 @@
 
 #include "OverlayWindow.g.h"
 #include "OverlayWindow.xaml.g.h"
+#include "MonitorManager.h"
 #include <winrt/Microsoft.UI.Windowing.h>
 #include <winrt/Microsoft.UI.Composition.SystemBackdrops.h>
 
@@ -15,8 +16,12 @@ namespace winrt::BrightnessApp::implementation
         void TriggerBrightnessDelta(int delta, bool showOsd = true);
         void TriggerTrayWheel(int delta);
         void TriggerBrightnessSet(int target, bool showOsd = true);
+        void TriggerBrightnessDeltaForTarget(const std::wstring& targetMonitorId, int delta, bool showOsd = true);
+        void TriggerTrayWheelForTarget(const std::wstring& targetMonitorId, int delta);
+        void TriggerBrightnessSetForTarget(const std::wstring& targetMonitorId, int target, bool showOsd = true);
         void ApplyPendingBrightness();
         void UpdateContent(int brightness);
+        void UpdateMultiContent(const std::wstring& targetMonitorId, int brightness);
         void UpdateTheme();
         void ResetGraphics();
         void PositionWindow();
@@ -44,8 +49,11 @@ namespace winrt::BrightnessApp::implementation
 
         int m_displayedBrightness{ 45 };
         int m_pendingBrightness{ 45 };
+        std::wstring m_pendingTargetMonitorId;
         bool m_hasPendingChange{ false };
         bool m_isVisible{ false };
+        int m_osdWidthDip{ 194 };
+        int m_osdHeightDip{ 47 };
 
         int m_lastTheme{ -1 };
         int m_lastTransparency{ -1 };

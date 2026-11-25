@@ -438,22 +438,23 @@ namespace winrt::BrightnessApp::implementation
     {
         if (m_isUpdatingUI) return;
 
+        SaveCurrentMonitorConfigFromUI();
         g_Settings.Save();
         HWND hMain = FindWindowW(L"ClickBrightness_MessageWndClass", NULL);
         if (hMain)
         {
             g_HotkeyManager.RegisterAll(hMain);
         }
+        g_TrayIcon.SyncExtraTrayIcons();
+        g_TrayIcon.OnThemeChanged();
     }
 
     void SettingsWindow::InitializeControls()
     {
         // Cache panels initially
         m_generalPanel = GeneralPanel();
-        m_shortcutsPanel = ShortcutsPanel();
-        m_osdPanel = OsdPanel();
-        m_trayPanel = TrayPanel();
-        m_flyoutSliderPanel = FlyoutSliderPanel();
+        m_monitorsPanel = MonitorsPanel();
+        m_timingsPanel = TimingsPanel();
         m_aboutPanel = AboutPanel();
 
         // Load actual program icon for Titlebar and About page
@@ -520,26 +521,16 @@ namespace winrt::BrightnessApp::implementation
                 m_generalPanel.Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
                 children.Append(m_generalPanel);
             }
-            else if (tag == L"Shortcuts")
-            {
-                m_shortcutsPanel.Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
-                children.Append(m_shortcutsPanel);
-            }
-            else if (tag == L"OSD")
-            {
-                m_osdPanel.Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
-                children.Append(m_osdPanel);
-            }
-            else if (tag == L"Tray")
+            else if (tag == L"Monitors")
             {
                 EnsureTrayTabLoaded();
-                m_trayPanel.Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
-                children.Append(m_trayPanel);
+                m_monitorsPanel.Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
+                children.Append(m_monitorsPanel);
             }
-            else if (tag == L"FlyoutSlider")
+            else if (tag == L"Timings")
             {
-                m_flyoutSliderPanel.Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
-                children.Append(m_flyoutSliderPanel);
+                m_timingsPanel.Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
+                children.Append(m_timingsPanel);
             }
             else if (tag == L"About")
             {
@@ -571,10 +562,8 @@ namespace winrt::BrightnessApp::implementation
         auto buildSearchEntries = [this]() -> std::vector<SettingSearchEntry>
         {
             std::wstring catGen = g_Loc.Get(L"Nav_General", L"General").c_str();
-            std::wstring catSc = g_Loc.Get(L"Nav_Shortcuts", L"Shortcuts").c_str();
-            std::wstring catOsd = g_Loc.Get(L"Nav_OSD", L"On-Screen Display").c_str();
-            std::wstring catTray = g_Loc.Get(L"Nav_Tray", L"System Tray").c_str();
-            std::wstring catFlyout = g_Loc.Get(L"Nav_FlyoutSlider", L"Flyout Slider").c_str();
+            std::wstring catMon = g_Loc.Get(L"Nav_Monitors", L"Monitors").c_str();
+            std::wstring catTim = g_Loc.Get(L"Nav_Timings", L"Timings & Global").c_str();
 
             return {
                 // General
@@ -582,67 +571,78 @@ namespace winrt::BrightnessApp::implementation
                 { g_Loc.Get(L"Opt_AppTheme", L"App Theme").c_str(), catGen, L"theme dark light windows appearance", L"General", AppThemeComboBox() },
                 { g_Loc.Get(L"Opt_TransparencyEffects", L"Transparency Effects").c_str(), catGen, L"transparency mica acrylic blur solid opaque backdrop", L"General", TransparencyEffectsToggle() },
                 { g_Loc.Get(L"Opt_StartWithWindows", L"Start with Windows").c_str(), catGen, L"startup boot autostart logon windows", L"General", StartWithWindowsToggle() },
-                { g_Loc.Get(L"Opt_MonitorsToControl", L"Monitors to Control").c_str(), catGen, L"monitors displays screen multi-monitor all", L"General", AllMonitorsCheckBox() },
                 { g_Loc.Get(L"Opt_PhysicalMonitors", L"Physical Monitors").c_str(), catGen, L"detect redetect hardware ddc/ci driver", L"General", RedetectMonitorsButton() },
                 { g_Loc.Get(L"Opt_ResetDefaults", L"Reset Settings").c_str(), catGen, L"reset defaults restore factory", L"General", ResetDefaultsButton() },
 
-                // Shortcuts
-                { g_Loc.Get(L"Opt_HotkeyAdjust", L"Increase & Decrease Shortcuts").c_str(), catSc, L"enable disable stepping shortcuts hotkeys", L"Shortcuts", HotkeyAdjustToggle() },
-                { g_Loc.Get(L"Opt_KeyUp", L"Increase Brightness").c_str(), catSc, L"hotkey shortcut up raise f14", L"Shortcuts", KeyUpButton() },
-                { g_Loc.Get(L"Opt_KeyDown", L"Decrease Brightness").c_str(), catSc, L"hotkey shortcut down lower f13", L"Shortcuts", KeyDownButton() },
-                { g_Loc.Get(L"Opt_Step", L"Brightness Step").c_str(), catSc, L"step percentage increment shortcut", L"Shortcuts", StepComboBox() },
-                { g_Loc.Get(L"Opt_HotkeyAdjustShowOsd", L"Show OSD Banner").c_str(), catSc, L"show osd banner stepping hotkeys", L"Shortcuts", HotkeyAdjustShowOsdToggle() },
-                { g_Loc.Get(L"Opt_HotkeyPresets", L"Preset Shortcuts").c_str(), catSc, L"enable disable preset shortcuts hotkeys", L"Shortcuts", HotkeyPresetsToggle() },
-                { g_Loc.Get(L"Opt_KeyPreset1", L"Preset 1 Shortcut").c_str(), catSc, L"preset 1 shortcut hotkey f15", L"Shortcuts", KeyPreset1Button() },
-                { g_Loc.Get(L"Opt_Preset1Brightness", L"Preset 1 Brightness (%)").c_str(), catSc, L"preset 1 brightness target level", L"Shortcuts", Preset1BrightnessSlider() },
-                { g_Loc.Get(L"Opt_KeyPreset2", L"Preset 2 Shortcut").c_str(), catSc, L"preset 2 shortcut hotkey f16", L"Shortcuts", KeyPreset2Button() },
-                { g_Loc.Get(L"Opt_Preset2Brightness", L"Preset 2 Brightness (%)").c_str(), catSc, L"preset 2 brightness target level", L"Shortcuts", Preset2BrightnessSlider() },
-                { g_Loc.Get(L"Opt_HotkeyPresetsShowOsd", L"Show OSD Banner").c_str(), catSc, L"show osd banner preset shortcuts", L"Shortcuts", HotkeyPresetsShowOsdToggle() },
-                { g_Loc.Get(L"Opt_HotkeyPresetToggle", L"Preset Toggle Shortcut").c_str(), catSc, L"enable disable preset toggle shortcut hotkey f17", L"Shortcuts", HotkeyPresetToggleToggle() },
-                { g_Loc.Get(L"Opt_KeyPresetToggle", L"Preset Toggle Shortcut").c_str(), catSc, L"preset toggle shortcut hotkey f17", L"Shortcuts", KeyPresetToggleButton() },
-                { g_Loc.Get(L"Opt_PresetToggle1Brightness", L"Preset 1 Brightness (%)").c_str(), catSc, L"preset toggle 1 brightness target level", L"Shortcuts", PresetToggle1BrightnessSlider() },
-                { g_Loc.Get(L"Opt_PresetToggle2Brightness", L"Preset 2 Brightness (%)").c_str(), catSc, L"preset toggle 2 brightness target level", L"Shortcuts", PresetToggle2BrightnessSlider() },
-                { g_Loc.Get(L"Opt_HotkeyPresetToggleShowOsd", L"Show OSD Banner").c_str(), catSc, L"show osd banner preset toggle shortcut", L"Shortcuts", HotkeyPresetToggleShowOsdToggle() },
-                { g_Loc.Get(L"Opt_ResetShortcuts", L"Reset Shortcuts").c_str(), catSc, L"reset hotkeys shortcuts", L"Shortcuts", ResetHotkeysButton() },
-                { g_Loc.Get(L"Opt_DelayEnabled", L"Delayed Brightness Change").c_str(), catSc, L"delay debounce shortcut", L"Shortcuts", DelayEnabledToggle() },
-                { g_Loc.Get(L"Opt_WaitTime", L"Wait Time (ms)").c_str(), catSc, L"wait time delay ms shortcut", L"Shortcuts", DelaySlider() },
-                { g_Loc.Get(L"Opt_HoldSpeed", L"Hold Speed (ms)").c_str(), catSc, L"hold speed repeat interval shortcut", L"Shortcuts", RepeatSlider() },
+                // Monitors & Per-Monitor Controls
+                { g_Loc.Get(L"Opt_MainMonitor", L"Main Display").c_str(), catMon, L"main display primary monitor reference sync", L"Monitors", MainMonitorComboBox() },
+                { g_Loc.Get(L"Opt_SyncLaptopFnKeys", L"Sync External Monitors with Laptop Fn Keys").c_str(), catMon, L"laptop fn keys internal display sync external", L"Monitors", SyncLaptopFnKeysToggle() },
+                { g_Loc.Get(L"Opt_ConfigMonitor", L"Selected Display").c_str(), catMon, L"monitor display select configure", L"Monitors", ConfigMonitorComboBox() },
+                { g_Loc.Get(L"Opt_MonitorEnabled", L"Brightness Control").c_str(), catMon, L"enable disable monitor brightness control", L"Monitors", MonitorEnabledToggle() },
+                { g_Loc.Get(L"Opt_MonitorCustomName", L"Monitor Name").c_str(), catMon, L"monitor name label rename osd flyout", L"Monitors", MonitorCustomNameTextBox() },
+                { g_Loc.Get(L"Opt_MonitorControlMode", L"Control Mode").c_str(), catMon, L"control mode sync separate independent", L"Monitors", MonitorControlModeComboBox() },
+                { g_Loc.Get(L"Opt_MonitorOffset", L"Brightness Offset (%)").c_str(), catMon, L"offset relative sync main display", L"Monitors", MonitorOffsetSlider() },
 
-                // On-Screen Display
-                { g_Loc.Get(L"Opt_OverlayTheme", L"OSD Banner Theme").c_str(), catOsd, L"osd overlay banner theme dark light", L"OSD", OverlayThemeComboBox() },
-                { g_Loc.Get(L"Opt_OverlayTimeout", L"Banner Duration (ms)").c_str(), catOsd, L"osd overlay timeout duration hide ms", L"OSD", OverlayTimeoutSlider() },
-                { g_Loc.Get(L"Opt_OverlayUseWindowsAccent", L"Use Windows Accent Color").c_str(), catOsd, L"osd overlay accent windows color", L"OSD", OverlayUseWindowsAccentToggle() },
-                { g_Loc.Get(L"Opt_OverlayCustomAccent", L"Custom Accent Color").c_str(), catOsd, L"osd overlay custom accent color picker", L"OSD", OverlayAccentColorPickerButton() },
+                // Shortcuts (under Monitors)
+                { g_Loc.Get(L"Opt_HotkeyAdjust", L"Increase & Decrease Shortcuts").c_str(), catMon, L"enable disable stepping shortcuts hotkeys", L"Monitors", HotkeyAdjustToggle() },
+                { g_Loc.Get(L"Opt_KeyUp", L"Increase Brightness").c_str(), catMon, L"hotkey shortcut up raise f14", L"Monitors", KeyUpButton() },
+                { g_Loc.Get(L"Opt_KeyDown", L"Decrease Brightness").c_str(), catMon, L"hotkey shortcut down lower f13", L"Monitors", KeyDownButton() },
+                { g_Loc.Get(L"Opt_Step", L"Brightness Step").c_str(), catMon, L"step percentage increment shortcut", L"Monitors", StepComboBox() },
+                { g_Loc.Get(L"Opt_HotkeyAdjustShowOsd", L"Show OSD Banner").c_str(), catMon, L"show osd banner stepping hotkeys", L"Monitors", HotkeyAdjustShowOsdToggle() },
+                { g_Loc.Get(L"Opt_HotkeyPresets", L"Preset Shortcuts").c_str(), catMon, L"enable disable preset shortcuts hotkeys", L"Monitors", HotkeyPresetsToggle() },
+                { g_Loc.Get(L"Opt_KeyPreset1", L"Preset 1 Shortcut").c_str(), catMon, L"preset 1 shortcut hotkey f15", L"Monitors", KeyPreset1Button() },
+                { g_Loc.Get(L"Opt_Preset1Brightness", L"Preset 1 Brightness (%)").c_str(), catMon, L"preset 1 brightness target level", L"Monitors", Preset1BrightnessSlider() },
+                { g_Loc.Get(L"Opt_KeyPreset2", L"Preset 2 Shortcut").c_str(), catMon, L"preset 2 shortcut hotkey f16", L"Monitors", KeyPreset2Button() },
+                { g_Loc.Get(L"Opt_Preset2Brightness", L"Preset 2 Brightness (%)").c_str(), catMon, L"preset 2 brightness target level", L"Monitors", Preset2BrightnessSlider() },
+                { g_Loc.Get(L"Opt_HotkeyPresetsShowOsd", L"Show OSD Banner").c_str(), catMon, L"show osd banner preset shortcuts", L"Monitors", HotkeyPresetsShowOsdToggle() },
+                { g_Loc.Get(L"Opt_HotkeyPresetToggle", L"Preset Toggle Shortcut").c_str(), catMon, L"enable disable preset toggle shortcut hotkey f17", L"Monitors", HotkeyPresetToggleToggle() },
+                { g_Loc.Get(L"Opt_KeyPresetToggle", L"Preset Toggle Shortcut").c_str(), catMon, L"preset toggle shortcut hotkey f17", L"Monitors", KeyPresetToggleButton() },
+                { g_Loc.Get(L"Opt_PresetToggle1Brightness", L"Preset 1 Brightness (%)").c_str(), catMon, L"preset toggle 1 brightness target level", L"Monitors", PresetToggle1BrightnessSlider() },
+                { g_Loc.Get(L"Opt_PresetToggle2Brightness", L"Preset 2 Brightness (%)").c_str(), catMon, L"preset toggle 2 brightness target level", L"Monitors", PresetToggle2BrightnessSlider() },
+                { g_Loc.Get(L"Opt_HotkeyPresetToggleShowOsd", L"Show OSD Banner").c_str(), catMon, L"show osd banner preset toggle shortcut", L"Monitors", HotkeyPresetToggleShowOsdToggle() },
+                { g_Loc.Get(L"Opt_ResetShortcuts", L"Reset Shortcuts").c_str(), catMon, L"reset hotkeys shortcuts", L"Monitors", ResetHotkeysButton() },
 
-                // System Tray
-                { g_Loc.Get(L"Opt_TrayShowPercentage", L"Percentage Icon").c_str(), catTray, L"tray percentage icon show disable colored follow windows font number live", L"Tray", TrayPercentageModeComboBox() },
-                { g_Loc.Get(L"Opt_TrayIconColor", L"Icon Color").c_str(), catTray, L"tray icon percentage custom color picker light mode", L"Tray", TrayIconColorPickerButton() },
-                { g_Loc.Get(L"Opt_TrayIconDualColor", L"Separate Dark & Light Colors").c_str(), catTray, L"tray icon percentage dual separate dark light color", L"Tray", TrayIconDualColorToggle() },
-                { g_Loc.Get(L"Opt_TrayIconColorDark", L"Dark Mode Color").c_str(), catTray, L"tray icon percentage custom dark mode color picker", L"Tray", TrayIconDarkColorPickerButton() },
-                { g_Loc.Get(L"Opt_TrayFont", L"Tray Icon Font").c_str(), catTray, L"tray font family typography", L"Tray", TrayFontComboBox() },
-                { g_Loc.Get(L"Opt_TrayFontWeight", L"Font Weight").c_str(), catTray, L"tray font weight bold light semilight thin", L"Tray", TrayFontWeightSlider() },
-                { g_Loc.Get(L"Opt_TrayFontSize", L"Tray Font Size (%)").c_str(), catTray, L"tray font size scale", L"Tray", TrayFontSizeSlider() },
-                { g_Loc.Get(L"Opt_TrayFontSize100", L"100% Width (%)").c_str(), catTray, L"tray 100 width scale", L"Tray", TrayFontSize100Slider() },
-                { g_Loc.Get(L"Opt_TrayYOffset", L"Vertical Offset (px)").c_str(), catTray, L"tray vertical offset y baseline", L"Tray", TrayYOffsetSlider() },
-                { g_Loc.Get(L"Opt_TrayWheel", L"Scroll on Tray Icon").c_str(), catTray, L"tray scroll wheel mouse", L"Tray", TrayWheelToggle() },
-                { g_Loc.Get(L"Opt_TrayWheelStep", L"Brightness Step").c_str(), catTray, L"tray scroll wheel step percentage", L"Tray", TrayWheelStepComboBox() },
-                { g_Loc.Get(L"Opt_TrayWheelShowOsd", L"Show OSD When Scrolling").c_str(), catTray, L"tray scroll osd banner", L"Tray", TrayWheelShowOsdToggle() },
-                { g_Loc.Get(L"Opt_TrayWheelDelay", L"Scrolling Hardware Delay").c_str(), catTray, L"tray scroll wheel delay debounce", L"Tray", TrayWheelDelayToggle() },
-                { g_Loc.Get(L"Opt_TrayWheelWaitTime", L"Scrolling Wait Time (ms)").c_str(), catTray, L"tray scroll wheel wait time ms", L"Tray", TrayWheelDelaySlider() },
-                { g_Loc.Get(L"Opt_TrayMiddleClick", L"Middle-Click Quick Action").c_str(), catTray, L"tray middle click quick action", L"Tray", TrayMiddleClickToggle() },
-                { g_Loc.Get(L"Opt_TrayMiddleClickShowOsd", L"Show OSD On Middle-Click").c_str(), catTray, L"tray middle click osd banner", L"Tray", TrayMiddleClickShowOsdToggle() },
-                { g_Loc.Get(L"Opt_TrayMiddleClickBrightness", L"Target Brightness (%)").c_str(), catTray, L"tray middle click brightness target", L"Tray", TrayMiddleClickSlider() },
+                // OSD Accent (under Monitors)
+                { g_Loc.Get(L"Opt_OverlayUseWindowsAccent", L"Use Windows Accent Color").c_str(), catMon, L"osd overlay accent windows color", L"Monitors", OverlayUseWindowsAccentToggle() },
+                { g_Loc.Get(L"Opt_OverlayCustomAccent", L"Custom Accent Color").c_str(), catMon, L"osd overlay custom accent color picker", L"Monitors", OverlayAccentColorPickerButton() },
 
-                // Flyout Slider
-                { g_Loc.Get(L"Opt_FlyoutScrollEnabled", L"Slider Scrolling").c_str(), catFlyout, L"flyout slider scroll wheel mouse enable", L"FlyoutSlider", FlyoutScrollEnabledToggle() },
-                { g_Loc.Get(L"Opt_FlyoutScrollStep", L"Scrolling Brightness Step").c_str(), catFlyout, L"flyout slider scroll step percentage", L"FlyoutSlider", FlyoutScrollStepComboBox() },
-                { g_Loc.Get(L"Opt_FlyoutKeyboardEnabled", L"Keyboard Controls").c_str(), catFlyout, L"flyout keyboard arrow keys buttons navigation", L"FlyoutSlider", FlyoutKeyboardEnabledToggle() },
-                { g_Loc.Get(L"Opt_FlyoutScrollDelay", L"Slider Scrolling Delay").c_str(), catFlyout, L"flyout slider scroll delay debounce", L"FlyoutSlider", FlyoutScrollDelayToggle() },
-                { g_Loc.Get(L"Opt_FlyoutScrollWaitTime", L"Scrolling Wait Time (ms)").c_str(), catFlyout, L"flyout slider scroll wait time ms", L"FlyoutSlider", FlyoutScrollDelaySlider() },
-                { g_Loc.Get(L"Opt_FlyoutButtonDelay", L"Button Clicking Delay").c_str(), catFlyout, L"flyout button click delay debounce", L"FlyoutSlider", FlyoutButtonDelayToggle() },
-                { g_Loc.Get(L"Opt_FlyoutButtonWaitTime", L"Button Wait Time (ms)").c_str(), catFlyout, L"flyout button wait time ms", L"FlyoutSlider", FlyoutButtonDelaySlider() },
-                { g_Loc.Get(L"Opt_FlyoutUseWindowsAccent", L"Use Windows Accent Color").c_str(), catFlyout, L"flyout accent windows color", L"FlyoutSlider", FlyoutUseWindowsAccentToggle() },
-                { g_Loc.Get(L"Opt_FlyoutCustomAccent", L"Custom Accent Color").c_str(), catFlyout, L"flyout custom accent color picker", L"FlyoutSlider", FlyoutAccentColorPickerButton() },
+                // System Tray (under Monitors)
+                { g_Loc.Get(L"Opt_TrayShowPercentage", L"Percentage Icon").c_str(), catMon, L"tray percentage icon show disable colored follow windows font number live", L"Monitors", TrayPercentageModeComboBox() },
+                { g_Loc.Get(L"Opt_TrayIconColor", L"Icon Color").c_str(), catMon, L"tray icon percentage custom color picker light mode", L"Monitors", TrayIconColorPickerButton() },
+                { g_Loc.Get(L"Opt_TrayIconDualColor", L"Separate Dark & Light Colors").c_str(), catMon, L"tray icon percentage dual separate dark light color", L"Monitors", TrayIconDualColorToggle() },
+                { g_Loc.Get(L"Opt_TrayIconColorDark", L"Dark Mode Color").c_str(), catMon, L"tray icon percentage custom dark mode color picker", L"Monitors", TrayIconDarkColorPickerButton() },
+                { g_Loc.Get(L"Opt_TrayFont", L"Tray Icon Font").c_str(), catMon, L"tray font family typography", L"Monitors", TrayFontComboBox() },
+                { g_Loc.Get(L"Opt_TrayFontWeight", L"Font Weight").c_str(), catMon, L"tray font weight bold light semilight thin", L"Monitors", TrayFontWeightSlider() },
+                { g_Loc.Get(L"Opt_TrayFontSize", L"Tray Font Size (%)").c_str(), catMon, L"tray font size scale", L"Monitors", TrayFontSizeSlider() },
+                { g_Loc.Get(L"Opt_TrayFontSize100", L"100% Width (%)").c_str(), catMon, L"tray 100 width scale", L"Monitors", TrayFontSize100Slider() },
+                { g_Loc.Get(L"Opt_TrayYOffset", L"Vertical Offset (px)").c_str(), catMon, L"tray vertical offset y baseline", L"Monitors", TrayYOffsetSlider() },
+                { g_Loc.Get(L"Opt_TrayWheel", L"Scroll on Tray Icon").c_str(), catMon, L"tray scroll wheel mouse", L"Monitors", TrayWheelToggle() },
+                { g_Loc.Get(L"Opt_TrayWheelStep", L"Brightness Step").c_str(), catMon, L"tray scroll wheel step percentage", L"Monitors", TrayWheelStepComboBox() },
+                { g_Loc.Get(L"Opt_TrayWheelShowOsd", L"Show OSD When Scrolling").c_str(), catMon, L"tray scroll osd banner", L"Monitors", TrayWheelShowOsdToggle() },
+                { g_Loc.Get(L"Opt_TrayMiddleClick", L"Middle-Click Quick Action").c_str(), catMon, L"tray middle click quick action", L"Monitors", TrayMiddleClickToggle() },
+                { g_Loc.Get(L"Opt_TrayMiddleClickShowOsd", L"Show OSD On Middle-Click").c_str(), catMon, L"tray middle click osd banner", L"Monitors", TrayMiddleClickShowOsdToggle() },
+                { g_Loc.Get(L"Opt_TrayMiddleClickBrightness", L"Target Brightness (%)").c_str(), catMon, L"tray middle click brightness target", L"Monitors", TrayMiddleClickSlider() },
+
+                // Flyout Slider (under Monitors)
+                { g_Loc.Get(L"Opt_FlyoutScrollEnabled", L"Slider Scrolling").c_str(), catMon, L"flyout slider scroll wheel mouse enable", L"Monitors", FlyoutScrollEnabledToggle() },
+                { g_Loc.Get(L"Opt_FlyoutScrollStep", L"Scrolling Brightness Step").c_str(), catMon, L"flyout slider scroll step percentage", L"Monitors", FlyoutScrollStepComboBox() },
+                { g_Loc.Get(L"Opt_FlyoutUseWindowsAccent", L"Use Windows Accent Color").c_str(), catMon, L"flyout accent windows color", L"Monitors", FlyoutUseWindowsAccentToggle() },
+                { g_Loc.Get(L"Opt_FlyoutCustomAccent", L"Custom Accent Color").c_str(), catMon, L"flyout custom accent color picker", L"Monitors", FlyoutAccentColorPickerButton() },
+
+                // Timings & Global
+                { g_Loc.Get(L"Opt_OverlayTheme", L"OSD Banner Theme").c_str(), catTim, L"osd overlay banner theme dark light", L"Timings", OverlayThemeComboBox() },
+                { g_Loc.Get(L"Opt_OverlayTimeout", L"Banner Duration (ms)").c_str(), catTim, L"osd overlay timeout duration hide ms", L"Timings", OverlayTimeoutSlider() },
+                { g_Loc.Get(L"Opt_FlyoutKeyboardEnabled", L"Keyboard Controls").c_str(), catTim, L"flyout keyboard arrow keys buttons navigation", L"Timings", FlyoutKeyboardEnabledToggle() },
+                { g_Loc.Get(L"Opt_DelayEnabled", L"Delayed Brightness Change").c_str(), catTim, L"delay debounce shortcut", L"Timings", DelayEnabledToggle() },
+                { g_Loc.Get(L"Opt_WaitTime", L"Wait Time (ms)").c_str(), catTim, L"wait time delay ms shortcut", L"Timings", DelaySlider() },
+                { g_Loc.Get(L"Opt_HoldSpeed", L"Hold Speed (ms)").c_str(), catTim, L"hold speed repeat interval shortcut", L"Timings", RepeatSlider() },
+                { g_Loc.Get(L"Opt_TrayWheelDelay", L"Scrolling Hardware Delay").c_str(), catTim, L"tray scroll wheel delay debounce", L"Timings", TrayWheelDelayToggle() },
+                { g_Loc.Get(L"Opt_TrayWheelWaitTime", L"Scrolling Wait Time (ms)").c_str(), catTim, L"tray scroll wheel wait time ms", L"Timings", TrayWheelDelaySlider() },
+                { g_Loc.Get(L"Opt_FlyoutScrollDelay", L"Slider Scrolling Delay").c_str(), catTim, L"flyout slider scroll delay debounce", L"Timings", FlyoutScrollDelayToggle() },
+                { g_Loc.Get(L"Opt_FlyoutScrollWaitTime", L"Scrolling Wait Time (ms)").c_str(), catTim, L"flyout slider scroll wait time ms", L"Timings", FlyoutScrollDelaySlider() },
+                { g_Loc.Get(L"Opt_FlyoutButtonDelay", L"Button Clicking Delay").c_str(), catTim, L"flyout button click delay debounce", L"Timings", FlyoutButtonDelayToggle() },
+                { g_Loc.Get(L"Opt_FlyoutButtonWaitTime", L"Button Wait Time (ms)").c_str(), catTim, L"flyout button wait time ms", L"Timings", FlyoutButtonDelaySlider() },
+
                 { g_Loc.Get(L"About_Title", L"About ClickBrightness").c_str(), g_Loc.Get(L"Nav_About", L"About").c_str(), L"about version info license github open source", L"About", AboutPanel() }
             };
         };
@@ -650,10 +650,8 @@ namespace winrt::BrightnessApp::implementation
         auto navigateToEntry = [this](const SettingSearchEntry& entry)
         {
             if (entry.navTag == L"General") NavView().SelectedItem(NavItemGeneral());
-            else if (entry.navTag == L"Shortcuts") NavView().SelectedItem(NavItemShortcuts());
-            else if (entry.navTag == L"OSD") NavView().SelectedItem(NavItemOSD());
-            else if (entry.navTag == L"Tray") { EnsureTrayTabLoaded(); NavView().SelectedItem(NavItemTray()); }
-            else if (entry.navTag == L"FlyoutSlider") NavView().SelectedItem(NavItemFlyoutSlider());
+            else if (entry.navTag == L"Monitors") { EnsureTrayTabLoaded(); NavView().SelectedItem(NavItemMonitors()); }
+            else if (entry.navTag == L"Timings") NavView().SelectedItem(NavItemTimings());
             else if (entry.navTag == L"About") { EnsureAboutTabLoaded(); NavView().SelectedItem(NavItemAbout()); }
 
             if (entry.targetControl)
@@ -791,23 +789,123 @@ namespace winrt::BrightnessApp::implementation
             }
         });
 
-        // All Monitors CheckBox
-        AllMonitorsCheckBox().Click([this](auto&&, auto&&)
+        // Main Display ComboBox
+        MainMonitorComboBox().SelectionChanged([this](auto&&, auto&&)
         {
             if (m_isUpdatingUI) return;
-            bool isAll = AllMonitorsCheckBox().IsChecked().GetBoolean();
-            if (isAll)
+            int idx = MainMonitorComboBox().SelectedIndex();
+            if (idx >= 0 && idx < static_cast<int>(m_cachedMonitorIds.size()))
             {
-                g_Settings.selectedMonitors = L"all";
-            }
-            else
-            {
-                if (!m_cachedMonitorIds.empty())
+                g_Settings.mainMonitorId = m_cachedMonitorIds[idx];
+                if (g_Settings.FindMonitorConfig(g_Settings.mainMonitorId))
                 {
-                    g_Settings.selectedMonitors = m_cachedMonitorIds[0];
+                    g_Settings.GetOrCreateMonitorConfig(g_Settings.mainMonitorId).controlMode = 0;
                 }
+                g_MonitorManager.UpdateFnSyncListener();
+                PopulateMonitorsSelectionList();
+                LoadMonitorConfigToUI();
+                ApplyAndSave();
             }
-            UpdateMonitorsSelectionUI();
+        });
+
+        // Sync External Monitors with Laptop Fn Keys
+        SyncLaptopFnKeysToggle().Toggled([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            bool on = SyncLaptopFnKeysToggle().IsOn();
+            g_Settings.syncExternalWithLaptopFnKeys = on;
+            SyncLaptopFnKeysStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+            g_MonitorManager.UpdateFnSyncListener();
+            ApplyAndSave();
+        });
+
+        // Config Monitor Selector ComboBox
+        ConfigMonitorComboBox().SelectionChanged([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            int idx = ConfigMonitorComboBox().SelectedIndex();
+            if (idx >= 0 && idx < static_cast<int>(m_cachedMonitorIds.size()))
+            {
+                SaveCurrentMonitorConfigFromUI();
+                m_selectedConfigMonitorId = m_cachedMonitorIds[idx];
+                LoadMonitorConfigToUI();
+            }
+        });
+
+        // Per-Monitor Enabled Toggle
+        MonitorEnabledToggle().Toggled([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI || m_selectedConfigMonitorId.empty()) return;
+            auto& cfg = g_Settings.GetOrCreateMonitorConfig(m_selectedConfigMonitorId);
+            cfg.enabled = MonitorEnabledToggle().IsOn();
+            MonitorEnabledStatusText().Text(cfg.enabled ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+            ApplyAndSave();
+        });
+
+        // Per-Monitor Custom Name TextBox
+        MonitorCustomNameTextBox().TextChanged([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI || m_selectedConfigMonitorId.empty()) return;
+            auto& cfg = g_Settings.GetOrCreateMonitorConfig(m_selectedConfigMonitorId);
+            cfg.customName = AppSettings::SanitizeMonitorName(MonitorCustomNameTextBox().Text().c_str(), 20);
+            ApplyAndSave();
+        });
+
+        // Per-Monitor Control Mode ComboBox
+        MonitorControlModeComboBox().SelectionChanged([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI || m_selectedConfigMonitorId.empty()) return;
+            auto& cfg = g_Settings.GetOrCreateMonitorConfig(m_selectedConfigMonitorId);
+            int idx = MonitorControlModeComboBox().SelectedIndex();
+            cfg.controlMode = (idx == 1) ? 1 : 0;
+            LoadMonitorConfigToUI();
+            ApplyAndSave();
+        });
+
+        // Per-Monitor Offset Slider & NumberBox
+        MonitorOffsetSlider().ValueChanged([this](auto&&, auto&& e)
+        {
+            if (m_isUpdatingUI || m_selectedConfigMonitorId.empty()) return;
+            int val = static_cast<int>(std::round(e.NewValue()));
+            val = (std::clamp)(val, -100, 100);
+            g_Settings.GetOrCreateMonitorConfig(m_selectedConfigMonitorId).offset = val;
+            m_isUpdatingUI = true;
+            MonitorOffsetNumberBox().Value(val);
+            m_isUpdatingUI = false;
+            ApplyAndSave();
+        });
+
+        MonitorOffsetNumberBox().ValueChanged([this](auto&&, auto&& e)
+        {
+            if (m_isUpdatingUI || m_selectedConfigMonitorId.empty()) return;
+            if (std::isnan(e.NewValue())) return;
+            int val = static_cast<int>(std::round(e.NewValue()));
+            val = (std::clamp)(val, -100, 100);
+            g_Settings.GetOrCreateMonitorConfig(m_selectedConfigMonitorId).offset = val;
+            m_isUpdatingUI = true;
+            MonitorOffsetSlider().Value(val);
+            m_isUpdatingUI = false;
+            ApplyAndSave();
+        });
+
+        // Per-Monitor Sync 0% when Main is 0%
+        MonitorOffsetZeroToggle().Toggled([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI || m_selectedConfigMonitorId.empty()) return;
+            auto& cfg = g_Settings.GetOrCreateMonitorConfig(m_selectedConfigMonitorId);
+            cfg.syncZeroWhenMainZero = MonitorOffsetZeroToggle().IsOn();
+            MonitorOffsetZeroStatusText().Text(cfg.syncZeroWhenMainZero ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+            ApplyAndSave();
+        });
+
+        // Sync-mode Separate Tray Icon Toggle
+        SyncSeparateTrayIconToggle().Toggled([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI || m_selectedConfigMonitorId.empty()) return;
+            auto& cfg = g_Settings.GetOrCreateMonitorConfig(m_selectedConfigMonitorId);
+            cfg.syncSeparateTrayIcon = SyncSeparateTrayIconToggle().IsOn();
+            SyncSeparateTrayIconStatusText().Text(cfg.syncSeparateTrayIcon ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+            TrayAppearanceCustomSection().Visibility(cfg.syncSeparateTrayIcon ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
             ApplyAndSave();
         });
 
@@ -1775,6 +1873,15 @@ namespace winrt::BrightnessApp::implementation
             g_TrayIcon.UpdateWheelHook();
             g_Settings.language = L"default";
             g_Settings.selectedMonitors = L"all";
+            g_Settings.syncExternalWithLaptopFnKeys = false;
+            for (auto& [monId, cfg] : g_Settings.monitorConfigs)
+            {
+                cfg.enabled = true;
+                cfg.controlMode = 0;
+                cfg.offset = 0;
+                g_Settings.CopyCustomizationToMonitor(cfg);
+            }
+            g_MonitorManager.UpdateFnSyncListener();
             g_Loc.SetLanguage(L"default");
             UpdateLocalizedStrings();
             PopulateLanguageList();
@@ -1950,113 +2057,180 @@ namespace winrt::BrightnessApp::implementation
 
     void SettingsWindow::PopulateMonitorsSelectionList()
     {
+        bool prevUpdating = m_isUpdatingUI;
+        m_isUpdatingUI = true;
+
         auto monitors = g_MonitorManager.GetMonitors();
         m_cachedMonitorIds.clear();
-        MonitorsListStackPanel().Children().Clear();
+        MainMonitorComboBox().Items().Clear();
+        ConfigMonitorComboBox().Items().Clear();
 
         if (monitors.empty())
         {
-            auto tb = winrt::Microsoft::UI::Xaml::Controls::TextBlock();
-            tb.Text(g_Loc.Get(L"Monitors_NoneDetected", L"No DDC/CI monitors detected yet."));
-            tb.FontSize(12);
-            tb.Foreground(Application::Current().Resources().Lookup(box_value(L"TextFillColorSecondaryBrush")).as<winrt::Microsoft::UI::Xaml::Media::Brush>());
-            MonitorsListStackPanel().Children().Append(tb);
+            m_selectedConfigMonitorId.clear();
+            m_isUpdatingUI = prevUpdating;
             UpdateMonitorsSelectionUI();
             return;
         }
 
-        // If current saved selection doesn't match ANY of the detected monitors
-        // (which happens after GPU driver update re-enumerates devices),
-        // automatically fallback to "all" so the user never has 0 monitors selected!
-        if (!g_Settings.selectedMonitors.empty() && _wcsicmp(g_Settings.selectedMonitors.c_str(), L"all") != 0)
+        if (g_Settings.mainMonitorId.empty())
         {
-            bool anyFound = false;
-            for (const auto& mon : monitors)
+            g_Settings.mainMonitorId = monitors[0].id;
+        }
+        bool mainFound = false;
+        for (const auto& mon : monitors)
+        {
+            if (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0)
             {
-                if (g_Settings.IsMonitorSelected(mon.id))
-                {
-                    anyFound = true;
-                    break;
-                }
+                mainFound = true;
+                break;
             }
-            if (!anyFound)
-            {
-                g_Settings.selectedMonitors = L"all";
-                g_Settings.Save();
-            }
+        }
+        if (!mainFound)
+        {
+            g_Settings.mainMonitorId = monitors[0].id;
+        }
+
+        if (m_selectedConfigMonitorId.empty())
+        {
+            m_selectedConfigMonitorId = g_Settings.mainMonitorId;
         }
 
         int displayIndex = 1;
+        int mainIdx = 0;
+        int configIdx = 0;
+        bool configFound = false;
+
         for (const auto& mon : monitors)
         {
             m_cachedMonitorIds.push_back(mon.id);
-
-            // Display numbering: sequential 1, 2, 3... matching Windows Display Settings
-            std::wstring dispNum = std::to_wstring(displayIndex);
-
             std::wstring monName = !mon.friendlyName.empty() ? mon.friendlyName : mon.description;
+            auto& cfg = g_Settings.GetOrCreateMonitorConfig(mon.id, monName);
+            if (cfg.customName.empty())
+            {
+                cfg.customName = AppSettings::SanitizeMonitorName(monName, 20);
+            }
+
+            std::wstring dispNum = std::to_wstring(displayIndex);
             std::wstring fmt = g_Loc.Get(L"Monitors_DisplayFormat", L"Display %s: %s");
             wchar_t buf[256];
             swprintf_s(buf, fmt.c_str(), dispNum.c_str(), monName.c_str());
             std::wstring label = buf;
-
-            if (mon.isPrimary)
+            if (mon.isInternal)
+            {
+                label += L" (" + g_Loc.Get(L"InternalBadge", L"Internal") + L")";
+            }
+            else if (mon.isPrimary)
             {
                 label += L" (" + g_Loc.Get(L"PrimaryBadge", L"Primary") + L")";
             }
 
-            auto cb = winrt::Microsoft::UI::Xaml::Controls::CheckBox();
-            cb.Content(box_value(label));
-            cb.Tag(box_value(mon.id));
-            cb.FontSize(13);
+            MainMonitorComboBox().Items().Append(box_value(label));
+            ConfigMonitorComboBox().Items().Append(box_value(label));
+
+            if (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0)
+            {
+                mainIdx = displayIndex - 1;
+            }
+            if (_wcsicmp(mon.id.c_str(), m_selectedConfigMonitorId.c_str()) == 0)
+            {
+                configIdx = displayIndex - 1;
+                configFound = true;
+            }
 
             displayIndex++;
-
-            cb.Click([this, id = mon.id](auto&& sender, auto&&)
-            {
-                if (m_isUpdatingUI) return;
-                auto clickedBox = sender.as<winrt::Microsoft::UI::Xaml::Controls::CheckBox>();
-                bool isChecked = clickedBox.IsChecked().GetBoolean();
-                g_Settings.SetMonitorSelected(id, isChecked, m_cachedMonitorIds);
-                UpdateMonitorsSelectionUI();
-                ApplyAndSave();
-            });
-
-            MonitorsListStackPanel().Children().Append(cb);
         }
 
+        if (!configFound)
+        {
+            m_selectedConfigMonitorId = g_Settings.mainMonitorId;
+            configIdx = mainIdx;
+        }
+
+        MainMonitorComboBox().SelectedIndex(mainIdx);
+        ConfigMonitorComboBox().SelectedIndex(configIdx);
+
+        m_isUpdatingUI = prevUpdating;
         UpdateMonitorsSelectionUI();
+        LoadMonitorConfigToUI();
     }
 
     void SettingsWindow::UpdateMonitorsSelectionUI()
     {
+        bool prevUpdating = m_isUpdatingUI;
         m_isUpdatingUI = true;
 
-        bool isAll = (g_Settings.selectedMonitors.empty() || _wcsicmp(g_Settings.selectedMonitors.c_str(), L"all") == 0);
-        AllMonitorsCheckBox().IsChecked(isAll);
+        bool isMainInternal = g_MonitorManager.IsMainDisplayInternal();
+        SyncLaptopFnKeysCard().Visibility(isMainInternal ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        SyncLaptopFnKeysToggle().IsOn(g_Settings.syncExternalWithLaptopFnKeys);
+        SyncLaptopFnKeysStatusText().Text(g_Settings.syncExternalWithLaptopFnKeys ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
 
-        bool allChildrenChecked = !m_cachedMonitorIds.empty();
+        m_isUpdatingUI = prevUpdating;
+    }
 
-        for (auto child : MonitorsListStackPanel().Children())
+    void SettingsWindow::SaveCurrentMonitorConfigFromUI()
+    {
+        if (m_selectedConfigMonitorId.empty()) return;
+        if (!g_Settings.FindMonitorConfig(m_selectedConfigMonitorId)) return;
+        auto& cfg = g_Settings.GetOrCreateMonitorConfig(m_selectedConfigMonitorId);
+        g_Settings.CopyCustomizationToMonitor(cfg);
+    }
+
+    void SettingsWindow::LoadMonitorConfigToUI()
+    {
+        bool prevUpdating = m_isUpdatingUI;
+        m_isUpdatingUI = true;
+
+        const MonitorControlConfig* cfg = g_Settings.FindMonitorConfig(m_selectedConfigMonitorId);
+        if (!cfg && !g_Settings.mainMonitorId.empty())
         {
-            if (auto cb = child.try_as<winrt::Microsoft::UI::Xaml::Controls::CheckBox>())
-            {
-                std::wstring id = unbox_value<hstring>(cb.Tag()).c_str();
-                bool checked = isAll || g_Settings.IsMonitorSelected(id);
-                cb.IsChecked(checked);
-                if (!checked)
-                {
-                    allChildrenChecked = false;
-                }
-            }
+            m_selectedConfigMonitorId = g_Settings.mainMonitorId;
+            cfg = g_Settings.FindMonitorConfig(m_selectedConfigMonitorId);
         }
 
-        if (allChildrenChecked && !m_cachedMonitorIds.empty())
+        if (!cfg)
         {
-            AllMonitorsCheckBox().IsChecked(true);
+            m_isUpdatingUI = prevUpdating;
+            return;
         }
 
-        m_isUpdatingUI = false;
+        bool isMain = (_wcsicmp(m_selectedConfigMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
+        if (isMain && cfg->controlMode != 0)
+        {
+            g_Settings.GetOrCreateMonitorConfig(m_selectedConfigMonitorId).controlMode = 0;
+        }
+
+        MonitorEnabledToggle().IsOn(cfg->enabled);
+        MonitorEnabledStatusText().Text(cfg->enabled ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+        MonitorCustomNameTextBox().Text(cfg->customName);
+
+        MonitorControlModeComboBox().IsEnabled(!isMain);
+        MonitorControlModeComboBox().SelectedIndex((isMain || cfg->controlMode == 0) ? 0 : 1);
+
+        bool isSyncNonMain = (!isMain && cfg->controlMode == 0);
+        MonitorOffsetCard().Visibility(isSyncNonMain ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        MonitorOffsetZeroCard().Visibility(isSyncNonMain ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        MonitorSyncNoticeBanner().Visibility(isSyncNonMain ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        MonitorCustomizationsPanel().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
+
+        ShortcutsCustomSection().Visibility(isSyncNonMain ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible);
+        OsdAccentCustomSection().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
+        SyncSeparateTrayIconSection().Visibility(isSyncNonMain ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        TrayAppearanceCustomSection().Visibility((!isSyncNonMain || cfg->syncSeparateTrayIcon) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        TrayWheelCustomSection().Visibility(isSyncNonMain ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible);
+        FlyoutBehaviorCustomSection().Visibility(isSyncNonMain ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible);
+        FlyoutAccentCustomSection().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
+
+        MonitorOffsetSlider().Value(cfg->offset);
+        MonitorOffsetNumberBox().Value(cfg->offset);
+        MonitorOffsetZeroToggle().IsOn(cfg->syncZeroWhenMainZero);
+        MonitorOffsetZeroStatusText().Text(cfg->syncZeroWhenMainZero ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+        SyncSeparateTrayIconToggle().IsOn(cfg->syncSeparateTrayIcon);
+        SyncSeparateTrayIconStatusText().Text(cfg->syncSeparateTrayIcon ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+
+        g_Settings.ApplyMonitorCustomizationToLegacy(*cfg);
+        m_isUpdatingUI = prevUpdating;
+        LoadSettingsToUI();
     }
 
     void SettingsWindow::UpdateLocalizedStrings()
@@ -2072,10 +2246,8 @@ namespace winrt::BrightnessApp::implementation
 
         // Navigation
         NavItemGeneral().Content(box_value(g_Loc.Get(L"Nav_General", L"General")));
-        NavItemShortcuts().Content(box_value(g_Loc.Get(L"Nav_Shortcuts", L"Shortcuts")));
-        NavItemOSD().Content(box_value(g_Loc.Get(L"Nav_OSD", L"On-Screen Display")));
-        NavItemTray().Content(box_value(g_Loc.Get(L"Nav_Tray", L"System Tray")));
-        NavItemFlyoutSlider().Content(box_value(g_Loc.Get(L"Nav_FlyoutSlider", L"Flyout Slider")));
+        NavItemMonitors().Content(box_value(g_Loc.Get(L"Nav_Monitors", L"Monitors")));
+        NavItemTimings().Content(box_value(g_Loc.Get(L"Nav_Timings", L"Timings & Global")));
         NavItemAbout().Content(box_value(g_Loc.Get(L"Nav_About", L"About")));
 
         auto ensureNavIcon = [](winrt::Microsoft::UI::Xaml::Controls::NavigationViewItem const& item, winrt::hstring const& glyph)
@@ -2096,10 +2268,8 @@ namespace winrt::BrightnessApp::implementation
         };
 
         ensureNavIcon(NavItemGeneral(), L"\uE713");
-        ensureNavIcon(NavItemShortcuts(), L"\uE765");
-        ensureNavIcon(NavItemOSD(), L"\uE7F4");
-        ensureNavIcon(NavItemTray(), L"\uE718");
-        ensureNavIcon(NavItemFlyoutSlider(), L"\uE9E9");
+        ensureNavIcon(NavItemMonitors(), L"\uE7F4");
+        ensureNavIcon(NavItemTimings(), L"\uE916");
         ensureNavIcon(NavItemAbout(), L"\uE946");
 
         SettingsSearchBox().PlaceholderText(g_Loc.Get(L"Search_Placeholder", L"Search settings"));
@@ -2151,16 +2321,41 @@ namespace winrt::BrightnessApp::implementation
         StartWithWindowsToggle().IsOn(startWithWin);
         StartWithWindowsStatusText().Text(startWithWin ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
 
-        MonitorsToControlTitleText().Text(g_Loc.Get(L"Opt_MonitorsToControl", L"Monitors to Control"));
-        MonitorsToControlDescText().Text(g_Loc.Get(L"Desc_MonitorsToControl", L"Select which monitors have their brightness adjusted"));
-        AllMonitorsCheckBox().Content(box_value(g_Loc.Get(L"Monitors_All", L"All Monitors")));
-
         PhysicalMonitorsTitleText().Text(g_Loc.Get(L"Opt_PhysicalMonitors", L"Physical Monitors"));
         RedetectMonitorsButton().Content(box_value(g_Loc.Get(L"Btn_Redetect", L"Re-detect")));
 
+        // Monitors & Timings Headers
+        MonitorsHeaderTitle().Text(g_Loc.Get(L"Monitors_Title", L"Monitors & Displays"));
+        MonitorsHeaderSubtitle().Text(g_Loc.Get(L"Monitors_Subtitle", L"Configure main display, sync/separate modes, offsets, and per-monitor controls"));
+        MainMonitorTitleText().Text(g_Loc.Get(L"Opt_MainMonitor", L"Main Display"));
+        MainMonitorDescText().Text(g_Loc.Get(L"Desc_MainMonitor", L"Primary reference display used for brightness offsets and Sync mode"));
+        SyncLaptopFnKeysTitleText().Text(g_Loc.Get(L"Opt_SyncLaptopFnKeys", L"Sync External Monitors with Laptop Fn Keys"));
+        SyncLaptopFnKeysDescText().Text(g_Loc.Get(L"Desc_SyncLaptopFnKeys", L"Automatically sync external Sync-mode monitors when adjusting internal display brightness via laptop Fn keys"));
+        MonitorConfigSectionTitle().Text(g_Loc.Get(L"Sec_MonitorConfig", L"Display Configuration"));
+        ConfigMonitorSelectTitleText().Text(g_Loc.Get(L"Opt_ConfigMonitor", L"Selected Display"));
+        ConfigMonitorSelectDescText().Text(g_Loc.Get(L"Desc_ConfigMonitor", L"Choose a detected display to configure its mode, name, and controls"));
+        MonitorEnabledTitleText().Text(g_Loc.Get(L"Opt_MonitorEnabled", L"Brightness Control"));
+        MonitorEnabledDescText().Text(g_Loc.Get(L"Desc_MonitorEnabled", L"Enable or disable brightness adjustments for this display"));
+        MonitorCustomNameTitleText().Text(g_Loc.Get(L"Opt_MonitorCustomName", L"Monitor Name"));
+        MonitorCustomNameDescText().Text(g_Loc.Get(L"Desc_MonitorCustomName", L"Display label shown in the OSD banner and flyout slider (max 20 characters)"));
+        MonitorControlModeTitleText().Text(g_Loc.Get(L"Opt_MonitorControlMode", L"Control Mode"));
+        MonitorControlModeDescText().Text(g_Loc.Get(L"Desc_MonitorControlMode", L"Sync follows the Main Display with an offset; Separate uses independent controls"));
+        MonitorModeItemSync().Content(box_value(g_Loc.Get(L"MonitorMode_Sync", L"Sync")));
+        MonitorModeItemSeparate().Content(box_value(g_Loc.Get(L"MonitorMode_Separate", L"Separate")));
+        MonitorOffsetTitleText().Text(g_Loc.Get(L"Opt_MonitorOffset", L"Brightness Offset (%)"));
+        MonitorOffsetDescText().Text(g_Loc.Get(L"Desc_MonitorOffset", L"Relative brightness offset applied compared to the Main Display"));
+        MonitorOffsetZeroTitleText().Text(g_Loc.Get(L"Opt_MonitorOffsetZero", L"Set to 0% when Main Display is 0%"));
+        MonitorOffsetZeroDescText().Text(g_Loc.Get(L"Desc_MonitorOffsetZero", L"Allow this display to drop to 0% when the Main Display is at 0%, even with a positive offset"));
+        SyncTraySectionTitle().Text(g_Loc.Get(L"Sec_TrayAppearance", L"System Tray Icon"));
+        SyncSeparateTrayIconTitleText().Text(g_Loc.Get(L"Opt_SyncSeparateTrayIcon", L"Separate Tray Icon"));
+        SyncSeparateTrayIconDescText().Text(g_Loc.Get(L"Desc_SyncSeparateTrayIcon", L"Show a dedicated system tray brightness icon for this Sync-mode display"));
+        MonitorSyncNoticeText().Text(g_Loc.Get(L"Monitor_SyncNotice", L"This display is in Sync mode and uses the Main Display's shortcuts and wheel controls. You can customize its OSD color, Flyout color, and optional tray icon below."));
+
+        TimingsHeaderTitle().Text(g_Loc.Get(L"Timings_Title", L"Timings & Global"));
+        TimingsHeaderSubtitle().Text(g_Loc.Get(L"Timings_Subtitle", L"Global hardware delays, OSD appearance, and flyout keyboard navigation"));
+        GlobalOsdFlyoutSectionTitle().Text(g_Loc.Get(L"Sec_GlobalOsdFlyout", L"OSD & Flyout Global"));
+
         // Shortcuts
-        ShortcutsHeaderTitle().Text(g_Loc.Get(L"Shortcuts_Title", L"Keyboard Shortcuts"));
-        ShortcutsHeaderSubtitle().Text(g_Loc.Get(L"Shortcuts_Subtitle", L"Global hotkeys for brightness stepping and preset jumping"));
         ShortcutsAdjustSectionTitle().Text(g_Loc.Get(L"Sec_ShortcutsAdjust", L"Brightness Stepping Shortcuts"));
         HotkeyAdjustTitleText().Text(g_Loc.Get(L"Opt_HotkeyAdjust", L"Increase & Decrease Shortcuts"));
         HotkeyAdjustDescText().Text(g_Loc.Get(L"Desc_HotkeyAdjust", L"Enable global keyboard shortcuts to raise and lower brightness"));
@@ -2223,8 +2418,6 @@ namespace winrt::BrightnessApp::implementation
         HoldSpeedDescText().Text(g_Loc.Get(L"Desc_HoldSpeed", L"Key hold interval for smooth stepping (higher = slower)"));
 
         // OSD
-        OsdHeaderTitle().Text(g_Loc.Get(L"OSD_Title", L"On-Screen Display (OSD)"));
-        OsdHeaderSubtitle().Text(g_Loc.Get(L"OSD_Subtitle", L"Visual overlay popup for real-time brightness adjustments"));
         OverlayThemeTitleText().Text(g_Loc.Get(L"Opt_OverlayTheme", L"OSD Banner Theme"));
         OverlayThemeDescText().Text(g_Loc.Get(L"Desc_OverlayTheme", L"Visual appearance and color theme of the brightness overlay banner"));
         OverlayThemeItemFollowWindows().Content(box_value(g_Loc.Get(L"Theme_FollowWindowsSystem", L"Follow Windows (system)")));
@@ -2244,13 +2437,10 @@ namespace winrt::BrightnessApp::implementation
         OverlayCustomAccentTitleText().Text(g_Loc.Get(L"Opt_OverlayCustomAccent", L"Custom Accent Color"));
         OverlayCustomAccentDescText().Text(g_Loc.Get(L"Desc_OverlayCustomAccent", L"Fill color for overlay brightness bar (configured when Windows accent is off)"));
 
-        OsdTimingSectionTitle().Text(g_Loc.Get(L"Sec_Timing", L"Timing"));
         OverlayTimeoutTitleText().Text(g_Loc.Get(L"Opt_OverlayTimeout", L"Hide Time (ms)"));
         OverlayTimeoutDescText().Text(g_Loc.Get(L"Desc_OverlayTimeout", L"Auto-hide timeout for banner overlay"));
 
         // System Tray
-        TrayHeaderTitle().Text(g_Loc.Get(L"Tray_Title", L"System Tray Icon"));
-        TrayHeaderSubtitle().Text(g_Loc.Get(L"Tray_Subtitle", L"Taskbar indicator, live percentage typography, and mouse actions"));
         TrayAppearanceSectionTitle().Text(g_Loc.Get(L"Sec_TrayAppearance", L"System Tray Icon"));
         TrayShowPercentageTitleText().Text(g_Loc.Get(L"Opt_TrayShowPercentage", L"Percentage Icon"));
         TrayShowPercentageDescText().Text(g_Loc.Get(L"Desc_TrayShowPercentage", L"Choose how the brightness percentage is displayed on the system tray icon"));
@@ -2302,8 +2492,7 @@ namespace winrt::BrightnessApp::implementation
         TrayMiddleClickBrightnessDescText().Text(g_Loc.Get(L"Desc_TrayMiddleClickBrightness", L"Brightness percentage applied when middle-clicking the tray icon"));
 
         // Flyout
-        FlyoutSliderHeaderTitle().Text(g_Loc.Get(L"Flyout_Title", L"Flyout Slider"));
-        FlyoutSliderHeaderSubtitle().Text(g_Loc.Get(L"FlyoutSlider_Subtitle", L"Hardware brightness slider popup with mouse wheel control"));
+        FlyoutSliderSectionTitle().Text(g_Loc.Get(L"Flyout_Title", L"Flyout Slider"));
         FlyoutScrollEnabledTitleText().Text(g_Loc.Get(L"Opt_FlyoutScrollEnabled", L"Slider Scrolling"));
         FlyoutScrollEnabledDescText().Text(g_Loc.Get(L"Desc_FlyoutScrollEnabled", L"Adjust brightness by scrolling the mouse wheel over the flyout slider"));
         FlyoutScrollEnabledStatusText().Text(FlyoutScrollEnabledToggle().IsOn() ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
