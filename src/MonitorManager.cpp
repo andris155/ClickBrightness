@@ -2,25 +2,43 @@
 #include "Settings.h"
 #include "resource.h"
 #include <map>
+#include <wbemidl.h>
+#include <wrl/client.h>
 
 #pragma comment(lib, "dxva2.lib")
+#pragma comment(lib, "wbemuuid.lib")
+#pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "oleaut32.lib")
 
 MonitorManager g_MonitorManager;
 
-static std::map<std::wstring, std::vector<std::wstring>> QueryAllDisplayFriendlyNames() {
-    std::map<std::wstring, std::vector<std::wstring>> result;
+struct DisplayConfigSummary {
+    std::map<std::wstring, std::vector<std::wstring>> friendlyNames;
+    std::wstring internalFriendlyName;
+    std::wstring internalDeviceName;
+};
+
+static bool IsInternalOutputTechnology(DISPLAYCONFIG_VIDEO_OUTPUT_TECHNOLOGY tech) {
+    return tech == DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INTERNAL ||
+           tech == DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_EMBEDDED ||
+           tech == DISPLAYCONFIG_OUTPUT_TECHNOLOGY_UDI_EMBEDDED ||
+           tech == DISPLAYCONFIG_OUTPUT_TECHNOLOGY_LVDS;
+}
+
+static DisplayConfigSummary QueryDisplayConfigInfo() {
+    DisplayConfigSummary summary;
 
     UINT32 pathCount = 0;
     UINT32 modeCount = 0;
     if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &pathCount, &modeCount) != ERROR_SUCCESS || pathCount == 0) {
-        return result;
+        return summary;
     }
 
     std::vector<DISPLAYCONFIG_PATH_INFO> paths(pathCount);
     std::vector<DISPLAYCONFIG_MODE_INFO> modes(modeCount);
 
     if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &pathCount, paths.data(), &modeCount, modes.data(), nullptr) != ERROR_SUCCESS) {
-        return result;
+        return summary;
     }
 
     for (size_t i = 0; i < pathCount; ++i) {
@@ -36,13 +54,232 @@ static std::map<std::wstring, std::vector<std::wstring>> QueryAllDisplayFriendly
             targetName.header.adapterId = paths[i].targetInfo.adapterId;
             targetName.header.id = paths[i].targetInfo.id;
             if (DisplayConfigGetDeviceInfo(&targetName.header) == ERROR_SUCCESS) {
-                if (targetName.monitorFriendlyDeviceName[0] != L'\0') {
-                    result[sourceName.viewGdiDeviceName].push_back(targetName.monitorFriendlyDeviceName);
+                std::wstring friendly = targetName.monitorFriendlyDeviceName;
+                if (!friendly.empty()) {
+                    summary.friendlyNames[sourceName.viewGdiDeviceName].push_back(friendly);
+                }
+                if (IsInternalOutputTechnology(paths[i].targetInfo.outputTechnology) && summary.internalDeviceName.empty()) {
+                    summary.internalDeviceName = sourceName.viewGdiDeviceName;
+                    summary.internalFriendlyName = !friendly.empty() ? friendly : L"Internal Display";
                 }
             }
         }
     }
-    return result;
+    return summary;
+}
+
+struct ScopedBstr {
+    BSTR bstr = nullptr;
+    ScopedBstr(const wchar_t* s) : bstr(s ? SysAllocString(s) : nullptr) {}
+    ~ScopedBstr() { if (bstr) SysFreeString(bstr); }
+    operator BSTR() const { return bstr; }
+};
+
+struct ScopedComInit {
+    bool shouldUninit = false;
+    ScopedComInit() {
+        HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+        if (hr == S_OK || hr == S_FALSE) {
+            shouldUninit = true;
+        }
+    }
+    ~ScopedComInit() {
+        if (shouldUninit) {
+            CoUninitialize();
+        }
+    }
+};
+
+static bool ConnectWmiServices(Microsoft::WRL::ComPtr<IWbemServices>& pSvc) {
+    if (pSvc) return true;
+
+    Microsoft::WRL::ComPtr<IWbemLocator> pLoc;
+    HRESULT hr = CoCreateInstance(CLSID_WbemLocator, 0, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pLoc));
+    if (FAILED(hr) || !pLoc) return false;
+
+    ScopedBstr ns(L"ROOT\\WMI");
+    hr = pLoc->ConnectServer(ns, NULL, NULL, NULL, 0, NULL, NULL, &pSvc);
+    if (FAILED(hr) || !pSvc) {
+        pSvc.Reset();
+        return false;
+    }
+
+    CoSetProxyBlanket(
+        pSvc.Get(),
+        RPC_C_AUTHN_WINNT,
+        RPC_C_AUTHZ_NONE,
+        NULL,
+        RPC_C_AUTHN_LEVEL_CALL,
+        RPC_C_IMP_LEVEL_IMPERSONATE,
+        NULL,
+        EOAC_NONE
+    );
+    return true;
+}
+
+static std::wstring EscapeWmiPathString(const std::wstring& s) {
+    std::wstring out;
+    out.reserve(s.size() + 8);
+    for (wchar_t c : s) {
+        if (c == L'\\' || c == L'"') {
+            out.push_back(L'\\');
+        }
+        out.push_back(c);
+    }
+    return out;
+}
+
+static bool ReadWmiBrightnessVariant(IWbemClassObject* pObj, const wchar_t* propName, DWORD& outVal) {
+    VARIANT vtProp;
+    VariantInit(&vtProp);
+    HRESULT hr = pObj->Get(propName, 0, &vtProp, 0, 0);
+    bool ok = false;
+    if (SUCCEEDED(hr)) {
+        if (vtProp.vt == VT_UI1) { outVal = vtProp.bVal; ok = true; }
+        else if (vtProp.vt == VT_I4) { outVal = static_cast<DWORD>(vtProp.lVal); ok = true; }
+        else if (vtProp.vt == VT_UI4) { outVal = vtProp.ulVal; ok = true; }
+        else if (vtProp.vt == VT_I2) { outVal = static_cast<DWORD>(vtProp.iVal); ok = true; }
+        else if (vtProp.vt == VT_UI2) { outVal = vtProp.uiVal; ok = true; }
+    }
+    VariantClear(&vtProp);
+    return ok;
+}
+
+static void EnumInternalMonitorsWmi(std::vector<PhysicalMonitorInfo>& monitors, const DisplayConfigSummary& dispCfg) {
+    ScopedComInit com;
+    Microsoft::WRL::ComPtr<IWbemServices> pSvc;
+    if (!ConnectWmiServices(pSvc)) return;
+
+    ScopedBstr wql(L"WQL");
+    ScopedBstr query(L"SELECT InstanceName, CurrentBrightness, Active FROM WmiMonitorBrightness");
+    Microsoft::WRL::ComPtr<IEnumWbemClassObject> pEnum;
+    HRESULT hr = pSvc->ExecQuery(wql, query, WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY, NULL, &pEnum);
+    if (FAILED(hr) || !pEnum) return;
+
+    // Determine if the internal display device is currently the primary monitor
+    bool internalIsPrimary = false;
+    if (!dispCfg.internalDeviceName.empty()) {
+        DISPLAY_DEVICEW dd = { sizeof(dd) };
+        for (DWORD idx = 0; EnumDisplayDevicesW(NULL, idx, &dd, 0); ++idx) {
+            if (_wcsicmp(dd.DeviceName, dispCfg.internalDeviceName.c_str()) == 0) {
+                internalIsPrimary = (dd.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE) != 0;
+                break;
+            }
+        }
+    } else if (monitors.empty()) {
+        internalIsPrimary = true;
+    }
+
+    int internalIndex = 0;
+    Microsoft::WRL::ComPtr<IWbemClassObject> pObj;
+    ULONG uReturn = 0;
+    while (SUCCEEDED(pEnum->Next(WBEM_INFINITE, 1, &pObj, &uReturn)) && uReturn > 0) {
+        VARIANT vtActive;
+        VariantInit(&vtActive);
+        bool isActive = true;
+        if (SUCCEEDED(pObj->Get(L"Active", 0, &vtActive, 0, 0)) && vtActive.vt == VT_BOOL) {
+            isActive = (vtActive.boolVal != VARIANT_FALSE);
+        }
+        VariantClear(&vtActive);
+
+        if (isActive) {
+            VARIANT vtInst;
+            VariantInit(&vtInst);
+            std::wstring instName;
+            if (SUCCEEDED(pObj->Get(L"InstanceName", 0, &vtInst, 0, 0)) && vtInst.vt == VT_BSTR && vtInst.bstrVal) {
+                instName = vtInst.bstrVal;
+            }
+            VariantClear(&vtInst);
+
+            DWORD curB = 50;
+            if (!instName.empty() && ReadWmiBrightnessVariant(pObj.Get(), L"CurrentBrightness", curB)) {
+                if (curB > 100) curB = 100;
+                PhysicalMonitorInfo info;
+                info.hPhysical = NULL;
+                info.isInternal = true;
+                info.wmiInstanceName = instName;
+                info.description = L"Internal Display (WMI)";
+                info.friendlyName = !dispCfg.internalFriendlyName.empty() ? dispCfg.internalFriendlyName : L"Internal Display";
+                info.deviceName = dispCfg.internalDeviceName;
+                info.id = L"INTERNAL#" + std::to_wstring(internalIndex++);
+                info.minBrightness = 0;
+                info.maxBrightness = 100;
+                info.currentBrightness = curB;
+                info.isPrimary = internalIsPrimary;
+                monitors.push_back(info);
+            }
+        }
+        pObj.Reset();
+    }
+}
+
+static bool GetInternalBrightnessWmi(const std::wstring& instanceName, DWORD& outBrightness) {
+    ScopedComInit com;
+    Microsoft::WRL::ComPtr<IWbemServices> pSvc;
+    if (!ConnectWmiServices(pSvc)) return false;
+
+    ScopedBstr wql(L"WQL");
+    ScopedBstr query(L"SELECT InstanceName, CurrentBrightness, Active FROM WmiMonitorBrightness");
+    Microsoft::WRL::ComPtr<IEnumWbemClassObject> pEnum;
+    if (FAILED(pSvc->ExecQuery(wql, query, WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY, NULL, &pEnum)) || !pEnum) {
+        return false;
+    }
+
+    Microsoft::WRL::ComPtr<IWbemClassObject> pObj;
+    ULONG uReturn = 0;
+    while (SUCCEEDED(pEnum->Next(WBEM_INFINITE, 1, &pObj, &uReturn)) && uReturn > 0) {
+        VARIANT vtInst;
+        VariantInit(&vtInst);
+        bool match = false;
+        if (SUCCEEDED(pObj->Get(L"InstanceName", 0, &vtInst, 0, 0)) && vtInst.vt == VT_BSTR && vtInst.bstrVal) {
+            match = (instanceName.empty() || _wcsicmp(vtInst.bstrVal, instanceName.c_str()) == 0);
+        }
+        VariantClear(&vtInst);
+
+        if (match && ReadWmiBrightnessVariant(pObj.Get(), L"CurrentBrightness", outBrightness)) {
+            if (outBrightness > 100) outBrightness = 100;
+            return true;
+        }
+        pObj.Reset();
+    }
+    return false;
+}
+
+static bool SetInternalBrightnessWmi(IWbemServices* pSvc, const std::wstring& instanceName, DWORD brightness) {
+    if (!pSvc || instanceName.empty()) return false;
+    if (brightness > 100) brightness = 100;
+
+    ScopedBstr className(L"WmiMonitorBrightnessMethods");
+    ScopedBstr methodName(L"WmiSetBrightness");
+
+    Microsoft::WRL::ComPtr<IWbemClassObject> pClass;
+    if (FAILED(pSvc->GetObject(className, 0, NULL, &pClass, NULL)) || !pClass) return false;
+
+    Microsoft::WRL::ComPtr<IWbemClassObject> pInParamsDef;
+    if (FAILED(pClass->GetMethod(methodName, 0, &pInParamsDef, NULL)) || !pInParamsDef) return false;
+
+    Microsoft::WRL::ComPtr<IWbemClassObject> pInInst;
+    if (FAILED(pInParamsDef->SpawnInstance(0, &pInInst)) || !pInInst) return false;
+
+    VARIANT vtTimeout;
+    VariantInit(&vtTimeout);
+    vtTimeout.vt = VT_I4;
+    vtTimeout.lVal = 0;
+    pInInst->Put(L"Timeout", 0, &vtTimeout, 0);
+    VariantClear(&vtTimeout);
+
+    VARIANT vtBrightness;
+    VariantInit(&vtBrightness);
+    vtBrightness.vt = VT_UI1;
+    vtBrightness.bVal = static_cast<BYTE>(brightness);
+    pInInst->Put(L"Brightness", 0, &vtBrightness, 0);
+    VariantClear(&vtBrightness);
+
+    std::wstring objPath = L"WmiMonitorBrightnessMethods.InstanceName=\"" + EscapeWmiPathString(instanceName) + L"\"";
+    ScopedBstr bstrPath(objPath.c_str());
+
+    HRESULT hr = pSvc->ExecMethod(bstrPath, methodName, 0, NULL, pInInst.Get(), NULL, NULL);
+    return SUCCEEDED(hr);
 }
 
 struct EnumContext {
@@ -100,6 +337,7 @@ static BOOL CALLBACK MonitorEnumCallback(HMONITOR hMonitor, HDC hdcMonitor, LPRE
                     info.maxBrightness = maxB;
                     info.currentBrightness = curB;
                     info.isPrimary = isPrimary;
+                    info.isInternal = false;
                     ctx->monitors->push_back(info);
                 }
             }
@@ -164,12 +402,14 @@ void MonitorManager::EnumMonitorsInternal() {
     }
     m_monitors.clear();
 
+    DisplayConfigSummary dispCfg = QueryDisplayConfigInfo();
     EnumContext ctx;
     ctx.rawMonitors = &m_rawMonitors;
     ctx.monitors = &m_monitors;
-    ctx.friendlyNames = QueryAllDisplayFriendlyNames();
+    ctx.friendlyNames = dispCfg.friendlyNames;
 
     EnumDisplayMonitors(NULL, NULL, MonitorEnumCallback, reinterpret_cast<LPARAM>(&ctx));
+    EnumInternalMonitorsWmi(m_monitors, dispCfg);
 
     if (!m_monitors.empty()) {
         m_driverAvailable = true;
@@ -237,11 +477,16 @@ int MonitorManager::GetCurrentBrightness() {
     for (auto& mon : m_monitors) {
         if (mon.isPrimary && g_Settings.IsMonitorSelected(mon.id)) {
             DWORD minB = 0, curB = 0, maxB = 100;
-            if (GetMonitorBrightness(mon.hPhysical, &minB, &curB, &maxB)) {
+            bool ok = mon.isInternal
+                ? GetInternalBrightnessWmi(mon.wmiInstanceName, curB)
+                : (GetMonitorBrightness(mon.hPhysical, &minB, &curB, &maxB) != FALSE);
+            if (ok) {
                 mon.currentBrightness = curB;
-                mon.minBrightness = minB;
-                mon.maxBrightness = maxB;
-                m_cachedBrightness = SafeCalcBrightnessPercent(curB, minB, maxB);
+                if (!mon.isInternal) {
+                    mon.minBrightness = minB;
+                    mon.maxBrightness = maxB;
+                }
+                m_cachedBrightness = SafeCalcBrightnessPercent(curB, mon.minBrightness, mon.maxBrightness);
                 g_Settings.cachedBrightness = m_cachedBrightness;
                 return m_cachedBrightness;
             }
@@ -252,11 +497,16 @@ int MonitorManager::GetCurrentBrightness() {
     for (auto& mon : m_monitors) {
         if (g_Settings.IsMonitorSelected(mon.id)) {
             DWORD minB = 0, curB = 0, maxB = 100;
-            if (GetMonitorBrightness(mon.hPhysical, &minB, &curB, &maxB)) {
+            bool ok = mon.isInternal
+                ? GetInternalBrightnessWmi(mon.wmiInstanceName, curB)
+                : (GetMonitorBrightness(mon.hPhysical, &minB, &curB, &maxB) != FALSE);
+            if (ok) {
                 mon.currentBrightness = curB;
-                mon.minBrightness = minB;
-                mon.maxBrightness = maxB;
-                m_cachedBrightness = SafeCalcBrightnessPercent(curB, minB, maxB);
+                if (!mon.isInternal) {
+                    mon.minBrightness = minB;
+                    mon.maxBrightness = maxB;
+                }
+                m_cachedBrightness = SafeCalcBrightnessPercent(curB, mon.minBrightness, mon.maxBrightness);
                 g_Settings.cachedBrightness = m_cachedBrightness;
                 return m_cachedBrightness;
             }
@@ -267,11 +517,16 @@ int MonitorManager::GetCurrentBrightness() {
     if (!m_monitors.empty()) {
         auto& mon = m_monitors[0];
         DWORD minB = 0, curB = 0, maxB = 100;
-        if (GetMonitorBrightness(mon.hPhysical, &minB, &curB, &maxB)) {
+        bool ok = mon.isInternal
+            ? GetInternalBrightnessWmi(mon.wmiInstanceName, curB)
+            : (GetMonitorBrightness(mon.hPhysical, &minB, &curB, &maxB) != FALSE);
+        if (ok) {
             mon.currentBrightness = curB;
-            mon.minBrightness = minB;
-            mon.maxBrightness = maxB;
-            m_cachedBrightness = SafeCalcBrightnessPercent(curB, minB, maxB);
+            if (!mon.isInternal) {
+                mon.minBrightness = minB;
+                mon.maxBrightness = maxB;
+            }
+            m_cachedBrightness = SafeCalcBrightnessPercent(curB, mon.minBrightness, mon.maxBrightness);
             g_Settings.cachedBrightness = m_cachedBrightness;
             return m_cachedBrightness;
         } else {
@@ -311,6 +566,9 @@ bool MonitorManager::SetBrightness(int brightness, bool async) {
         }
     }
 
+    ScopedComInit comSync;
+    Microsoft::WRL::ComPtr<IWbemServices> pWmiSync;
+
     bool allSuccess = true;
     for (const auto& mon : m_monitors) {
         if (!g_Settings.IsMonitorSelected(mon.id)) {
@@ -319,8 +577,14 @@ bool MonitorManager::SetBrightness(int brightness, bool async) {
         DWORD targetVal = (mon.maxBrightness > mon.minBrightness)
             ? (mon.minBrightness + (mon.maxBrightness - mon.minBrightness) * brightness / 100)
             : (DWORD)brightness;
-        if (!SetMonitorBrightness(mon.hPhysical, targetVal)) {
-            allSuccess = false;
+        if (mon.isInternal) {
+            if (!ConnectWmiServices(pWmiSync) || !SetInternalBrightnessWmi(pWmiSync.Get(), mon.wmiInstanceName, targetVal)) {
+                allSuccess = false;
+            }
+        } else {
+            if (!SetMonitorBrightness(mon.hPhysical, targetVal)) {
+                allSuccess = false;
+            }
         }
     }
 
@@ -332,6 +596,9 @@ bool MonitorManager::SetBrightness(int brightness, bool async) {
 }
 
 void MonitorManager::WorkerLoop() {
+    ScopedComInit comWorker;
+    Microsoft::WRL::ComPtr<IWbemServices> pWmiSvc;
+
     while (true) {
         int targetBrightness = -1;
         bool doReinit = false;
@@ -368,6 +635,8 @@ void MonitorManager::WorkerLoop() {
             }
             struct MonTarget {
                 HANDLE hPhysical;
+                bool isInternal;
+                std::wstring wmiInstanceName;
                 DWORD targetVal;
             };
             std::vector<MonTarget> targets;
@@ -392,7 +661,7 @@ void MonitorManager::WorkerLoop() {
                         DWORD targetVal = (mon.maxBrightness > mon.minBrightness)
                             ? (mon.minBrightness + (mon.maxBrightness - mon.minBrightness) * targetBrightness / 100)
                             : (DWORD)targetBrightness;
-                        targets.push_back({ mon.hPhysical, targetVal });
+                        targets.push_back({ mon.hPhysical, mon.isInternal, mon.wmiInstanceName, targetVal });
                     }
                 }
             }
@@ -408,12 +677,13 @@ void MonitorManager::WorkerLoop() {
                     }
                 }
 
-                // Verify the physical monitor handle is still open and valid (not destroyed by suspend/reinit)
+                // Verify the monitor is still present (not destroyed by suspend/reinit)
                 bool validHandle = false;
                 {
                     std::lock_guard<std::mutex> lock(m_mutex);
                     for (const auto& mon : m_monitors) {
-                        if (mon.hPhysical == tgt.hPhysical) {
+                        if (tgt.isInternal ? (mon.isInternal && mon.wmiInstanceName == tgt.wmiInstanceName)
+                                           : (!mon.isInternal && mon.hPhysical == tgt.hPhysical)) {
                             validHandle = true;
                             break;
                         }
@@ -423,17 +693,30 @@ void MonitorManager::WorkerLoop() {
                     break;
                 }
 
-                bool ok = (SetMonitorBrightness(tgt.hPhysical, tgt.targetVal) != FALSE);
-                if (!ok) {
-                    // Retry once after a brief micro-sleep in case of transient I2C bus contention
-                    Sleep(25);
+                bool ok = false;
+                if (tgt.isInternal) {
+                    if (!ConnectWmiServices(pWmiSvc) || !SetInternalBrightnessWmi(pWmiSvc.Get(), tgt.wmiInstanceName, tgt.targetVal)) {
+                        pWmiSvc.Reset();
+                        if (ConnectWmiServices(pWmiSvc)) {
+                            ok = SetInternalBrightnessWmi(pWmiSvc.Get(), tgt.wmiInstanceName, tgt.targetVal);
+                        }
+                    } else {
+                        ok = true;
+                    }
+                } else {
                     ok = (SetMonitorBrightness(tgt.hPhysical, tgt.targetVal) != FALSE);
+                    if (!ok) {
+                        // Retry once after a brief micro-sleep in case of transient I2C bus contention
+                        Sleep(25);
+                        ok = (SetMonitorBrightness(tgt.hPhysical, tgt.targetVal) != FALSE);
+                    }
                 }
 
                 if (ok) {
                     std::lock_guard<std::mutex> lock(m_mutex);
                     for (auto& mon : m_monitors) {
-                        if (mon.hPhysical == tgt.hPhysical) {
+                        if (tgt.isInternal ? (mon.isInternal && mon.wmiInstanceName == tgt.wmiInstanceName)
+                                           : (!mon.isInternal && mon.hPhysical == tgt.hPhysical)) {
                             mon.currentBrightness = tgt.targetVal;
                             break;
                         }

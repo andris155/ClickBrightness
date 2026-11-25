@@ -17,10 +17,12 @@ struct PhysicalMonitorInfo {
     std::wstring friendlyName;
     std::wstring deviceName;
     std::wstring id;
+    std::wstring wmiInstanceName;
     DWORD minBrightness;
     DWORD maxBrightness;
     DWORD currentBrightness;
     bool isPrimary;
+    bool isInternal;
 };
 
 class MonitorManager {
