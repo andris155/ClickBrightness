@@ -50,10 +50,13 @@ struct MonitorControlConfig {
     COLORREF overlayAccentColorDark = RGB(96, 205, 255);
 
     // Tray (without timings)
-    int trayPercentageMode = 0; // 0 = Follow Windows, 1 = Colored, 2 = Disabled, 3 = Hide
+    int trayPercentageMode = 0; // 0 = Follow Windows, 1 = Colored, 2 = Disabled, 3 = Hide, 4 = Custom
     COLORREF trayIconColor = RGB(0, 120, 212);
     bool trayIconUseDualColors = false;
     COLORREF trayIconColorDark = RGB(96, 205, 255);
+    bool trayIconUseDualCustomIcons = false;
+    std::wstring trayCustomIcon = L"preset:sun";
+    std::wstring trayCustomIconDark = L"preset:sun-blue";
     std::wstring trayFont = L"Segoe UI Variable Text";
     int trayFontWeight = 375;
     int trayFontSize = 102;
@@ -76,6 +79,21 @@ struct MonitorControlConfig {
     COLORREF flyoutAccentColorDark = RGB(96, 205, 255);
     bool flyoutScrollEnabled = true;
     int flyoutScrollStep = 5;
+
+    // Schedule
+    int scheduleMode = 0;               // 0 = Disabled, 1 = Custom Time, 2 = Sunrise / Sunset
+    int scheduleSunSource = 0;          // 0 = Location service, 1 = Geographic coordinates
+    int scheduleDayHour = 7;
+    int scheduleDayMinute = 0;
+    int scheduleNightHour = 20;
+    int scheduleNightMinute = 0;
+    int scheduleDayBrightness = 80;
+    int scheduleNightBrightness = 30;
+    double scheduleLatitude = 47.4979;  // Default: Budapest
+    double scheduleLongitude = 19.0402;
+    int scheduleSunriseOffset = 0;      // -180 to +180 min
+    int scheduleSunsetOffset = 0;       // -180 to +180 min
+    bool scheduleShowOsd = true;
 
     int cachedBrightness = 45;
 };
@@ -127,10 +145,13 @@ struct AppSettings {
     int hotkeyRepeatIntervalMs = 90;   // Default: 90 ms (~11 steps/sec, ~1.8s for 0-100% with step=5)
 
     // Tray Appearance
-    int trayPercentageMode = 0;                        // 0 = Follow Windows, 1 = Colored, 2 = Disabled, 3 = Hide
+    int trayPercentageMode = 0;                        // 0 = Follow Windows, 1 = Colored, 2 = Disabled, 3 = Hide, 4 = Custom
     COLORREF trayIconColor = RGB(0, 120, 212);         // Default: #0078D4 (used when trayPercentageMode == 1)
     bool trayIconUseDualColors = false;                // Default: OFF (Separate color for dark taskbar)
     COLORREF trayIconColorDark = RGB(96, 205, 255);    // Default: #60CDFF (used on dark taskbar when dual colors ON)
+    bool trayIconUseDualCustomIcons = false;           // Default: OFF (Separate custom icon for dark taskbar)
+    std::wstring trayCustomIcon = L"preset:sun";       // Default: sun.ico
+    std::wstring trayCustomIconDark = L"preset:sun-blue"; // Default dark: sun-blue.ico
     std::wstring trayFont = L"Segoe UI Variable Text"; // Default font: Segoe UI Variable Text
     int trayFontWeight = 375;                          // Default: 375
     int trayFontSize = 102;                            // Default: 102% (1-2 digits)
@@ -168,6 +189,21 @@ struct AppSettings {
     bool showSeparateInMultiFlyout = true;     // Default: ON
     bool disableTurnedOffControl = false;      // Default: OFF
     std::map<std::wstring, MonitorControlConfig> monitorConfigs;
+
+    // Schedule (active customization mirror)
+    int scheduleMode = 0;
+    int scheduleSunSource = 0;
+    int scheduleDayHour = 7;
+    int scheduleDayMinute = 0;
+    int scheduleNightHour = 20;
+    int scheduleNightMinute = 0;
+    int scheduleDayBrightness = 80;
+    int scheduleNightBrightness = 30;
+    double scheduleLatitude = 47.4979;
+    double scheduleLongitude = 19.0402;
+    int scheduleSunriseOffset = 0;
+    int scheduleSunsetOffset = 0;
+    bool scheduleShowOsd = true;
 
     // OSD & Tray Menu Theme (0 = Follow Windows (system), 1 = Dark, 2 = Light)
     int overlayTheme = 0;

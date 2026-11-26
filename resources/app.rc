@@ -1,7 +1,19 @@
 #include <windows.h>
 #include "resource.h"
 
-IDI_APP_ICON ICON "program.ico"
+IDI_APP_ICON    ICON "program.ico"
+IDI_SUN_DEFAULT ICON "sun.ico"
+IDI_SUN_DARK    ICON "sun-dark.ico"
+IDI_SUN_BLACK   ICON "sun-black.ico"
+IDI_SUN_WHITE   ICON "sun-white.ico"
+IDI_SUN_RED     ICON "sun-red.ico"
+IDI_SUN_ORANGE  ICON "sun-orange.ico"
+IDI_SUN_GREEN   ICON "sun-green.ico"
+IDI_SUN_TEAL    ICON "sun-teal.ico"
+IDI_SUN_BLUE    ICON "sun-blue.ico"
+IDI_SUN_PURPLE  ICON "sun-purple.ico"
+IDI_SUN_PINK    ICON "sun-pink.ico"
+IDI_SUN_GRAY    ICON "sun-gray.ico"
 
 
 // Version Information

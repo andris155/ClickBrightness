@@ -42,6 +42,9 @@ namespace winrt::BrightnessApp::implementation
         void SaveCurrentMonitorConfigFromUI();
         void OpenMonitorsSubpage(const std::wstring& subpageTag);
         void OpenTimingsSubpage(const std::wstring& subpageTag);
+        void UpdateScheduleVisibility();
+        void UpdateScheduleSunPreview();
+        winrt::fire_and_forget DetectScheduleLocationAsync();
         void UpdateTitleBarDragRegions();
         void SetBackButtonUsable(bool usable);
 

@@ -1,6 +1,18 @@
 #pragma once
 
 #define IDI_APP_ICON                    101
+#define IDI_SUN_DEFAULT                 102
+#define IDI_SUN_DARK                    103
+#define IDI_SUN_BLACK                   104
+#define IDI_SUN_WHITE                   105
+#define IDI_SUN_RED                     106
+#define IDI_SUN_ORANGE                  107
+#define IDI_SUN_GREEN                   109
+#define IDI_SUN_TEAL                    110
+#define IDI_SUN_BLUE                    111
+#define IDI_SUN_PURPLE                  112
+#define IDI_SUN_PINK                    113
+#define IDI_SUN_GRAY                    114
 
 // Tray context menu items
 #define IDM_TRAY_OPTIONS                1001
@@ -29,6 +41,8 @@
 #define IDT_PRESET_TOGGLE_RELEASE       3006
 #define IDT_OVERLAY_ANIM                3007
 #define IDT_POWER_STATE_POLL            3008
+#define IDT_SCHEDULE_TICK               3009
+#define IDT_SCHEDULE_EXACT              3010
 
 // Custom Windows Messages
 #define WM_APP_TRAYMSG                  (WM_APP + 1)

@@ -23,6 +23,7 @@
 #include "OverlayWindow.h"
 #include "SettingsWindow.xaml.h"
 #include "HotkeyManager.h"
+#include "ScheduleManager.h"
 #include "ThemeHelper.h"
 #include "CliParser.h"
 #include "resource.h"
@@ -411,6 +412,7 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
                 else
                 {
                     g_MonitorManager.OnDisplayPowerOn();
+                    ScheduleManager::Refresh();
                 }
             }
             return TRUE;
@@ -424,9 +426,16 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
             g_MonitorManager.OnPowerResume();
             int b = g_MonitorManager.GetCachedBrightness();
             g_TrayIcon.UpdateBrightness(b);
+            ScheduleManager::Refresh();
             SetTimer(hwnd, IDT_GPU_RESET_COOLDOWN, 500, NULL);
         }
         return TRUE;
+    }
+
+    case WM_TIMECHANGE:
+    {
+        ScheduleManager::Refresh();
+        return 0;
     }
 
     case WM_TIMER:
@@ -449,6 +458,7 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
 
             int b = g_MonitorManager.GetCachedBrightness();
             g_TrayIcon.UpdateBrightness(b);
+            ScheduleManager::Refresh();
 
             // If driver is still settling or physical monitors aren't ready yet, start retry loop
             if (!g_MonitorManager.IsDriverAvailable())
@@ -482,6 +492,17 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
             }
             return 0;
         }
+        else if (wParam == IDT_SCHEDULE_TICK)
+        {
+            ScheduleManager::Tick();
+            return 0;
+        }
+        else if (wParam == IDT_SCHEDULE_EXACT)
+        {
+            KillTimer(hwnd, IDT_SCHEDULE_EXACT);
+            ScheduleManager::Tick();
+            return 0;
+        }
         else if (wParam == IDT_PRESET_TOGGLE_RELEASE)
         {
             UINT vk = s_toggleHeldVk ? s_toggleHeldVk : g_Settings.hotkeyPresetToggleKey;
@@ -512,6 +533,7 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
         g_HotkeyManager.UnregisterAll(hwnd);
         g_TrayIcon.Destroy();
         g_FlyoutWindow.Destroy();
+        ScheduleManager::Uninit();
         g_OverlayWindow.Destroy();
         g_MonitorManager.Cleanup();
         PostQuitMessage(0);
@@ -659,6 +681,11 @@ namespace winrt::BrightnessApp::implementation
             // Pre-create flyout and overlay windows
             g_FlyoutWindow.Create();
             g_OverlayWindow.Create();
+
+            if (g_hMainWnd)
+            {
+                ScheduleManager::Init(g_hMainWnd);
+            }
 
             // Setup IPC named events
             s_hEvents[0] = CreateEventW(NULL, FALSE, FALSE, EVENT_NAME_SHOW_SETTINGS);

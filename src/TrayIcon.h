@@ -8,6 +8,7 @@
 #include <wrl/client.h>
 #include <string>
 #include <vector>
+#include <map>
 
 struct MonitorControlConfig;
 
@@ -47,16 +48,19 @@ public:
     UINT GetId() const { return m_uId; }
 
     static bool IsTrayColorLight();
+    static HICON LoadCustomIconForSpec(const std::wstring& spec, int iconSize);
 
 private:
     void InitD2D();
     void CleanupD2D();
+    HICON GetOrLoadCustomIcon(const std::wstring& spec, int iconSize);
 
     HWND m_hOwnerWnd;
     UINT m_uId;
     UINT m_uCallbackMsg;
     HICON m_hBaseSunIcon;
     HICON m_iconCache[101];
+    std::map<std::wstring, HICON> m_customIconCache;
     std::vector<ExtraTraySlot> m_extraSlots;
     int m_lastBrightness;
     bool m_created;

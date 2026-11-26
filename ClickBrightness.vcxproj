@@ -217,6 +217,8 @@
       <DependentUpon>src\FlyoutWindow.xaml</DependentUpon>
     </ClInclude>
     <ClInclude Include="src\LocalizationManager.h" />
+    <ClInclude Include="src\ScheduleManager.h" />
+    <ClInclude Include="src\SolarCalculator.h" />
     <ClInclude Include="src\Settings.h" />
     <ClInclude Include="src\MonitorManager.h" />
     <ClInclude Include="src\HotkeyManager.h" />
@@ -245,6 +247,7 @@
       <DependentUpon>src\FlyoutWindow.xaml</DependentUpon>
     </ClCompile>
     <ClCompile Include="src\LocalizationManager.cpp" />
+    <ClCompile Include="src\ScheduleManager.cpp" />
     <ClCompile Include="src\Settings.cpp" />
     <ClCompile Include="src\MonitorManager.cpp" />
     <ClCompile Include="src\HotkeyManager.cpp" />

@@ -19,6 +19,7 @@
 #include "DpiHelper.h"
 #include "ThemeHelper.h"
 #include "LocalizationManager.h"
+#include "ScheduleManager.h"
 
 #include <microsoft.ui.xaml.window.h>
 #include <winrt/Microsoft.UI.Composition.SystemBackdrops.h>
@@ -26,8 +27,130 @@
 #include <winrt/Microsoft.UI.Interop.h>
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
+#include <winrt/Windows.Devices.Geolocation.h>
 #include <winrt/Windows.Storage.Streams.h>
 #include <robuffer.h>
+#include <commdlg.h>
+
+namespace
+{
+    struct SunIconPreset
+    {
+        const wchar_t* spec;
+        const wchar_t* label;
+    };
+
+    static const SunIconPreset kSunIconPresets[] = {
+        { L"preset:sun",        L"Sun (Default)" },
+        { L"preset:sun-dark",   L"Sun (Dark)" },
+        { L"preset:sun-black",  L"Sun (Black)" },
+        { L"preset:sun-white",  L"Sun (White)" },
+        { L"preset:sun-red",    L"Sun (Red)" },
+        { L"preset:sun-orange", L"Sun (Orange)" },
+        { L"preset:sun-green",  L"Sun (Green)" },
+        { L"preset:sun-teal",   L"Sun (Teal)" },
+        { L"preset:sun-blue",   L"Sun (Blue)" },
+        { L"preset:sun-purple", L"Sun (Purple)" },
+        { L"preset:sun-pink",   L"Sun (Pink)" },
+        { L"preset:sun-gray",   L"Sun (Gray)" },
+    };
+
+    static void PopulateSunPresetComboBox(winrt::Microsoft::UI::Xaml::Controls::ComboBox const& cb)
+    {
+        if (!cb || cb.Items().Size() > 0) return;
+        for (const auto& p : kSunIconPresets)
+        {
+            cb.Items().Append(winrt::box_value(winrt::hstring(p.label)));
+        }
+        cb.Items().Append(winrt::box_value(winrt::hstring(L"Custom File...")));
+    }
+
+    static void SelectSunPresetInComboBox(winrt::Microsoft::UI::Xaml::Controls::ComboBox const& cb, const std::wstring& spec)
+    {
+        if (!cb) return;
+        PopulateSunPresetComboBox(cb);
+        int presetCount = static_cast<int>(std::size(kSunIconPresets));
+        for (int i = 0; i < presetCount; ++i)
+        {
+            if (_wcsicmp(spec.c_str(), kSunIconPresets[i].spec) == 0)
+            {
+                cb.SelectedIndex(i);
+                return;
+            }
+        }
+        if (!spec.empty() && spec.rfind(L"preset:", 0) != 0)
+        {
+            cb.SelectedIndex(presetCount); // "Custom File..."
+        }
+        else
+        {
+            cb.SelectedIndex(0);
+        }
+    }
+
+    static std::wstring BrowseForIcoFile(HWND owner)
+    {
+        wchar_t path[MAX_PATH] = { 0 };
+        OPENFILENAMEW ofn = { sizeof(OPENFILENAMEW) };
+        ofn.hwndOwner = owner;
+        ofn.lpstrFilter = L"Icon Files (*.ico)\0*.ico\0All Files (*.*)\0*.*\0";
+        ofn.lpstrFile = path;
+        ofn.nMaxFile = MAX_PATH;
+        ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+        if (GetOpenFileNameW(&ofn))
+        {
+            return path;
+        }
+        return L"";
+    }
+
+    static void UpdateCustomIconPreview(winrt::Microsoft::UI::Xaml::Controls::Image const& img, const std::wstring& spec)
+    {
+        if (!img) return;
+        const int sz = 32;
+        HICON hIcon = TrayIcon::LoadCustomIconForSpec(spec, sz);
+        if (!hIcon)
+        {
+            hIcon = TrayIcon::LoadCustomIconForSpec(L"preset:sun", sz);
+        }
+        if (!hIcon) return;
+
+        BITMAPINFO bmi = {};
+        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        bmi.bmiHeader.biWidth = sz;
+        bmi.bmiHeader.biHeight = -sz; // top-down
+        bmi.bmiHeader.biPlanes = 1;
+        bmi.bmiHeader.biBitCount = 32;
+        bmi.bmiHeader.biCompression = BI_RGB;
+
+        void* bits = nullptr;
+        HDC hdcScreen = GetDC(NULL);
+        HDC hdcMem = CreateCompatibleDC(hdcScreen);
+        HBITMAP hBmp = CreateDIBSection(hdcMem, &bmi, DIB_RGB_COLORS, &bits, NULL, 0);
+        if (hBmp && bits)
+        {
+            HGDIOBJ oldObj = SelectObject(hdcMem, hBmp);
+            memset(bits, 0, sz * sz * 4);
+            DrawIconEx(hdcMem, 0, 0, hIcon, sz, sz, 0, NULL, DI_NORMAL);
+            SelectObject(hdcMem, oldObj);
+
+            winrt::Microsoft::UI::Xaml::Media::Imaging::WriteableBitmap wb(sz, sz);
+            auto buf = wb.PixelBuffer();
+            auto byteAccess = buf.as<Windows::Storage::Streams::IBufferByteAccess>();
+            byte* dst = nullptr;
+            if (SUCCEEDED(byteAccess->Buffer(&dst)) && dst)
+            {
+                memcpy(dst, bits, sz * sz * 4);
+            }
+            wb.Invalidate();
+            img.Source(wb);
+        }
+        if (hBmp) DeleteObject(hBmp);
+        if (hdcMem) DeleteDC(hdcMem);
+        if (hdcScreen) ReleaseDC(NULL, hdcScreen);
+        DestroyIcon(hIcon);
+    }
+}
 #include "../resources/resource.h"
 #include <functional>
 
@@ -705,6 +828,9 @@ namespace winrt::BrightnessApp::implementation
                 { g_Loc.Get(L"Opt_TrayIconColor", L"Icon Color").c_str(), catMon, L"tray icon percentage custom color picker light mode", L"Monitors_Tray", TrayIconColorPickerButton() },
                 { g_Loc.Get(L"Opt_TrayIconDualColor", L"Separate Dark & Light Colors").c_str(), catMon, L"tray icon percentage dual separate dark light color", L"Monitors_Tray", TrayIconDualColorToggle() },
                 { g_Loc.Get(L"Opt_TrayIconColorDark", L"Dark Mode Color").c_str(), catMon, L"tray icon percentage custom dark mode color picker", L"Monitors_Tray", TrayIconDarkColorPickerButton() },
+                { g_Loc.Get(L"Opt_TrayCustomIcon", L"Custom Icon").c_str(), catMon, L"tray custom icon preset sun browse ico", L"Monitors_Tray", TrayCustomIconPresetComboBox() },
+                { g_Loc.Get(L"Opt_TrayIconDualCustomIcons", L"Separate Dark & Light Icons").c_str(), catMon, L"tray custom icon dual separate dark light mode", L"Monitors_Tray", TrayIconDualCustomIconToggle() },
+                { g_Loc.Get(L"Opt_TrayCustomIconDark", L"Dark Mode Icon").c_str(), catMon, L"tray custom dark mode icon preset sun blue browse ico", L"Monitors_Tray", TrayCustomIconDarkPresetComboBox() },
                 { g_Loc.Get(L"Opt_TrayFont", L"Tray Icon Font").c_str(), catMon, L"tray font family typography", L"Monitors_Tray", TrayFontComboBox() },
                 { g_Loc.Get(L"Opt_TrayFontWeight", L"Font Weight").c_str(), catMon, L"tray font weight bold light semilight thin", L"Monitors_Tray", TrayFontWeightSlider() },
                 { g_Loc.Get(L"Opt_TrayFontSize", L"Tray Font Size (%)").c_str(), catMon, L"tray font size scale", L"Monitors_Tray", TrayFontSizeSlider() },
@@ -722,6 +848,11 @@ namespace winrt::BrightnessApp::implementation
                 { g_Loc.Get(L"Opt_FlyoutScrollStep", L"Scrolling Brightness Step").c_str(), catMon, L"flyout slider scroll step percentage", L"Monitors_Flyout", FlyoutScrollStepComboBox() },
                 { g_Loc.Get(L"Opt_FlyoutUseWindowsAccent", L"Use Windows Accent Color").c_str(), catMon, L"flyout accent windows color", L"Monitors_Flyout", FlyoutUseWindowsAccentToggle() },
                 { g_Loc.Get(L"Opt_FlyoutCustomAccent", L"Custom Accent Color").c_str(), catMon, L"flyout custom accent color picker", L"Monitors_Flyout", FlyoutAccentColorPickerButton() },
+
+                // Schedule (under Monitors)
+                { g_Loc.Get(L"Opt_ScheduleMode", L"Automatic Schedule").c_str(), catMon, L"schedule automatic day night custom time sunrise sunset", L"Monitors_Schedule", ScheduleModeComboBox() },
+                { g_Loc.Get(L"Opt_ScheduleDayBrightness", L"Daytime Brightness (%)").c_str(), catMon, L"schedule day brightness level", L"Monitors_Schedule", ScheduleDayBrightnessSlider() },
+                { g_Loc.Get(L"Opt_ScheduleNightBrightness", L"Nighttime Brightness (%)").c_str(), catMon, L"schedule night brightness level", L"Monitors_Schedule", ScheduleNightBrightnessSlider() },
 
                 // Timings & Global
                 { g_Loc.Get(L"Opt_DelayEnabled", L"Delayed Brightness Change").c_str(), catTim, L"delay debounce shortcut", L"Timings_Shortcuts", DelayEnabledToggle() },
@@ -749,6 +880,7 @@ namespace winrt::BrightnessApp::implementation
             else if (entry.navTag == L"Monitors_OSD") { EnsureTrayTabLoaded(); NavView().SelectedItem(NavItemMonitors()); OpenMonitorsSubpage(L"OSD"); }
             else if (entry.navTag == L"Monitors_Tray") { EnsureTrayTabLoaded(); NavView().SelectedItem(NavItemMonitors()); OpenMonitorsSubpage(L"Tray"); }
             else if (entry.navTag == L"Monitors_Flyout") { EnsureTrayTabLoaded(); NavView().SelectedItem(NavItemMonitors()); OpenMonitorsSubpage(L"Flyout"); }
+            else if (entry.navTag == L"Monitors_Schedule") { EnsureTrayTabLoaded(); NavView().SelectedItem(NavItemMonitors()); OpenMonitorsSubpage(L"Schedule"); }
             else if (entry.navTag == L"Timings") { NavView().SelectedItem(NavItemTimings()); OpenTimingsSubpage(L""); }
             else if (entry.navTag == L"Timings_Shortcuts") { NavView().SelectedItem(NavItemTimings()); OpenTimingsSubpage(L"Shortcuts"); }
             else if (entry.navTag == L"Timings_OSD") { NavView().SelectedItem(NavItemTimings()); OpenTimingsSubpage(L"OSD"); }
@@ -907,6 +1039,10 @@ namespace winrt::BrightnessApp::implementation
         MonitorsFlyoutCard().Click([this](auto&&, auto&&)
         {
             OpenMonitorsSubpage(L"Flyout");
+        });
+        MonitorsScheduleCard().Click([this](auto&&, auto&&)
+        {
+            OpenMonitorsSubpage(L"Schedule");
         });
         TitleBarBackButton().Click([this](auto&&, auto&&)
         {
@@ -1570,12 +1706,15 @@ namespace winrt::BrightnessApp::implementation
                 TrayPercentageModeComboBox().SelectedIndex(0);
                 m_isUpdatingUI = false;
             }
-            if (idx >= 0 && idx <= 3)
+            if (idx >= 0 && idx <= 4)
             {
                 g_Settings.trayPercentageMode = idx;
                 TrayIconColorCard().Visibility(idx == 1 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
                 TrayIconDualColorCard().Visibility(idx == 1 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
                 TrayIconDarkColorCard().Visibility((idx == 1 && g_Settings.trayIconUseDualColors) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+                TrayCustomIconCard().Visibility(idx == 4 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+                TrayIconDualCustomIconCard().Visibility(idx == 4 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+                TrayCustomIconDarkCard().Visibility((idx == 4 && g_Settings.trayIconUseDualCustomIcons) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
                 TrayTypographyPanel().Visibility((idx == 0 || idx == 1) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
                 ApplyAndSave();
                 g_TrayIcon.OnThemeChanged();
@@ -1593,6 +1732,114 @@ namespace winrt::BrightnessApp::implementation
             TrayIconDarkColorCard().Visibility((g_Settings.trayPercentageMode == 1 && on) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
             ApplyAndSave();
             g_TrayIcon.OnThemeChanged();
+        });
+
+        // Tray Custom Icon Presets & Browse
+        PopulateSunPresetComboBox(TrayCustomIconPresetComboBox());
+        PopulateSunPresetComboBox(TrayCustomIconDarkPresetComboBox());
+
+        TrayCustomIconPresetComboBox().SelectionChanged([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            int idx = TrayCustomIconPresetComboBox().SelectedIndex();
+            int presetCount = static_cast<int>(std::size(kSunIconPresets));
+            if (idx >= 0 && idx < presetCount)
+            {
+                g_Settings.trayCustomIcon = kSunIconPresets[idx].spec;
+                UpdateCustomIconPreview(TrayCustomIconPreview(), g_Settings.trayCustomIcon);
+                ApplyAndSave();
+                g_TrayIcon.OnThemeChanged();
+            }
+            else if (idx == presetCount)
+            {
+                std::wstring chosen = BrowseForIcoFile(m_hwnd);
+                if (!chosen.empty())
+                {
+                    g_Settings.trayCustomIcon = chosen;
+                    UpdateCustomIconPreview(TrayCustomIconPreview(), g_Settings.trayCustomIcon);
+                    ApplyAndSave();
+                    g_TrayIcon.OnThemeChanged();
+                }
+                else
+                {
+                    m_isUpdatingUI = true;
+                    SelectSunPresetInComboBox(TrayCustomIconPresetComboBox(), g_Settings.trayCustomIcon);
+                    m_isUpdatingUI = false;
+                }
+            }
+        });
+
+        TrayCustomIconBrowseButton().Click([this](auto&&, auto&&)
+        {
+            std::wstring chosen = BrowseForIcoFile(m_hwnd);
+            if (!chosen.empty())
+            {
+                g_Settings.trayCustomIcon = chosen;
+                m_isUpdatingUI = true;
+                SelectSunPresetInComboBox(TrayCustomIconPresetComboBox(), g_Settings.trayCustomIcon);
+                m_isUpdatingUI = false;
+                UpdateCustomIconPreview(TrayCustomIconPreview(), g_Settings.trayCustomIcon);
+                ApplyAndSave();
+                g_TrayIcon.OnThemeChanged();
+            }
+        });
+
+        TrayIconDualCustomIconToggle().Toggled([this](auto&&, auto&&)
+        {
+            bool on = TrayIconDualCustomIconToggle().IsOn();
+            TrayIconDualCustomIconStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+            TrayCustomIconTitleText().Text(on ? g_Loc.Get(L"Opt_TrayCustomIconLight", L"Light Mode Icon") : g_Loc.Get(L"Opt_TrayCustomIcon", L"Custom Icon"));
+            if (m_isUpdatingUI) return;
+            g_Settings.trayIconUseDualCustomIcons = on;
+            TrayCustomIconDarkCard().Visibility((g_Settings.trayPercentageMode == 4 && on) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+            ApplyAndSave();
+            g_TrayIcon.OnThemeChanged();
+        });
+
+        TrayCustomIconDarkPresetComboBox().SelectionChanged([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            int idx = TrayCustomIconDarkPresetComboBox().SelectedIndex();
+            int presetCount = static_cast<int>(std::size(kSunIconPresets));
+            if (idx >= 0 && idx < presetCount)
+            {
+                g_Settings.trayCustomIconDark = kSunIconPresets[idx].spec;
+                UpdateCustomIconPreview(TrayCustomIconDarkPreview(), g_Settings.trayCustomIconDark);
+                ApplyAndSave();
+                g_TrayIcon.OnThemeChanged();
+            }
+            else if (idx == presetCount)
+            {
+                std::wstring chosen = BrowseForIcoFile(m_hwnd);
+                if (!chosen.empty())
+                {
+                    g_Settings.trayCustomIconDark = chosen;
+                    UpdateCustomIconPreview(TrayCustomIconDarkPreview(), g_Settings.trayCustomIconDark);
+                    ApplyAndSave();
+                    g_TrayIcon.OnThemeChanged();
+                }
+                else
+                {
+                    m_isUpdatingUI = true;
+                    SelectSunPresetInComboBox(TrayCustomIconDarkPresetComboBox(), g_Settings.trayCustomIconDark);
+                    m_isUpdatingUI = false;
+                }
+            }
+        });
+
+        TrayCustomIconDarkBrowseButton().Click([this](auto&&, auto&&)
+        {
+            std::wstring chosen = BrowseForIcoFile(m_hwnd);
+            if (!chosen.empty())
+            {
+                g_Settings.trayCustomIconDark = chosen;
+                m_isUpdatingUI = true;
+                SelectSunPresetInComboBox(TrayCustomIconDarkPresetComboBox(), g_Settings.trayCustomIconDark);
+                m_isUpdatingUI = false;
+                UpdateCustomIconPreview(TrayCustomIconDarkPreview(), g_Settings.trayCustomIconDark);
+                ApplyAndSave();
+                g_TrayIcon.OnThemeChanged();
+            }
         });
 
         // Tray Font ComboBox
@@ -1908,6 +2155,163 @@ namespace winrt::BrightnessApp::implementation
             ApplyAndSave();
         });
 
+        // Schedule Mode ComboBox
+        ScheduleModeComboBox().SelectionChanged([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            int idx = ScheduleModeComboBox().SelectedIndex();
+            g_Settings.scheduleMode = (idx >= 0 && idx <= 2) ? idx : 0;
+            UpdateScheduleVisibility();
+            ApplyAndSave();
+            ScheduleManager::Refresh();
+        });
+
+        // Schedule Show OSD Toggle
+        ScheduleShowOsdToggle().Toggled([this](auto&&, auto&&)
+        {
+            bool on = ScheduleShowOsdToggle().IsOn();
+            ScheduleShowOsdStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+            if (m_isUpdatingUI) return;
+            g_Settings.scheduleShowOsd = on;
+            ApplyAndSave();
+        });
+
+        // Schedule Daytime Brightness Slider & NumberBox
+        ScheduleDayBrightnessSlider().ValueChanged([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            int val = (std::clamp)(static_cast<int>(std::round(ScheduleDayBrightnessSlider().Value())), 0, 100);
+            m_isUpdatingUI = true;
+            ScheduleDayBrightnessNumberBox().Value(val);
+            m_isUpdatingUI = false;
+            g_Settings.scheduleDayBrightness = val;
+            ApplyAndSave();
+            ScheduleManager::Refresh();
+        });
+        ScheduleDayBrightnessNumberBox().ValueChanged([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            double raw = ScheduleDayBrightnessNumberBox().Value();
+            if (std::isnan(raw)) return;
+            int val = (std::clamp)(static_cast<int>(std::round(raw)), 0, 100);
+            m_isUpdatingUI = true;
+            ScheduleDayBrightnessSlider().Value(val);
+            m_isUpdatingUI = false;
+            g_Settings.scheduleDayBrightness = val;
+            ApplyAndSave();
+            ScheduleManager::Refresh();
+        });
+
+        // Schedule Nighttime Brightness Slider & NumberBox
+        ScheduleNightBrightnessSlider().ValueChanged([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            int val = (std::clamp)(static_cast<int>(std::round(ScheduleNightBrightnessSlider().Value())), 0, 100);
+            m_isUpdatingUI = true;
+            ScheduleNightBrightnessNumberBox().Value(val);
+            m_isUpdatingUI = false;
+            g_Settings.scheduleNightBrightness = val;
+            ApplyAndSave();
+            ScheduleManager::Refresh();
+        });
+        ScheduleNightBrightnessNumberBox().ValueChanged([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            double raw = ScheduleNightBrightnessNumberBox().Value();
+            if (std::isnan(raw)) return;
+            int val = (std::clamp)(static_cast<int>(std::round(raw)), 0, 100);
+            m_isUpdatingUI = true;
+            ScheduleNightBrightnessSlider().Value(val);
+            m_isUpdatingUI = false;
+            g_Settings.scheduleNightBrightness = val;
+            ApplyAndSave();
+            ScheduleManager::Refresh();
+        });
+
+        // Schedule Custom Time Pickers
+        ScheduleDayTimePicker().TimeChanged([this](auto&&, winrt::Microsoft::UI::Xaml::Controls::TimePickerValueChangedEventArgs const& e)
+        {
+            if (m_isUpdatingUI) return;
+            auto totalSecs = std::chrono::duration_cast<std::chrono::seconds>(e.NewTime()).count();
+            int totalMins = static_cast<int>(totalSecs / 60);
+            g_Settings.scheduleDayHour = (totalMins / 60) % 24;
+            g_Settings.scheduleDayMinute = totalMins % 60;
+            ApplyAndSave();
+            ScheduleManager::Refresh();
+        });
+        ScheduleNightTimePicker().TimeChanged([this](auto&&, winrt::Microsoft::UI::Xaml::Controls::TimePickerValueChangedEventArgs const& e)
+        {
+            if (m_isUpdatingUI) return;
+            auto totalSecs = std::chrono::duration_cast<std::chrono::seconds>(e.NewTime()).count();
+            int totalMins = static_cast<int>(totalSecs / 60);
+            g_Settings.scheduleNightHour = (totalMins / 60) % 24;
+            g_Settings.scheduleNightMinute = totalMins % 60;
+            ApplyAndSave();
+            ScheduleManager::Refresh();
+        });
+
+        // Schedule Sun Source & Coordinates
+        ScheduleSunSourceComboBox().SelectionChanged([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            int idx = ScheduleSunSourceComboBox().SelectedIndex();
+            g_Settings.scheduleSunSource = (idx == 1) ? 1 : 0;
+            UpdateScheduleVisibility();
+            if (g_Settings.scheduleSunSource == 0)
+            {
+                DetectScheduleLocationAsync();
+            }
+            ApplyAndSave();
+            ScheduleManager::Refresh();
+        });
+
+        ScheduleDetectLocationButton().Click([this](auto&&, auto&&)
+        {
+            DetectScheduleLocationAsync();
+        });
+
+        ScheduleLatNumberBox().ValueChanged([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            double raw = ScheduleLatNumberBox().Value();
+            if (std::isnan(raw)) return;
+            g_Settings.scheduleLatitude = (std::clamp)(raw, -90.0, 90.0);
+            UpdateScheduleSunPreview();
+            ApplyAndSave();
+            ScheduleManager::Refresh();
+        });
+        ScheduleLonNumberBox().ValueChanged([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            double raw = ScheduleLonNumberBox().Value();
+            if (std::isnan(raw)) return;
+            g_Settings.scheduleLongitude = (std::clamp)(raw, -180.0, 180.0);
+            UpdateScheduleSunPreview();
+            ApplyAndSave();
+            ScheduleManager::Refresh();
+        });
+
+        ScheduleSunriseOffsetNumberBox().ValueChanged([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            double raw = ScheduleSunriseOffsetNumberBox().Value();
+            if (std::isnan(raw)) return;
+            g_Settings.scheduleSunriseOffset = (std::clamp)(static_cast<int>(std::round(raw)), -180, 180);
+            UpdateScheduleSunPreview();
+            ApplyAndSave();
+            ScheduleManager::Refresh();
+        });
+        ScheduleSunsetOffsetNumberBox().ValueChanged([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            double raw = ScheduleSunsetOffsetNumberBox().Value();
+            if (std::isnan(raw)) return;
+            g_Settings.scheduleSunsetOffset = (std::clamp)(static_cast<int>(std::round(raw)), -180, 180);
+            UpdateScheduleSunPreview();
+            ApplyAndSave();
+            ScheduleManager::Refresh();
+        });
+
         // Flyout Scroll Delay Toggle
         FlyoutScrollDelayToggle().Toggled([this](auto&&, auto&&)
         {
@@ -2122,6 +2526,9 @@ namespace winrt::BrightnessApp::implementation
             g_Settings.flyoutButtonDelayEnabled = false;
             g_Settings.flyoutButtonDelayMs = 500;
             g_Settings.trayPercentageMode = 0;
+            g_Settings.trayIconUseDualCustomIcons = false;
+            g_Settings.trayCustomIcon = L"preset:sun";
+            g_Settings.trayCustomIconDark = L"preset:sun-blue";
             g_Settings.trayIconColor = RGB(0, 120, 212);
             g_Settings.trayIconUseDualColors = false;
             g_Settings.trayIconColorDark = RGB(96, 205, 255);
@@ -2145,6 +2552,19 @@ namespace winrt::BrightnessApp::implementation
             g_Settings.syncExternalWithLaptopFnKeys = false;
             g_Settings.showSeparateInMultiFlyout = true;
             g_Settings.disableTurnedOffControl = false;
+            g_Settings.scheduleMode = 0;
+            g_Settings.scheduleSunSource = 0;
+            g_Settings.scheduleDayHour = 7;
+            g_Settings.scheduleDayMinute = 0;
+            g_Settings.scheduleNightHour = 20;
+            g_Settings.scheduleNightMinute = 0;
+            g_Settings.scheduleDayBrightness = 80;
+            g_Settings.scheduleNightBrightness = 30;
+            g_Settings.scheduleLatitude = 47.4979;
+            g_Settings.scheduleLongitude = 19.0402;
+            g_Settings.scheduleSunriseOffset = 0;
+            g_Settings.scheduleSunsetOffset = 0;
+            g_Settings.scheduleShowOsd = true;
             for (auto& [monId, cfg] : g_Settings.monitorConfigs)
             {
                 cfg.enabled = true;
@@ -2470,7 +2890,7 @@ namespace winrt::BrightnessApp::implementation
         bool isMain = (_wcsicmp(m_selectedConfigMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
         bool isSyncNonMain = (!isMain && (!cfg || cfg->controlMode == 0));
 
-        if (m_currentMonitorsSubpage == L"Shortcuts" && isSyncNonMain)
+        if ((m_currentMonitorsSubpage == L"Shortcuts" || m_currentMonitorsSubpage == L"Schedule") && isSyncNonMain)
         {
             m_currentMonitorsSubpage.clear();
         }
@@ -2515,11 +2935,13 @@ namespace winrt::BrightnessApp::implementation
         bool showOsd = (m_currentMonitorsSubpage == L"OSD");
         bool showTray = (m_currentMonitorsSubpage == L"Tray");
         bool showFlyout = (m_currentMonitorsSubpage == L"Flyout");
+        bool showSchedule = (m_currentMonitorsSubpage == L"Schedule" && !isSyncNonMain);
 
         if (showShortcuts) MonitorsBreadcrumbCurrentText().Text(g_Loc.Get(L"Nav_Shortcuts", L"Shortcuts"));
         else if (showOsd) MonitorsBreadcrumbCurrentText().Text(g_Loc.Get(L"Nav_OSD", L"On-Screen Display"));
         else if (showTray) MonitorsBreadcrumbCurrentText().Text(g_Loc.Get(L"Nav_Tray", L"System Tray"));
         else if (showFlyout) MonitorsBreadcrumbCurrentText().Text(g_Loc.Get(L"Nav_FlyoutSlider", L"Flyout Slider"));
+        else if (showSchedule) MonitorsBreadcrumbCurrentText().Text(g_Loc.Get(L"Nav_Schedule", L"Schedule"));
 
         ShortcutsCustomSection().Visibility(showShortcuts ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         OsdAccentCustomSection().Visibility(showOsd ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
@@ -2529,6 +2951,7 @@ namespace winrt::BrightnessApp::implementation
         TrayWheelCustomSection().Visibility((showTray && !isSyncNonMain) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         FlyoutBehaviorCustomSection().Visibility((showFlyout && !isSyncNonMain) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         FlyoutAccentCustomSection().Visibility(showFlyout ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        ScheduleCustomSection().Visibility(showSchedule ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
 
         if (viewChanged)
         {
@@ -2646,6 +3069,7 @@ namespace winrt::BrightnessApp::implementation
         SyncOverscrollMinCard().Visibility(isSync ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         MonitorSyncNoticeBanner().Visibility(isSyncNonMain ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         MonitorsShortcutsCard().Visibility(isSyncNonMain ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible);
+        MonitorsScheduleCard().Visibility(isSyncNonMain ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible);
 
         OpenMonitorsSubpage(m_currentMonitorsSubpage);
 
@@ -2899,10 +3323,20 @@ namespace winrt::BrightnessApp::implementation
         TrayPctColoredItem().Content(box_value(g_Loc.Get(L"Opt_TrayPctColored", L"Colored")));
         TrayPctDisabledItem().Content(box_value(g_Loc.Get(L"Opt_TrayPctDisabled", L"Disabled")));
         TrayPctHideItem().Content(box_value(g_Loc.Get(L"Opt_TrayPctHide", L"Hide")));
+        TrayPctCustomItem().Content(box_value(g_Loc.Get(L"Opt_TrayPctCustom", L"Custom")));
+        TrayCustomIconTitleText().Text(TrayIconDualCustomIconToggle().IsOn() ? g_Loc.Get(L"Opt_TrayCustomIconLight", L"Light Mode Icon") : g_Loc.Get(L"Opt_TrayCustomIcon", L"Custom Icon"));
+        TrayCustomIconDescText().Text(g_Loc.Get(L"Desc_TrayCustomIcon", L"Choose a preset sun icon or browse for a custom .ico file"));
+        TrayCustomIconBrowseButton().Content(box_value(g_Loc.Get(L"Common_Browse", L"Browse...")));
+        TrayIconDualCustomIconTitleText().Text(g_Loc.Get(L"Opt_TrayIconDualCustomIcons", L"Separate Dark & Light Icons"));
+        TrayIconDualCustomIconDescText().Text(g_Loc.Get(L"Desc_TrayIconDualCustomIcons", L"Use a different custom tray icon when Windows is in dark mode"));
+        TrayIconDualCustomIconStatusText().Text(TrayIconDualCustomIconToggle().IsOn() ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+        TrayCustomIconDarkTitleText().Text(g_Loc.Get(L"Opt_TrayCustomIconDark", L"Dark Mode Icon"));
+        TrayCustomIconDarkDescText().Text(g_Loc.Get(L"Desc_TrayCustomIconDark", L"Choose a preset sun icon or browse for a custom .ico file in dark mode"));
+        TrayCustomIconDarkBrowseButton().Content(box_value(g_Loc.Get(L"Common_Browse", L"Browse...")));
         TrayIconColorTitleText().Text(TrayIconDualColorToggle().IsOn() ? g_Loc.Get(L"Opt_TrayIconColorLight", L"Light Mode Color") : g_Loc.Get(L"Opt_TrayIconColor", L"Icon Color"));
         TrayIconColorDescText().Text(g_Loc.Get(L"Desc_TrayIconColor", L"Custom color for the system tray percentage text"));
         TrayIconDualColorTitleText().Text(g_Loc.Get(L"Opt_TrayIconDualColor", L"Separate Dark & Light Colors"));
-        TrayIconDualColorDescText().Text(g_Loc.Get(L"Desc_TrayIconDualColor", L"Use a different percentage icon color when Windows is in dark mode"));
+        TrayIconDualColorDescText().Text(g_Loc.Get(L"Desc_TrayIconDualColor", L"Use a different tray icon color when Windows is in dark mode"));
         TrayIconDualColorStatusText().Text(TrayIconDualColorToggle().IsOn() ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
         TrayIconDarkColorTitleText().Text(g_Loc.Get(L"Opt_TrayIconColorDark", L"Dark Mode Color"));
         TrayIconDarkColorDescText().Text(g_Loc.Get(L"Desc_TrayIconColorDark", L"Custom color for the system tray percentage text in dark mode"));
@@ -3341,7 +3775,7 @@ namespace winrt::BrightnessApp::implementation
 
         // Tray Percentage Icon Mode
         bool isMain = (_wcsicmp(m_selectedConfigMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
-        int pctMode = (g_Settings.trayPercentageMode >= 0 && g_Settings.trayPercentageMode <= 3) ? g_Settings.trayPercentageMode : 0;
+        int pctMode = (g_Settings.trayPercentageMode >= 0 && g_Settings.trayPercentageMode <= 4) ? g_Settings.trayPercentageMode : 0;
         if (isMain && pctMode == 3) pctMode = 0;
         TrayPctHideItem().Visibility(isMain ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible);
         TrayPctHideItem().IsEnabled(!isMain);
@@ -3352,6 +3786,16 @@ namespace winrt::BrightnessApp::implementation
         TrayIconColorCard().Visibility(pctMode == 1 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         TrayIconDualColorCard().Visibility(pctMode == 1 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         TrayIconDarkColorCard().Visibility((pctMode == 1 && g_Settings.trayIconUseDualColors) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        TrayIconDualCustomIconToggle().IsOn(g_Settings.trayIconUseDualCustomIcons);
+        TrayIconDualCustomIconStatusText().Text(g_Settings.trayIconUseDualCustomIcons ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+        TrayCustomIconTitleText().Text(g_Settings.trayIconUseDualCustomIcons ? g_Loc.Get(L"Opt_TrayCustomIconLight", L"Light Mode Icon") : g_Loc.Get(L"Opt_TrayCustomIcon", L"Custom Icon"));
+        TrayCustomIconCard().Visibility(pctMode == 4 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        TrayIconDualCustomIconCard().Visibility(pctMode == 4 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        TrayCustomIconDarkCard().Visibility((pctMode == 4 && g_Settings.trayIconUseDualCustomIcons) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        SelectSunPresetInComboBox(TrayCustomIconPresetComboBox(), g_Settings.trayCustomIcon);
+        SelectSunPresetInComboBox(TrayCustomIconDarkPresetComboBox(), g_Settings.trayCustomIconDark);
+        UpdateCustomIconPreview(TrayCustomIconPreview(), g_Settings.trayCustomIcon);
+        UpdateCustomIconPreview(TrayCustomIconDarkPreview(), g_Settings.trayCustomIconDark);
         TrayTypographyPanel().Visibility((pctMode == 0 || pctMode == 1) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
 
         // Tray Font Weight
@@ -3434,6 +3878,24 @@ namespace winrt::BrightnessApp::implementation
         TrayMiddleClickSlider().Value(g_Settings.trayMiddleClickBrightness);
         TrayMiddleClickNumberBox().Value(g_Settings.trayMiddleClickBrightness);
 
+        // Schedule
+        ScheduleModeComboBox().SelectedIndex((std::clamp)(g_Settings.scheduleMode, 0, 2));
+        ScheduleShowOsdToggle().IsOn(g_Settings.scheduleShowOsd);
+        ScheduleShowOsdStatusText().Text(g_Settings.scheduleShowOsd ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+        ScheduleDayBrightnessSlider().Value(g_Settings.scheduleDayBrightness);
+        ScheduleDayBrightnessNumberBox().Value(g_Settings.scheduleDayBrightness);
+        ScheduleNightBrightnessSlider().Value(g_Settings.scheduleNightBrightness);
+        ScheduleNightBrightnessNumberBox().Value(g_Settings.scheduleNightBrightness);
+        ScheduleDayTimePicker().Time(std::chrono::hours(g_Settings.scheduleDayHour) + std::chrono::minutes(g_Settings.scheduleDayMinute));
+        ScheduleNightTimePicker().Time(std::chrono::hours(g_Settings.scheduleNightHour) + std::chrono::minutes(g_Settings.scheduleNightMinute));
+        ScheduleSunSourceComboBox().SelectedIndex(g_Settings.scheduleSunSource == 1 ? 1 : 0);
+        ScheduleLatNumberBox().Value(g_Settings.scheduleLatitude);
+        ScheduleLonNumberBox().Value(g_Settings.scheduleLongitude);
+        ScheduleSunriseOffsetNumberBox().Value(g_Settings.scheduleSunriseOffset);
+        ScheduleSunsetOffsetNumberBox().Value(g_Settings.scheduleSunsetOffset);
+        UpdateScheduleVisibility();
+        UpdateScheduleSunPreview();
+
         // Start with Windows
         bool isInstalled = AppSettings::IsInstalledInProgramFiles();
         bool startWithWin = g_Settings.startWithWindows || AppSettings::IsStartWithWindowsEnabled();
@@ -3512,6 +3974,90 @@ namespace winrt::BrightnessApp::implementation
         }
         catch (...)
         {
+        }
+    }
+
+    void SettingsWindow::UpdateScheduleVisibility()
+    {
+        bool enabled = (g_Settings.scheduleMode != 0);
+        bool isCustom = (g_Settings.scheduleMode == 1);
+        bool isSun = (g_Settings.scheduleMode == 2);
+        bool isLocService = (g_Settings.scheduleSunSource == 0);
+
+        ScheduleShowOsdCard().Visibility(enabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        ScheduleBrightnessSection().Visibility(enabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        CustomScheduleSection().Visibility(isCustom ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        SunScheduleSection().Visibility(isSun ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        ScheduleLocationStatusCard().Visibility(isLocService ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        ScheduleCoordsCard().Visibility(!isLocService ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+    }
+
+    void SettingsWindow::UpdateScheduleSunPreview()
+    {
+        wchar_t locBuf[96];
+        swprintf_s(locBuf, L"%.4f, %.4f", g_Settings.scheduleLatitude, g_Settings.scheduleLongitude);
+        ScheduleLocationText().Text(locBuf);
+
+        auto info = ScheduleManager::GetTodaySunInfo(
+            g_Settings.scheduleLatitude,
+            g_Settings.scheduleLongitude,
+            g_Settings.scheduleSunriseOffset,
+            g_Settings.scheduleSunsetOffset);
+        if (info.valid)
+        {
+            wchar_t sunBuf[128];
+            swprintf_s(sunBuf, L"Today: %02d:%02d | %02d:%02d (Effective: %02d:%02d | %02d:%02d)",
+                info.riseHour, info.riseMin, info.setHour, info.setMin,
+                info.effectiveRiseHour, info.effectiveRiseMin, info.effectiveSetHour, info.effectiveSetMin);
+            ScheduleSunTimesText().Text(sunBuf);
+        }
+        else
+        {
+            ScheduleSunTimesText().Text(L"Polar day / night (no sunrise/sunset today)");
+        }
+    }
+
+    winrt::fire_and_forget SettingsWindow::DetectScheduleLocationAsync()
+    {
+        auto weak = get_weak();
+        try
+        {
+            auto access = co_await winrt::Windows::Devices::Geolocation::Geolocator::RequestAccessAsync();
+            if (access == winrt::Windows::Devices::Geolocation::GeolocationAccessStatus::Allowed)
+            {
+                winrt::Windows::Devices::Geolocation::Geolocator geolocator;
+                auto pos = co_await geolocator.GetGeopositionAsync();
+                auto self = weak.get();
+                if (!self) co_return;
+                double lat = pos.Coordinate().Point().Position().Latitude;
+                double lon = pos.Coordinate().Point().Position().Longitude;
+                g_Settings.scheduleLatitude = lat;
+                g_Settings.scheduleLongitude = lon;
+                bool prev = m_isUpdatingUI;
+                m_isUpdatingUI = true;
+                ScheduleLatNumberBox().Value(lat);
+                ScheduleLonNumberBox().Value(lon);
+                m_isUpdatingUI = prev;
+                UpdateScheduleSunPreview();
+                ApplyAndSave();
+                ScheduleManager::Refresh();
+            }
+            else
+            {
+                auto self = weak.get();
+                if (self)
+                {
+                    ScheduleLocationText().Text(L"Location permission denied (using saved coordinates)");
+                }
+            }
+        }
+        catch (...)
+        {
+            auto self = weak.get();
+            if (self)
+            {
+                ScheduleLocationText().Text(L"Could not detect location (using saved coordinates)");
+            }
         }
     }
 }

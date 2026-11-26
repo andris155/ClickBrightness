@@ -167,6 +167,47 @@ void TrayIcon::InvalidateIconCache() {
             }
         }
     }
+    for (auto& [key, hIcon] : m_customIconCache) {
+        if (hIcon) {
+            DestroyIcon(hIcon);
+        }
+    }
+    m_customIconCache.clear();
+}
+
+HICON TrayIcon::LoadCustomIconForSpec(const std::wstring& spec, int iconSize) {
+    if (iconSize <= 0) iconSize = 16;
+    UINT resId = 0;
+    if (spec.empty() || _wcsicmp(spec.c_str(), L"preset:sun") == 0) resId = IDI_SUN_DEFAULT;
+    else if (_wcsicmp(spec.c_str(), L"preset:sun-dark") == 0) resId = IDI_SUN_DARK;
+    else if (_wcsicmp(spec.c_str(), L"preset:sun-black") == 0) resId = IDI_SUN_BLACK;
+    else if (_wcsicmp(spec.c_str(), L"preset:sun-white") == 0) resId = IDI_SUN_WHITE;
+    else if (_wcsicmp(spec.c_str(), L"preset:sun-red") == 0) resId = IDI_SUN_RED;
+    else if (_wcsicmp(spec.c_str(), L"preset:sun-orange") == 0) resId = IDI_SUN_ORANGE;
+    else if (_wcsicmp(spec.c_str(), L"preset:sun-green") == 0) resId = IDI_SUN_GREEN;
+    else if (_wcsicmp(spec.c_str(), L"preset:sun-teal") == 0) resId = IDI_SUN_TEAL;
+    else if (_wcsicmp(spec.c_str(), L"preset:sun-blue") == 0) resId = IDI_SUN_BLUE;
+    else if (_wcsicmp(spec.c_str(), L"preset:sun-purple") == 0) resId = IDI_SUN_PURPLE;
+    else if (_wcsicmp(spec.c_str(), L"preset:sun-pink") == 0) resId = IDI_SUN_PINK;
+    else if (_wcsicmp(spec.c_str(), L"preset:sun-gray") == 0) resId = IDI_SUN_GRAY;
+
+    if (resId != 0) {
+        return (HICON)LoadImageW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(resId), IMAGE_ICON, iconSize, iconSize, LR_DEFAULTCOLOR);
+    }
+    return (HICON)LoadImageW(NULL, spec.c_str(), IMAGE_ICON, iconSize, iconSize, LR_LOADFROMFILE | LR_DEFAULTCOLOR);
+}
+
+HICON TrayIcon::GetOrLoadCustomIcon(const std::wstring& spec, int iconSize) {
+    std::wstring cacheKey = spec + L"|" + std::to_wstring(iconSize);
+    auto it = m_customIconCache.find(cacheKey);
+    if (it != m_customIconCache.end() && it->second) {
+        return it->second;
+    }
+    HICON hLoaded = LoadCustomIconForSpec(spec, iconSize);
+    if (hLoaded) {
+        m_customIconCache[cacheKey] = hLoaded;
+    }
+    return hLoaded;
 }
 
 void TrayIcon::ResetGraphicsResources() {
@@ -567,15 +608,25 @@ bool TrayIcon::UpdateBrightnessForTarget(const std::wstring& targetMonitorId, in
         const auto& cfg = g_Settings.GetEffectiveMonitorConfig(g_Settings.mainMonitorId);
 
         HICON hNewIcon = NULL;
-        bool hidePctIcon = (cfg.trayPercentageMode == 2) ||
-                           (g_Settings.disableTurnedOffControl && g_MonitorManager.IsMonitorPoweredOff(g_Settings.mainMonitorId));
+        bool isOffBlocked = (g_Settings.disableTurnedOffControl && g_MonitorManager.IsMonitorPoweredOff(g_Settings.mainMonitorId));
+        bool isCustomMode = (cfg.trayPercentageMode == 4 && !isOffBlocked);
+        bool hidePctIcon = (cfg.trayPercentageMode == 2) || isCustomMode || isOffBlocked;
         if (!hidePctIcon) {
             hNewIcon = m_iconCache[brightness];
             if (!hNewIcon) {
                 hNewIcon = CreateBrightnessIconForConfig(brightness, cfg);
                 m_iconCache[brightness] = hNewIcon;
             }
-        } else {
+        } else if (isCustomMode) {
+            HWND hTaskbar = FindWindowW(L"Shell_TrayWnd", NULL);
+            UINT dpi = hTaskbar ? GetDpiForWindow(hTaskbar) : GetDpiForSystem();
+            int iconSize = GetSystemMetricsForDpi(SM_CXSMICON, dpi);
+            if (iconSize <= 0) iconSize = 16;
+            bool isTaskbarDark = !IsTrayColorLight();
+            const std::wstring& spec = (cfg.trayIconUseDualCustomIcons && isTaskbarDark) ? cfg.trayCustomIconDark : cfg.trayCustomIcon;
+            hNewIcon = GetOrLoadCustomIcon(spec, iconSize);
+        }
+        if (!hNewIcon) {
             if (!m_hBaseSunIcon) {
                 HWND hTaskbar = FindWindowW(L"Shell_TrayWnd", NULL);
                 UINT dpi = hTaskbar ? GetDpiForWindow(hTaskbar) : GetDpiForSystem();
@@ -619,15 +670,25 @@ bool TrayIcon::UpdateBrightnessForTarget(const std::wstring& targetMonitorId, in
             slot.lastBrightness = brightness;
             const auto& cfg = g_Settings.GetEffectiveMonitorConfig(slot.monitorId);
             HICON hNewIcon = NULL;
-            bool hidePctIcon = (cfg.trayPercentageMode == 2) ||
-                               (g_Settings.disableTurnedOffControl && g_MonitorManager.IsMonitorPoweredOff(slot.monitorId));
+            bool isOffBlocked = (g_Settings.disableTurnedOffControl && g_MonitorManager.IsMonitorPoweredOff(slot.monitorId));
+            bool isCustomMode = (cfg.trayPercentageMode == 4 && !isOffBlocked);
+            bool hidePctIcon = (cfg.trayPercentageMode == 2) || isCustomMode || isOffBlocked;
             if (!hidePctIcon) {
                 hNewIcon = slot.iconCache[brightness];
                 if (!hNewIcon) {
                     hNewIcon = CreateBrightnessIconForConfig(brightness, cfg);
                     slot.iconCache[brightness] = hNewIcon;
                 }
-            } else {
+            } else if (isCustomMode) {
+                HWND hTaskbar = FindWindowW(L"Shell_TrayWnd", NULL);
+                UINT dpi = hTaskbar ? GetDpiForWindow(hTaskbar) : GetDpiForSystem();
+                int iconSize = GetSystemMetricsForDpi(SM_CXSMICON, dpi);
+                if (iconSize <= 0) iconSize = 16;
+                bool isTaskbarDark = !IsTrayColorLight();
+                const std::wstring& spec = (cfg.trayIconUseDualCustomIcons && isTaskbarDark) ? cfg.trayCustomIconDark : cfg.trayCustomIcon;
+                hNewIcon = GetOrLoadCustomIcon(spec, iconSize);
+            }
+            if (!hNewIcon) {
                 hNewIcon = m_hBaseSunIcon ? m_hBaseSunIcon : LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
             }
             if (!hNewIcon) return false;
@@ -720,13 +781,24 @@ void TrayIcon::SyncExtraTrayIcons(bool forceRefresh) {
                 : g_MonitorManager.GetMonitorBrightnessById(id);
             slot.lastBrightness = b;
 
-            bool hidePctIcon = (cfg.trayPercentageMode == 2) ||
-                               (g_Settings.disableTurnedOffControl && g_MonitorManager.IsMonitorPoweredOff(id));
-            HICON hIcon = (!hidePctIcon)
-                ? CreateBrightnessIconForConfig(b, cfg)
-                : (m_hBaseSunIcon ? m_hBaseSunIcon : LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION));
-            if (!hidePctIcon && hIcon) {
-                slot.iconCache[b] = hIcon;
+            bool isOffBlocked = (g_Settings.disableTurnedOffControl && g_MonitorManager.IsMonitorPoweredOff(id));
+            bool isCustomMode = (cfg.trayPercentageMode == 4 && !isOffBlocked);
+            bool hidePctIcon = (cfg.trayPercentageMode == 2) || isCustomMode || isOffBlocked;
+            HICON hIcon = NULL;
+            if (!hidePctIcon) {
+                hIcon = CreateBrightnessIconForConfig(b, cfg);
+                if (hIcon) slot.iconCache[b] = hIcon;
+            } else if (isCustomMode) {
+                HWND hTaskbar = FindWindowW(L"Shell_TrayWnd", NULL);
+                UINT dpi = hTaskbar ? GetDpiForWindow(hTaskbar) : GetDpiForSystem();
+                int iconSize = GetSystemMetricsForDpi(SM_CXSMICON, dpi);
+                if (iconSize <= 0) iconSize = 16;
+                bool isTaskbarDark = !IsTrayColorLight();
+                const std::wstring& spec = (cfg.trayIconUseDualCustomIcons && isTaskbarDark) ? cfg.trayCustomIconDark : cfg.trayCustomIcon;
+                hIcon = GetOrLoadCustomIcon(spec, iconSize);
+            }
+            if (!hIcon) {
+                hIcon = m_hBaseSunIcon ? m_hBaseSunIcon : LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
             }
 
             NOTIFYICONDATAW nid = { sizeof(NOTIFYICONDATAW) };

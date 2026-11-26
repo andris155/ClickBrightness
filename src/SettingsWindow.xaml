@@ -611,7 +611,7 @@
                                     <FontIcon Glyph="&#xE718;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                                         <TextBlock x:Name="SubmenuTrayTitleText" Text="System Tray Icon" FontSize="14" FontWeight="Normal"/>
-                                        <TextBlock x:Name="SubmenuTrayDescText" Text="Taskbar percentage icon, typography, and mouse actions" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="SubmenuTrayDescText" Text="Taskbar tray icon, typography, and mouse actions" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <FontIcon Grid.Column="2" Glyph="&#xE76C;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                 </Grid>
@@ -631,6 +631,25 @@
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                                         <TextBlock x:Name="SubmenuFlyoutTitleText" Text="Flyout Slider" FontSize="14" FontWeight="Normal"/>
                                         <TextBlock x:Name="SubmenuFlyoutDescText" Text="Flyout scrolling and slider accent color" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <FontIcon Grid.Column="2" Glyph="&#xE76C;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                </Grid>
+                            </Button>
+
+                            <Button x:Name="MonitorsScheduleCard" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE823;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="SubmenuScheduleTitleText" Text="Schedule" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="SubmenuScheduleDescText" Text="Automatic day and night brightness schedule" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <FontIcon Grid.Column="2" Glyph="&#xE76C;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                 </Grid>
@@ -1157,6 +1176,7 @@
                                         <ComboBoxItem x:Name="TrayPctColoredItem" Content="Colored"/>
                                         <ComboBoxItem x:Name="TrayPctDisabledItem" Content="Disabled"/>
                                         <ComboBoxItem x:Name="TrayPctHideItem" Content="Hide"/>
+                                        <ComboBoxItem x:Name="TrayPctCustomItem" Content="Custom"/>
                                     </ComboBox>
                                 </Grid>
                             </Border>
@@ -1203,7 +1223,7 @@
                                     <FontIcon Glyph="&#xE708;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                                         <TextBlock x:Name="TrayIconDualColorTitleText" Text="Separate Dark &amp; Light Colors" FontSize="14" FontWeight="Normal"/>
-                                        <TextBlock x:Name="TrayIconDualColorDescText" Text="Use a different percentage icon color when Windows is in dark mode" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="TrayIconDualColorDescText" Text="Use a different tray icon color when Windows is in dark mode" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <TextBlock x:Name="TrayIconDualColorStatusText" Text="Off" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
@@ -1237,6 +1257,78 @@
                                             </Button.Flyout>
                                         </Button>
                                         <TextBox x:Name="TrayIconDarkColorTextBox" Width="95" VerticalAlignment="Center" MaxLength="9"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Custom Tray Icon (Shown when Custom is selected) -->
+                            <Border x:Name="TrayCustomIconCard" Visibility="Collapsed" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="28" Height="28" Margin="0,0,12,0" VerticalAlignment="Center" CornerRadius="4"
+                                            Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                        <Image x:Name="TrayCustomIconPreview" Width="20" Height="20" Stretch="Uniform"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="TrayCustomIconTitleText" Text="Custom Icon" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="TrayCustomIconDescText" Text="Choose a preset sun icon or browse for a custom .ico file" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <ComboBox x:Name="TrayCustomIconPresetComboBox" Width="165" VerticalAlignment="Center"/>
+                                        <Button x:Name="TrayCustomIconBrowseButton" Content="Browse..." VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Separate Dark & Light Custom Icons Toggle (Shown when Custom is selected) -->
+                            <Border x:Name="TrayIconDualCustomIconCard" Visibility="Collapsed" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE708;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="TrayIconDualCustomIconTitleText" Text="Separate Dark &amp; Light Icons" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="TrayIconDualCustomIconDescText" Text="Use a different custom tray icon when Windows is in dark mode" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <TextBlock x:Name="TrayIconDualCustomIconStatusText" Text="Off" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                                        <ToggleSwitch x:Name="TrayIconDualCustomIconToggle" MinWidth="0" OnContent="" OffContent="" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Custom Dark Mode Tray Icon (Shown when Custom + Separate Icons are ON) -->
+                            <Border x:Name="TrayCustomIconDarkCard" Visibility="Collapsed" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="28" Height="28" Margin="0,0,12,0" VerticalAlignment="Center" CornerRadius="4"
+                                            Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                        <Image x:Name="TrayCustomIconDarkPreview" Width="20" Height="20" Stretch="Uniform"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="TrayCustomIconDarkTitleText" Text="Dark Mode Icon" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="TrayCustomIconDarkDescText" Text="Choose a preset sun icon or browse for a custom .ico file in dark mode" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <ComboBox x:Name="TrayCustomIconDarkPresetComboBox" Width="165" VerticalAlignment="Center"/>
+                                        <Button x:Name="TrayCustomIconDarkBrowseButton" Content="Browse..." VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -1655,6 +1747,235 @@
                                 </Grid>
                             </Border>
 
+                            </StackPanel>
+
+                            <!-- Schedule Subpage Section (Hidden for non-main Sync monitors) -->
+                            <StackPanel x:Name="ScheduleCustomSection" Visibility="Collapsed" Spacing="0">
+                                <TextBlock x:Name="ScheduleModeSectionTitle" Text="Schedule Mode" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,6"/>
+
+                                <!-- Schedule Mode -->
+                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon Glyph="&#xE823;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock x:Name="ScheduleModeTitleText" Text="Automatic Schedule" FontSize="14" FontWeight="Normal"/>
+                                            <TextBlock x:Name="ScheduleModeDescText" Text="Automatically switch between daytime and nighttime brightness levels" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                        <ComboBox x:Name="ScheduleModeComboBox" Grid.Column="2" Width="220" VerticalAlignment="Center">
+                                            <ComboBoxItem x:Name="ScheduleModeDisabledItem" Content="Disabled (Manual only)"/>
+                                            <ComboBoxItem x:Name="ScheduleModeCustomItem" Content="Custom Time Schedule"/>
+                                            <ComboBoxItem x:Name="ScheduleModeSunItem" Content="Sunrise / Sunset Sync"/>
+                                        </ComboBox>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Show OSD On Scheduled Switch -->
+                                <Border x:Name="ScheduleShowOsdCard" Visibility="Collapsed"
+                                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon Glyph="&#xE7F4;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock x:Name="ScheduleShowOsdTitleText" Text="Show OSD On Scheduled Switch" FontSize="14" FontWeight="Normal"/>
+                                            <TextBlock x:Name="ScheduleShowOsdDescText" Text="Display the on-screen brightness banner when an automatic transition occurs" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="ScheduleShowOsdStatusText" Text="On" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                                            <ToggleSwitch x:Name="ScheduleShowOsdToggle" MinWidth="0" OnContent="" OffContent="" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Brightness Levels -->
+                                <StackPanel x:Name="ScheduleBrightnessSection" Visibility="Collapsed" Spacing="0">
+                                    <TextBlock x:Name="ScheduleBrightnessSectionTitle" Text="Brightness Levels" FontSize="14" FontWeight="SemiBold" Margin="0,14,0,6"/>
+
+                                    <!-- Daytime Brightness -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Glyph="&#xE706;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                                <TextBlock x:Name="ScheduleDayBrightnessTitleText" Text="Daytime Brightness (%)" FontSize="14" FontWeight="Normal"/>
+                                                <TextBlock x:Name="ScheduleDayBrightnessDescText" Text="Target brightness during daytime or after sunrise" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                                <Slider x:Name="ScheduleDayBrightnessSlider" Width="120" Minimum="0" Maximum="100" StepFrequency="1" VerticalAlignment="Center"/>
+                                                <NumberBox x:Name="ScheduleDayBrightnessNumberBox" Width="90" Minimum="0" Maximum="100" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Nighttime Brightness -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Glyph="&#xE708;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                                <TextBlock x:Name="ScheduleNightBrightnessTitleText" Text="Nighttime Brightness (%)" FontSize="14" FontWeight="Normal"/>
+                                                <TextBlock x:Name="ScheduleNightBrightnessDescText" Text="Target brightness during nighttime or after sunset" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                                <Slider x:Name="ScheduleNightBrightnessSlider" Width="120" Minimum="0" Maximum="100" StepFrequency="1" VerticalAlignment="Center"/>
+                                                <NumberBox x:Name="ScheduleNightBrightnessNumberBox" Width="90" Minimum="0" Maximum="100" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- Custom Time Schedule -->
+                                <StackPanel x:Name="CustomScheduleSection" Visibility="Collapsed" Spacing="0">
+                                    <TextBlock x:Name="CustomScheduleSectionTitle" Text="Custom Time Schedule" FontSize="14" FontWeight="SemiBold" Margin="0,14,0,6"/>
+
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Glyph="&#xE706;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                                <TextBlock x:Name="ScheduleDayStartTitleText" Text="Daytime Start Time" FontSize="14" FontWeight="Normal"/>
+                                                <TextBlock x:Name="ScheduleDayStartDescText" Text="Time of day when Daytime Brightness is applied" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                            <TimePicker x:Name="ScheduleDayTimePicker" Grid.Column="2" ClockIdentifier="24HourClock" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Glyph="&#xE708;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                                <TextBlock x:Name="ScheduleNightStartTitleText" Text="Nighttime Start Time" FontSize="14" FontWeight="Normal"/>
+                                                <TextBlock x:Name="ScheduleNightStartDescText" Text="Time of day when Nighttime Brightness is applied" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                            <TimePicker x:Name="ScheduleNightTimePicker" Grid.Column="2" ClockIdentifier="24HourClock" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- Sunrise / Sunset Sync -->
+                                <StackPanel x:Name="SunScheduleSection" Visibility="Collapsed" Spacing="0">
+                                    <TextBlock x:Name="SunScheduleSectionTitle" Text="Sunrise / Sunset Sync" FontSize="14" FontWeight="SemiBold" Margin="0,14,0,6"/>
+
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Glyph="&#xE707;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                                <TextBlock x:Name="ScheduleSunSourceTitleText" Text="Location Source" FontSize="14" FontWeight="Normal"/>
+                                                <TextBlock x:Name="ScheduleSunSourceDescText" Text="Choose how geographic location is obtained for solar calculations" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                            <ComboBox x:Name="ScheduleSunSourceComboBox" Grid.Column="2" Width="220" VerticalAlignment="Center">
+                                                <ComboBoxItem x:Name="ScheduleSunLocItem" Content="Windows Location Service"/>
+                                                <ComboBoxItem x:Name="ScheduleSunCoordsItem" Content="Geographic Coordinates"/>
+                                            </ComboBox>
+                                        </Grid>
+                                    </Border>
+
+                                    <Border x:Name="ScheduleLocationStatusCard"
+                                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Glyph="&#xE81D;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                                <TextBlock x:Name="ScheduleLocationTitleText" Text="Detected Location" FontSize="14" FontWeight="Normal"/>
+                                                <TextBlock x:Name="ScheduleLocationText" Text="47.4979, 19.0402" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                            <Button x:Name="ScheduleDetectLocationButton" Grid.Column="2" Content="Detect Location" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <Border x:Name="ScheduleCoordsCard" Visibility="Collapsed"
+                                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Glyph="&#xE909;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                                <TextBlock x:Name="ScheduleCoordsTitleText" Text="Coordinates (Lat / Lon)" FontSize="14" FontWeight="Normal"/>
+                                                <TextBlock x:Name="ScheduleCoordsDescText" Text="Latitude (-90 to 90) and Longitude (-180 to 180)" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <NumberBox x:Name="ScheduleLatNumberBox" Width="105" Minimum="-90" Maximum="90" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
+                                                <NumberBox x:Name="ScheduleLonNumberBox" Width="105" Minimum="-180" Maximum="180" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Glyph="&#xE916;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                                <TextBlock x:Name="ScheduleSunOffsetsTitleText" Text="Sunrise / Sunset Offset (min)" FontSize="14" FontWeight="Normal"/>
+                                                <TextBlock x:Name="ScheduleSunTimesText" Text="Today: 07:00 | 20:00" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <NumberBox x:Name="ScheduleSunriseOffsetNumberBox" Width="105" Minimum="-180" Maximum="180" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
+                                                <NumberBox x:Name="ScheduleSunsetOffsetNumberBox" Width="105" Minimum="-180" Maximum="180" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
                             </StackPanel>
                             </StackPanel>
                             </StackPanel>

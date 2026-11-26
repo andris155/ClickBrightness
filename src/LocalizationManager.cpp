@@ -419,7 +419,7 @@ void LocalizationManager::LoadBuiltInDefaults() {
         { L"Desc_TrayIconColor", L"Custom color for the system tray percentage text" },
         { L"Opt_TrayIconColorLight", L"Light Mode Color" },
         { L"Opt_TrayIconDualColor", L"Separate Dark & Light Colors" },
-        { L"Desc_TrayIconDualColor", L"Use a different percentage icon color when Windows is in dark mode" },
+        { L"Desc_TrayIconDualColor", L"Use a different tray icon color when Windows is in dark mode" },
         { L"Opt_TrayIconColorDark", L"Dark Mode Color" },
         { L"Desc_TrayIconColorDark", L"Custom color for the system tray percentage text in dark mode" },
         { L"Sec_TrayTypography", L"System Tray Icon Typography" },

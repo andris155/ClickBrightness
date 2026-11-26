@@ -105,7 +105,7 @@ void AppSettings::Load() {
         bool showPct = (GetPrivateProfileIntW(L"Tray", L"ShowPercentage", 1, ini.c_str()) != 0);
         trayPercentageMode = showPct ? 0 : 2;
     } else {
-        trayPercentageMode = (pctMode >= 0 && pctMode <= 2) ? pctMode : 0;
+        trayPercentageMode = (pctMode >= 0 && pctMode <= 4) ? pctMode : 0;
     }
 
     wchar_t trayColBuf[64] = { 0 };
@@ -115,6 +115,13 @@ void AppSettings::Load() {
     trayIconUseDualColors = (GetPrivateProfileIntW(L"Tray", L"UseDualColors", 0, ini.c_str()) != 0);
     GetPrivateProfileStringW(L"Tray", L"IconColorDark", L"#60CDFF", trayColBuf, 64, ini.c_str());
     trayIconColorDark = ParseColor(trayColBuf, RGB(96, 205, 255));
+
+    trayIconUseDualCustomIcons = (GetPrivateProfileIntW(L"Tray", L"UseDualCustomIcons", 0, ini.c_str()) != 0);
+    wchar_t customIconBuf[MAX_PATH] = { 0 };
+    GetPrivateProfileStringW(L"Tray", L"CustomIcon", L"preset:sun", customIconBuf, MAX_PATH, ini.c_str());
+    trayCustomIcon = customIconBuf[0] ? customIconBuf : L"preset:sun";
+    GetPrivateProfileStringW(L"Tray", L"CustomIconDark", L"preset:sun-blue", customIconBuf, MAX_PATH, ini.c_str());
+    trayCustomIconDark = customIconBuf[0] ? customIconBuf : L"preset:sun-blue";
 
     wchar_t fontBuf[128] = { 0 };
     GetPrivateProfileStringW(L"Tray", L"Font", L"Segoe UI Variable Text", fontBuf, 128, ini.c_str());
@@ -300,7 +307,7 @@ void AppSettings::Load() {
             cfg.controlMode = 0;
         }
         int defaultPctMode = (!isMainMon && cfg.controlMode == 0 && !legacySyncSeparateTray) ? 3 : cfg.trayPercentageMode;
-        cfg.trayPercentageMode = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"TrayPercentageMode", defaultPctMode, ini.c_str()), 0, 3);
+        cfg.trayPercentageMode = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"TrayPercentageMode", defaultPctMode, ini.c_str()), 0, 4);
         if (isMainMon && cfg.trayPercentageMode == 3) {
             cfg.trayPercentageMode = 0;
         }
@@ -309,6 +316,12 @@ void AppSettings::Load() {
         cfg.trayIconUseDualColors = (GetPrivateProfileIntW(sec.c_str(), L"TrayUseDualColors", cfg.trayIconUseDualColors ? 1 : 0, ini.c_str()) != 0);
         GetPrivateProfileStringW(sec.c_str(), L"TrayIconColorDark", FormatColor(cfg.trayIconColorDark).c_str(), colBuf, 64, ini.c_str());
         cfg.trayIconColorDark = ParseColor(colBuf, cfg.trayIconColorDark);
+        cfg.trayIconUseDualCustomIcons = (GetPrivateProfileIntW(sec.c_str(), L"TrayUseDualCustomIcons", cfg.trayIconUseDualCustomIcons ? 1 : 0, ini.c_str()) != 0);
+        wchar_t mIconBuf[MAX_PATH] = { 0 };
+        GetPrivateProfileStringW(sec.c_str(), L"TrayCustomIcon", cfg.trayCustomIcon.c_str(), mIconBuf, MAX_PATH, ini.c_str());
+        if (mIconBuf[0] != L'\0') cfg.trayCustomIcon = mIconBuf;
+        GetPrivateProfileStringW(sec.c_str(), L"TrayCustomIconDark", cfg.trayCustomIconDark.c_str(), mIconBuf, MAX_PATH, ini.c_str());
+        if (mIconBuf[0] != L'\0') cfg.trayCustomIconDark = mIconBuf;
         wchar_t mFontBuf[128] = { 0 };
         GetPrivateProfileStringW(sec.c_str(), L"TrayFont", cfg.trayFont.c_str(), mFontBuf, 128, ini.c_str());
         if (mFontBuf[0] != L'\0') cfg.trayFont = mFontBuf;
@@ -336,6 +349,23 @@ void AppSettings::Load() {
         cfg.flyoutAccentColorDark = ParseColor(colBuf, cfg.flyoutAccentColorDark);
         cfg.flyoutScrollEnabled = (GetPrivateProfileIntW(sec.c_str(), L"FlyoutScrollEnabled", cfg.flyoutScrollEnabled ? 1 : 0, ini.c_str()) != 0);
         cfg.flyoutScrollStep = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"FlyoutScrollStep", cfg.flyoutScrollStep, ini.c_str()), 1, 50);
+
+        cfg.scheduleMode = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"ScheduleMode", 0, ini.c_str()), 0, 2);
+        cfg.scheduleSunSource = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"ScheduleSunSource", 0, ini.c_str()), 0, 1);
+        cfg.scheduleDayHour = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"ScheduleDayHour", 7, ini.c_str()), 0, 23);
+        cfg.scheduleDayMinute = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"ScheduleDayMinute", 0, ini.c_str()), 0, 59);
+        cfg.scheduleNightHour = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"ScheduleNightHour", 20, ini.c_str()), 0, 23);
+        cfg.scheduleNightMinute = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"ScheduleNightMinute", 0, ini.c_str()), 0, 59);
+        cfg.scheduleDayBrightness = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"ScheduleDayBrightness", 80, ini.c_str()), 0, 100);
+        cfg.scheduleNightBrightness = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"ScheduleNightBrightness", 30, ini.c_str()), 0, 100);
+        wchar_t sLatBuf[64] = { 0 }, sLonBuf[64] = { 0 };
+        GetPrivateProfileStringW(sec.c_str(), L"ScheduleLatitude", L"47.4979", sLatBuf, 64, ini.c_str());
+        try { cfg.scheduleLatitude = std::stod(sLatBuf); } catch (...) { cfg.scheduleLatitude = 47.4979; }
+        GetPrivateProfileStringW(sec.c_str(), L"ScheduleLongitude", L"19.0402", sLonBuf, 64, ini.c_str());
+        try { cfg.scheduleLongitude = std::stod(sLonBuf); } catch (...) { cfg.scheduleLongitude = 19.0402; }
+        cfg.scheduleSunriseOffset = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"ScheduleSunriseOffset", 0, ini.c_str()), -180, 180);
+        cfg.scheduleSunsetOffset = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"ScheduleSunsetOffset", 0, ini.c_str()), -180, 180);
+        cfg.scheduleShowOsd = (GetPrivateProfileIntW(sec.c_str(), L"ScheduleShowOsd", 1, ini.c_str()) != 0);
 
         cfg.cachedBrightness = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"CachedBrightness", cachedBrightness, ini.c_str()), 0, 100);
         monitorConfigs[monId] = cfg;
@@ -454,6 +484,9 @@ void AppSettings::Save() const {
     addLine(L"IconColor", FormatColor(trayIconColor));
     addLine(L"UseDualColors", trayIconUseDualColors ? L"1" : L"0");
     addLine(L"IconColorDark", FormatColor(trayIconColorDark));
+    addLine(L"UseDualCustomIcons", trayIconUseDualCustomIcons ? L"1" : L"0");
+    addLine(L"CustomIcon", trayCustomIcon);
+    addLine(L"CustomIconDark", trayCustomIconDark);
     addLine(L"Font", trayFont);
     addLine(L"FontWeight", std::to_wstring(trayFontWeight));
     addLine(L"FontSize", std::to_wstring(trayFontSize));
@@ -523,6 +556,9 @@ void AppSettings::Save() const {
         addLine(L"TrayIconColor", FormatColor(cfg.trayIconColor));
         addLine(L"TrayUseDualColors", cfg.trayIconUseDualColors ? L"1" : L"0");
         addLine(L"TrayIconColorDark", FormatColor(cfg.trayIconColorDark));
+        addLine(L"TrayUseDualCustomIcons", cfg.trayIconUseDualCustomIcons ? L"1" : L"0");
+        addLine(L"TrayCustomIcon", cfg.trayCustomIcon);
+        addLine(L"TrayCustomIconDark", cfg.trayCustomIconDark);
         addLine(L"TrayFont", cfg.trayFont);
         addLine(L"TrayFontWeight", std::to_wstring(cfg.trayFontWeight));
         addLine(L"TrayFontSize", std::to_wstring(cfg.trayFontSize));
@@ -540,6 +576,19 @@ void AppSettings::Save() const {
         addLine(L"FlyoutAccentColorDark", FormatColor(cfg.flyoutAccentColorDark));
         addLine(L"FlyoutScrollEnabled", cfg.flyoutScrollEnabled ? L"1" : L"0");
         addLine(L"FlyoutScrollStep", std::to_wstring(cfg.flyoutScrollStep));
+        addLine(L"ScheduleMode", std::to_wstring(cfg.scheduleMode));
+        addLine(L"ScheduleSunSource", std::to_wstring(cfg.scheduleSunSource));
+        addLine(L"ScheduleDayHour", std::to_wstring(cfg.scheduleDayHour));
+        addLine(L"ScheduleDayMinute", std::to_wstring(cfg.scheduleDayMinute));
+        addLine(L"ScheduleNightHour", std::to_wstring(cfg.scheduleNightHour));
+        addLine(L"ScheduleNightMinute", std::to_wstring(cfg.scheduleNightMinute));
+        addLine(L"ScheduleDayBrightness", std::to_wstring(cfg.scheduleDayBrightness));
+        addLine(L"ScheduleNightBrightness", std::to_wstring(cfg.scheduleNightBrightness));
+        addLine(L"ScheduleLatitude", std::to_wstring(cfg.scheduleLatitude));
+        addLine(L"ScheduleLongitude", std::to_wstring(cfg.scheduleLongitude));
+        addLine(L"ScheduleSunriseOffset", std::to_wstring(cfg.scheduleSunriseOffset));
+        addLine(L"ScheduleSunsetOffset", std::to_wstring(cfg.scheduleSunsetOffset));
+        addLine(L"ScheduleShowOsd", cfg.scheduleShowOsd ? L"1" : L"0");
         addLine(L"CachedBrightness", std::to_wstring(cfg.cachedBrightness));
     }
 
@@ -950,12 +999,28 @@ MonitorControlConfig AppSettings::GetEffectiveMonitorConfig(const std::wstring& 
         result.trayIconColor = own.trayIconColor;
         result.trayIconUseDualColors = own.trayIconUseDualColors;
         result.trayIconColorDark = own.trayIconColorDark;
+        result.trayIconUseDualCustomIcons = own.trayIconUseDualCustomIcons;
+        result.trayCustomIcon = own.trayCustomIcon;
+        result.trayCustomIconDark = own.trayCustomIconDark;
         result.trayFont = own.trayFont;
         result.trayFontWeight = own.trayFontWeight;
         result.trayFontSize = own.trayFontSize;
         result.trayFontSize100 = own.trayFontSize100;
         result.trayYOffset = own.trayYOffset;
         result.trayYOffsetUseComma = own.trayYOffsetUseComma;
+        result.scheduleMode = own.scheduleMode;
+        result.scheduleSunSource = own.scheduleSunSource;
+        result.scheduleDayHour = own.scheduleDayHour;
+        result.scheduleDayMinute = own.scheduleDayMinute;
+        result.scheduleNightHour = own.scheduleNightHour;
+        result.scheduleNightMinute = own.scheduleNightMinute;
+        result.scheduleDayBrightness = own.scheduleDayBrightness;
+        result.scheduleNightBrightness = own.scheduleNightBrightness;
+        result.scheduleLatitude = own.scheduleLatitude;
+        result.scheduleLongitude = own.scheduleLongitude;
+        result.scheduleSunriseOffset = own.scheduleSunriseOffset;
+        result.scheduleSunsetOffset = own.scheduleSunsetOffset;
+        result.scheduleShowOsd = own.scheduleShowOsd;
         result.cachedBrightness = own.cachedBrightness;
     }
     if (isMain && result.trayPercentageMode == 3) {
@@ -996,6 +1061,9 @@ void AppSettings::CopyCustomizationToMonitor(MonitorControlConfig& dst) const {
     dst.trayIconColor = trayIconColor;
     dst.trayIconUseDualColors = trayIconUseDualColors;
     dst.trayIconColorDark = trayIconColorDark;
+    dst.trayIconUseDualCustomIcons = trayIconUseDualCustomIcons;
+    dst.trayCustomIcon = trayCustomIcon;
+    dst.trayCustomIconDark = trayCustomIconDark;
     dst.trayFont = trayFont;
     dst.trayFontWeight = trayFontWeight;
     dst.trayFontSize = trayFontSize;
@@ -1015,6 +1083,19 @@ void AppSettings::CopyCustomizationToMonitor(MonitorControlConfig& dst) const {
     dst.flyoutAccentColorDark = flyoutAccentColorDark;
     dst.flyoutScrollEnabled = flyoutScrollEnabled;
     dst.flyoutScrollStep = flyoutScrollStep;
+    dst.scheduleMode = scheduleMode;
+    dst.scheduleSunSource = scheduleSunSource;
+    dst.scheduleDayHour = scheduleDayHour;
+    dst.scheduleDayMinute = scheduleDayMinute;
+    dst.scheduleNightHour = scheduleNightHour;
+    dst.scheduleNightMinute = scheduleNightMinute;
+    dst.scheduleDayBrightness = scheduleDayBrightness;
+    dst.scheduleNightBrightness = scheduleNightBrightness;
+    dst.scheduleLatitude = scheduleLatitude;
+    dst.scheduleLongitude = scheduleLongitude;
+    dst.scheduleSunriseOffset = scheduleSunriseOffset;
+    dst.scheduleSunsetOffset = scheduleSunsetOffset;
+    dst.scheduleShowOsd = scheduleShowOsd;
     dst.cachedBrightness = cachedBrightness;
 }
 
@@ -1050,6 +1131,9 @@ void AppSettings::ApplyMonitorCustomizationToLegacy(const MonitorControlConfig& 
     trayIconColor = src.trayIconColor;
     trayIconUseDualColors = src.trayIconUseDualColors;
     trayIconColorDark = src.trayIconColorDark;
+    trayIconUseDualCustomIcons = src.trayIconUseDualCustomIcons;
+    trayCustomIcon = src.trayCustomIcon;
+    trayCustomIconDark = src.trayCustomIconDark;
     trayFont = src.trayFont;
     trayFontWeight = src.trayFontWeight;
     trayFontSize = src.trayFontSize;
@@ -1069,6 +1153,19 @@ void AppSettings::ApplyMonitorCustomizationToLegacy(const MonitorControlConfig& 
     flyoutAccentColorDark = src.flyoutAccentColorDark;
     flyoutScrollEnabled = src.flyoutScrollEnabled;
     flyoutScrollStep = src.flyoutScrollStep;
+    scheduleMode = src.scheduleMode;
+    scheduleSunSource = src.scheduleSunSource;
+    scheduleDayHour = src.scheduleDayHour;
+    scheduleDayMinute = src.scheduleDayMinute;
+    scheduleNightHour = src.scheduleNightHour;
+    scheduleNightMinute = src.scheduleNightMinute;
+    scheduleDayBrightness = src.scheduleDayBrightness;
+    scheduleNightBrightness = src.scheduleNightBrightness;
+    scheduleLatitude = src.scheduleLatitude;
+    scheduleLongitude = src.scheduleLongitude;
+    scheduleSunriseOffset = src.scheduleSunriseOffset;
+    scheduleSunsetOffset = src.scheduleSunsetOffset;
+    scheduleShowOsd = src.scheduleShowOsd;
     cachedBrightness = src.cachedBrightness;
 }
 
