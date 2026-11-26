@@ -352,7 +352,10 @@ namespace winrt::BrightnessApp::implementation
             };
 
             addPassthrough(SettingsSearchBox());
-            addPassthrough(TitleBarBackButton());
+            if (TitleBarBackButton().Visibility() == winrt::Microsoft::UI::Xaml::Visibility::Visible)
+            {
+                addPassthrough(TitleBarBackButton());
+            }
 
             if (!passthroughRects.empty())
             {
@@ -364,6 +367,23 @@ namespace winrt::BrightnessApp::implementation
         }
         catch (...)
         {
+        }
+    }
+
+    void SettingsWindow::SetBackButtonUsable(bool usable)
+    {
+        auto btn = TitleBarBackButton();
+        auto targetVis = usable ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed;
+        bool visChanged = (btn.Visibility() != targetVis);
+        btn.IsEnabled(usable);
+        btn.Visibility(targetVis);
+        TitleBarLeftPanel().Padding(usable
+            ? winrt::Microsoft::UI::Xaml::Thickness{ 8, 0, 16, 0 }
+            : winrt::Microsoft::UI::Xaml::Thickness{ 16, 0, 16, 0 });
+        if (visChanged)
+        {
+            AppTitleBar().UpdateLayout();
+            UpdateTitleBarDragRegions();
         }
     }
 
@@ -586,7 +606,7 @@ namespace winrt::BrightnessApp::implementation
             {
                 m_generalPanel.Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
                 children.Append(m_generalPanel);
-                TitleBarBackButton().IsEnabled(false);
+                SetBackButtonUsable(false);
             }
             else if (tag == L"Monitors")
             {
@@ -606,7 +626,7 @@ namespace winrt::BrightnessApp::implementation
                 EnsureAboutTabLoaded();
                 m_aboutPanel.Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
                 children.Append(m_aboutPanel);
-                TitleBarBackButton().IsEnabled(false);
+                SetBackButtonUsable(false);
             }
         });
 
@@ -2360,7 +2380,7 @@ namespace winrt::BrightnessApp::implementation
             m_currentMonitorsSubpage.clear();
         }
 
-        TitleBarBackButton().IsEnabled(!m_currentMonitorsSubpage.empty());
+        SetBackButtonUsable(!m_currentMonitorsSubpage.empty());
 
         auto hostChildren = MonitorsViewHost().Children();
         bool viewChanged = (prevSubpage.empty() != m_currentMonitorsSubpage.empty()) ||
@@ -2427,7 +2447,7 @@ namespace winrt::BrightnessApp::implementation
         std::wstring prevSubpage = m_currentTimingsSubpage;
         m_currentTimingsSubpage = subpageTag;
 
-        TitleBarBackButton().IsEnabled(!m_currentTimingsSubpage.empty());
+        SetBackButtonUsable(!m_currentTimingsSubpage.empty());
 
         auto hostChildren = TimingsViewHost().Children();
         bool viewChanged = (prevSubpage.empty() != m_currentTimingsSubpage.empty()) ||

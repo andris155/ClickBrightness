@@ -26,7 +26,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- Left Back Button + App Title & Icon -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Spacing="6" Padding="8,0,16,0">
+            <StackPanel x:Name="TitleBarLeftPanel" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Spacing="6" Padding="16,0,16,0">
                 <Button x:Name="TitleBarBackButton"
                         Width="36" Height="32"
                         Padding="0"
@@ -34,6 +34,7 @@
                         BorderThickness="0"
                         CornerRadius="4"
                         IsEnabled="False"
+                        Visibility="Collapsed"
                         VerticalAlignment="Center"
                         ToolTipService.ToolTip="Back">
                     <FontIcon Glyph="&#xE72B;" FontSize="12"/>

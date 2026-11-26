@@ -43,6 +43,7 @@ namespace winrt::BrightnessApp::implementation
         void OpenMonitorsSubpage(const std::wstring& subpageTag);
         void OpenTimingsSubpage(const std::wstring& subpageTag);
         void UpdateTitleBarDragRegions();
+        void SetBackButtonUsable(bool usable);
 
         void EnsureTrayTabLoaded();
         void EnsureAboutTabLoaded();
