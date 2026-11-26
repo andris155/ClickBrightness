@@ -413,6 +413,7 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
 
             // 1. Re-initialize physical monitors on the new GPU driver
             g_MonitorManager.Reinitialize();
+            g_HotkeyManager.RegisterAll(hwnd);
 
             // 2. Recreate Direct2D, Direct3D, XAML swapchains, and tray menus on the new GPU device
             g_TrayIcon.ResetGraphicsResources();
@@ -440,6 +441,9 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
             {
                 KillTimer(hwnd, IDT_MONITOR_RETRY);
                 g_monitorRetryCount = 0;
+                g_HotkeyManager.RegisterAll(hwnd);
+                g_TrayIcon.SyncExtraTrayIcons();
+                g_FlyoutWindow.RefreshOnDisplayChange();
                 int b = g_MonitorManager.GetCachedBrightness();
                 g_TrayIcon.UpdateBrightness(b);
                 OnSettingsDisplayChanged();

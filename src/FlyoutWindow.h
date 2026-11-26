@@ -20,6 +20,7 @@ public:
     void ApplyPendingBrightness();
     void OnThemeChanged();
     void ResetGraphicsResources();
+    void RefreshOnDisplayChange();
 };
 
 extern FlyoutWindow g_FlyoutWindow;

@@ -1,5 +1,6 @@
 #include "MonitorManager.h"
 #include "Settings.h"
+#include "ThemeHelper.h"
 #include "resource.h"
 #include <map>
 #include <wbemidl.h>
@@ -643,6 +644,7 @@ int MonitorManager::GetMonitorBrightnessById(const std::wstring& monitorId) {
     if (monitorId.empty() || _wcsicmp(monitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0) {
         return GetCurrentBrightness();
     }
+    int pendingSyncVal = kNoPendingBrightness;
     {
         std::lock_guard<std::mutex> wlock(m_workerMutex);
         if (m_pendingTargetBrightness != kNoPendingBrightness) {
@@ -652,10 +654,13 @@ int MonitorManager::GetMonitorBrightnessById(const std::wstring& monitorId) {
             if (m_pendingTargetMonitorId.empty()) {
                 const auto* cfg = g_Settings.FindMonitorConfig(monitorId);
                 if (!cfg || cfg->controlMode == 0) {
-                    return cfg ? AppSettings::ComputeSyncedBrightness(m_pendingTargetBrightness, *cfg) : (std::clamp)(m_pendingTargetBrightness, 0, 100);
+                    pendingSyncVal = m_pendingTargetBrightness;
                 }
             }
         }
+    }
+    if (pendingSyncVal != kNoPendingBrightness) {
+        return GetEffectiveSyncedBrightness(monitorId, pendingSyncVal);
     }
     std::lock_guard<std::mutex> lock(m_mutex);
     for (auto& mon : m_monitors) {
@@ -688,6 +693,43 @@ int MonitorManager::GetMonitorBrightnessById(const std::wstring& monitorId) {
     return m_cachedBrightness;
 }
 
+void MonitorManager::GetSyncFirstHitBoundsLocked(int& outFirstHit100, int& outFirstHit0) const {
+    outFirstHit100 = 100;
+    outFirstHit0 = 0;
+    for (const auto& mon : m_monitors) {
+        const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
+        if (cfg && !cfg->enabled) continue;
+        bool isMain = (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
+        int mode = cfg ? cfg->controlMode : 0;
+        if (!isMain && (mode != 0 || !cfg)) continue;
+
+        int off = (isMain || !cfg) ? 0 : cfg->offset;
+        if (100 - off < outFirstHit100) outFirstHit100 = 100 - off;
+        if (-off > outFirstHit0) outFirstHit0 = -off;
+    }
+}
+
+int MonitorManager::GetEffectiveSyncedBrightnessLocked(const std::wstring& monitorId, int baseBrightness) const {
+    int firstHit100 = 100, firstHit0 = 0;
+    GetSyncFirstHitBoundsLocked(firstHit100, firstHit0);
+
+    bool isMain = (_wcsicmp(monitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
+    const auto* cfg = g_Settings.FindMonitorConfig(monitorId);
+    int off = (isMain || !cfg) ? 0 : cfg->offset;
+    bool osMax = cfg ? cfg->syncOverscrollMax : true;
+    bool osMin = cfg ? cfg->syncOverscrollMin : true;
+
+    int effBase = baseBrightness;
+    if (!osMax && effBase > firstHit100) effBase = firstHit100;
+    if (!osMin && effBase < firstHit0) effBase = firstHit0;
+    return (std::clamp)(effBase + off, 0, 100);
+}
+
+int MonitorManager::GetEffectiveSyncedBrightness(const std::wstring& monitorId, int baseBrightness) const {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return GetEffectiveSyncedBrightnessLocked(monitorId, baseBrightness);
+}
+
 void MonitorManager::GetTargetBounds(const std::wstring& targetMonitorId, int& outMin, int& outMax) const {
     outMin = 0;
     outMax = 100;
@@ -702,37 +744,40 @@ void MonitorManager::GetTargetBounds(const std::wstring& targetMonitorId, int& o
     if (!isSyncTarget) return;
 
     std::lock_guard<std::mutex> lock(m_mutex);
-    // Pass 1: expand range so overscroll-enabled monitors can reach 0% and 100%
+    int firstHit100 = 100, firstHit0 = 0;
+    GetSyncFirstHitBoundsLocked(firstHit100, firstHit0);
+
+    bool anyBoundSet = false;
+    int maxBound = firstHit100;
+    int minBound = firstHit0;
+
+    // Each synced display (including Main) contributes the max/min base it can use:
+    // if overscroll is enabled for that display, it can go until that display reaches 100%/0%;
+    // if overscroll is disabled for that display, it stops at firstHit100/firstHit0.
     for (const auto& mon : m_monitors) {
         const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
         if (cfg && !cfg->enabled) continue;
         bool isMain = (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
         int mode = cfg ? cfg->controlMode : 0;
-        if (isMain || mode != 0 || !cfg) continue;
+        if (!isMain && (mode != 0 || !cfg)) continue;
 
-        int off = cfg->offset;
-        if (off > 0 && cfg->syncOverscrollMin) {
-            if (-off < outMin) outMin = -off;
-        }
-        if (off < 0 && cfg->syncOverscrollMax) {
-            if (100 - off > outMax) outMax = 100 - off;
+        int off = (isMain || !cfg) ? 0 : cfg->offset;
+        bool osMax = cfg ? cfg->syncOverscrollMax : true;
+        bool osMin = cfg ? cfg->syncOverscrollMin : true;
+        int dispMax = osMax ? (100 - off) : firstHit100;
+        int dispMin = osMin ? (-off) : firstHit0;
+        if (!anyBoundSet) {
+            maxBound = dispMax;
+            minBound = dispMin;
+            anyBoundSet = true;
+        } else {
+            if (dispMax > maxBound) maxBound = dispMax;
+            if (dispMin < minBound) minBound = dispMin;
         }
     }
-    // Pass 2: clamp range for monitors with overscroll disabled
-    for (const auto& mon : m_monitors) {
-        const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
-        if (cfg && !cfg->enabled) continue;
-        bool isMain = (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
-        int mode = cfg ? cfg->controlMode : 0;
-        if (isMain || mode != 0 || !cfg) continue;
-
-        int off = cfg->offset;
-        if (!cfg->syncOverscrollMax) {
-            if (100 - off < outMax) outMax = 100 - off;
-        }
-        if (!cfg->syncOverscrollMin) {
-            if (-off > outMin) outMin = -off;
-        }
+    if (anyBoundSet) {
+        outMax = maxBound;
+        outMin = minBound;
     }
     if (outMin > outMax) {
         outMin = 0;
@@ -769,6 +814,7 @@ std::vector<BrightnessChangeEntry> MonitorManager::GetChangedMonitorsForTarget(c
         }
     }
 
+    bool isOverlayDark = ThemeHelper::IsOverlayInDarkMode(g_Settings.overlayTheme);
     for (const auto& mon : m_monitors) {
         const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
         bool enabled = cfg ? cfg->enabled : true;
@@ -779,17 +825,19 @@ std::vector<BrightnessChangeEntry> MonitorManager::GetChangedMonitorsForTarget(c
 
         if (isSyncTarget) {
             if (!isMain && mode != 0) continue; // Skip Separate non-main monitors
-            int effB = (!isMain && cfg) ? AppSettings::ComputeSyncedBrightness(targetBrightness, *cfg) : (std::clamp)(targetBrightness, 0, 100);
+            int effB = GetEffectiveSyncedBrightnessLocked(mon.id, targetBrightness);
             const auto& effCfg = g_Settings.GetEffectiveMonitorConfig(mon.id);
+            COLORREF osdCol = (effCfg.overlayUseDualColors && isOverlayDark) ? effCfg.overlayAccentColorDark : effCfg.overlayAccentColor;
             std::wstring dispName = (cfg && !cfg->customName.empty()) ? cfg->customName : AppSettings::SanitizeMonitorName(mon.friendlyName);
             if (dispName.empty()) dispName = mon.id;
-            result.push_back({ mon.id, dispName, effB, effCfg.overlayUseWindowsAccent, effCfg.overlayAccentColor });
+            result.push_back({ mon.id, dispName, effB, effCfg.overlayUseWindowsAccent, osdCol });
         } else {
             if (_wcsicmp(mon.id.c_str(), targetMonitorId.c_str()) != 0) continue;
             const auto& effCfg = g_Settings.GetEffectiveMonitorConfig(mon.id);
+            COLORREF osdCol = (effCfg.overlayUseDualColors && isOverlayDark) ? effCfg.overlayAccentColorDark : effCfg.overlayAccentColor;
             std::wstring dispName = (cfg && !cfg->customName.empty()) ? cfg->customName : AppSettings::SanitizeMonitorName(mon.friendlyName);
             if (dispName.empty()) dispName = mon.id;
-            result.push_back({ mon.id, dispName, targetBrightness, effCfg.overlayUseWindowsAccent, effCfg.overlayAccentColor });
+            result.push_back({ mon.id, dispName, targetBrightness, effCfg.overlayUseWindowsAccent, osdCol });
         }
     }
     return result;
@@ -858,7 +906,7 @@ bool MonitorManager::SetMonitorBrightnessTarget(const std::wstring& targetMonito
 
         if (isSyncTarget) {
             if (!isMain && mode != 0) continue;
-            effB = (!isMain && cfg) ? AppSettings::ComputeSyncedBrightness(brightness, *cfg) : (std::clamp)(brightness, 0, 100);
+            effB = GetEffectiveSyncedBrightnessLocked(mon.id, brightness);
         } else {
             if (_wcsicmp(mon.id.c_str(), targetMonitorId.c_str()) != 0) continue;
         }
@@ -959,7 +1007,7 @@ void MonitorManager::WorkerLoop() {
 
                         if (isSyncTarget) {
                             if (!isMain && mode != 0) continue;
-                            effB = (!isMain && cfg) ? AppSettings::ComputeSyncedBrightness(targetBrightness, *cfg) : (std::clamp)(targetBrightness, 0, 100);
+                            effB = GetEffectiveSyncedBrightnessLocked(mon.id, targetBrightness);
                         } else {
                             if (_wcsicmp(mon.id.c_str(), targetMonitorId.c_str()) != 0) continue;
                         }

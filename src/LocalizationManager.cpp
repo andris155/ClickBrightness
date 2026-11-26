@@ -410,7 +410,7 @@ void LocalizationManager::LoadBuiltInDefaults() {
         { L"Desc_OverlayCustomAccent", L"Fill color for OSD indicator bar (configured when Windows accent is off)" },
         { L"Tray_Title", L"System Tray Icon" },
         { L"Sec_TrayAppearance", L"System Tray Icon" },
-        { L"Opt_TrayShowPercentage", L"Percentage Icon" },
+        { L"Opt_TrayShowPercentage", L"Tray Icon" },
         { L"Desc_TrayShowPercentage", L"Choose how the brightness percentage is displayed on the system tray icon" },
         { L"Opt_TrayPctFollowWindows", L"Follow Windows" },
         { L"Opt_TrayPctColored", L"Colored" },

@@ -414,7 +414,7 @@ namespace winrt::BrightnessApp::implementation
         int curTrans = g_Settings.transparencyEnabled ? 1 : 0;
         COLORREF accCol = effCfg.flyoutUseWindowsAccent
             ? ThemeHelper::GetAccentColors().GetForTheme(!isDark)
-            : effCfg.flyoutAccentColor;
+            : ((effCfg.flyoutUseDualColors && isDark) ? effCfg.flyoutAccentColorDark : effCfg.flyoutAccentColor);
 
         if (m_lastTheme == (isDark ? 1 : 0) && m_lastTransparency == curTrans && m_lastAccentCol == accCol)
         {
@@ -509,7 +509,7 @@ namespace winrt::BrightnessApp::implementation
         bool isDark = ThemeHelper::IsOverlayInDarkMode(g_Settings.overlayTheme);
         COLORREF accCol = effCfg.flyoutUseWindowsAccent
             ? ThemeHelper::GetAccentColors().GetForTheme(!isDark)
-            : effCfg.flyoutAccentColor;
+            : ((effCfg.flyoutUseDualColors && isDark) ? effCfg.flyoutAccentColorDark : effCfg.flyoutAccentColor);
 
         winrt::Windows::UI::Color accColor = winrt::Microsoft::UI::ColorHelper::FromArgb(
             255, GetRValue(accCol), GetGValue(accCol), GetBValue(accCol)
@@ -558,11 +558,13 @@ namespace winrt::BrightnessApp::implementation
         if (isSyncGroup)
         {
             sig += g_Settings.mainMonitorId + L"|";
+            sig += g_Settings.showSeparateInMultiFlyout ? L"1|" : L"0|";
             for (const auto& mon : g_MonitorManager.GetMonitors())
             {
                 if (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0) continue;
                 const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
                 if (!cfg || !cfg->enabled) continue;
+                if (cfg->controlMode == 1 && !g_Settings.showSeparateInMultiFlyout) continue;
                 std::wstring monName = !cfg->customName.empty() ? cfg->customName : AppSettings::SanitizeMonitorName(mon.friendlyName, 20);
                 sig += mon.id + L":" + std::to_wstring(cfg->controlMode) + L":" + monName + L";";
             }
@@ -586,10 +588,11 @@ namespace winrt::BrightnessApp::implementation
             return true;
         }
 
-        // Two passes: sync-mode monitors first, then separate-mode monitors (each with individual preset buttons)
+        // Two passes: sync-mode monitors first, then separate-mode monitors (if enabled)
         for (int pass = 0; pass < 2; ++pass)
         {
             bool wantSeparate = (pass == 1);
+            if (wantSeparate && !g_Settings.showSeparateInMultiFlyout) continue;
             for (const auto& mon : g_MonitorManager.GetMonitors())
             {
                 if (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0) continue;
@@ -602,7 +605,7 @@ namespace winrt::BrightnessApp::implementation
                 if (monName.empty()) monName = mon.id;
                 int effB = isSeparate
                     ? (std::clamp)(g_MonitorManager.GetMonitorBrightnessById(mon.id), 0, 100)
-                    : AppSettings::ComputeSyncedBrightness(m_syncBaseBrightness, *cfg);
+                    : g_MonitorManager.GetEffectiveSyncedBrightness(mon.id, m_syncBaseBrightness);
 
                 winrt::Microsoft::UI::Xaml::Controls::TextBlock hdr;
                 hdr.FontFamily(winrt::Microsoft::UI::Xaml::Media::FontFamily(L"Segoe UI Variable Text, Segoe UI"));
@@ -637,6 +640,7 @@ namespace winrt::BrightnessApp::implementation
                     hdr.Text(monName + L"\n" + std::to_wstring(v) + L"%");
                     g_MonitorManager.SetMonitorBrightnessTarget(monIdCopy, v, true);
                     g_TrayIcon.UpdateBrightnessForTarget(monIdCopy, v);
+                    m_hasSeparatePendingSave = true;
                 });
 
                 sl.Loaded([this, sl, monIdCopy](auto&&, auto&&)
@@ -759,7 +763,12 @@ namespace winrt::BrightnessApp::implementation
         int minB = 0, maxB = 100;
         g_MonitorManager.GetTargetBounds(m_targetMonitorId, minB, maxB);
         m_syncBaseBrightness = (std::clamp)(val, minB, maxB);
-        m_brightness = (std::clamp)(m_syncBaseBrightness, 0, 100);
+        bool isMainOrSync = m_targetMonitorId.empty() ||
+                            _wcsicmp(m_targetMonitorId.c_str(), L"__SYNC__") == 0 ||
+                            _wcsicmp(m_targetMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0;
+        m_brightness = isMainOrSync
+            ? g_MonitorManager.GetEffectiveSyncedBrightness(g_Settings.mainMonitorId, m_syncBaseBrightness)
+            : (std::clamp)(m_syncBaseBrightness, 0, 100);
         int enabledCount = 0;
         for (const auto& m : g_MonitorManager.GetMonitors())
         {
@@ -791,7 +800,7 @@ namespace winrt::BrightnessApp::implementation
                 const auto* sCfg = g_Settings.FindMonitorConfig(entry.monitorId);
                 int effB = entry.isSeparate
                     ? (std::clamp)(g_MonitorManager.GetMonitorBrightnessById(entry.monitorId), 0, 100)
-                    : (sCfg ? AppSettings::ComputeSyncedBrightness(m_syncBaseBrightness, *sCfg) : m_brightness);
+                    : g_MonitorManager.GetEffectiveSyncedBrightness(entry.monitorId, m_syncBaseBrightness);
                 entry.header.Text(entry.displayName + L"\n" + std::to_wstring(effB) + L"%");
                 entry.slider.Value(effB);
             }
@@ -961,7 +970,7 @@ namespace winrt::BrightnessApp::implementation
             extraWidth += entry.isSeparate ? 95 : 70;
         }
         int width = DpiHelper::Scale(!m_syncEntries.empty() ? (137 + extraWidth) : 121, dpi);
-        int height = DpiHelper::Scale(!m_syncEntries.empty() ? 590 : 576, dpi);
+        int height = DpiHelper::Scale(!m_syncEntries.empty() ? 574 : 576, dpi);
         m_lastW = width;
         m_lastH = height;
 
@@ -971,6 +980,62 @@ namespace winrt::BrightnessApp::implementation
         }
         SetBrightnessVisual(m_syncBaseBrightness);
         RootGrid().UpdateLayout();
+    }
+
+    void FlyoutWindow::RefreshLayoutInPlace()
+    {
+        if (!m_isVisible)
+        {
+            if (m_targetMonitorId.empty() || _wcsicmp(m_targetMonitorId.c_str(), L"__SYNC__") == 0)
+            {
+                Prewarm();
+            }
+            return;
+        }
+
+        m_syncBaseBrightness = g_MonitorManager.GetTargetControlBrightness(m_targetMonitorId);
+        m_brightness = (std::clamp)(m_syncBaseBrightness, 0, 100);
+        bool rebuilt = RebuildSyncMonitorsPanel();
+        UpdateTheme();
+        ApplySliderBrushes();
+
+        RECT rc = {};
+        if (m_hwnd) GetWindowRect(m_hwnd, &rc);
+        POINT pt = { rc.left + (rc.right - rc.left) / 2, rc.top + (rc.bottom - rc.top) / 2 };
+        HMONITOR hMon = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO mi = { sizeof(mi) };
+        GetMonitorInfoW(hMon, &mi);
+        UINT dpi = DpiHelper::GetDpiForMonitor(hMon);
+        if (dpi == 0 && m_hwnd) dpi = GetDpiForWindow(m_hwnd);
+        if (dpi == 0) dpi = 96;
+
+        int extraWidth = 0;
+        for (const auto& entry : m_syncEntries)
+        {
+            extraWidth += entry.isSeparate ? 95 : 70;
+        }
+        int width = DpiHelper::Scale(!m_syncEntries.empty() ? (137 + extraWidth) : 121, dpi);
+        int height = DpiHelper::Scale(!m_syncEntries.empty() ? 574 : 576, dpi);
+        bool sizeChanged = (m_lastW != width || m_lastH != height);
+        m_lastW = width;
+        m_lastH = height;
+
+        SetBrightnessVisual(m_syncBaseBrightness);
+        if (rebuilt || sizeChanged)
+        {
+            RootGrid().UpdateLayout();
+        }
+
+        if (m_hwnd && sizeChanged)
+        {
+            int x = rc.right - width;
+            int y = rc.bottom - height;
+            if (x + width > mi.rcWork.right) x = mi.rcWork.right - width - DpiHelper::Scale(12, dpi);
+            if (x < mi.rcWork.left) x = mi.rcWork.left + DpiHelper::Scale(12, dpi);
+            if (y + height > mi.rcWork.bottom) y = mi.rcWork.bottom - height - DpiHelper::Scale(12, dpi);
+            if (y < mi.rcWork.top) y = mi.rcWork.top + DpiHelper::Scale(12, dpi);
+            SetWindowPos(m_hwnd, HWND_TOP, x, y, width, height, SWP_NOACTIVATE);
+        }
     }
 
     void FlyoutWindow::ShowWindow(const POINT* pTrayPos)
@@ -1010,7 +1075,7 @@ namespace winrt::BrightnessApp::implementation
             extraWidth += entry.isSeparate ? 95 : 70;
         }
         int width = DpiHelper::Scale(!m_syncEntries.empty() ? (137 + extraWidth) : 121, dpi);
-        int height = DpiHelper::Scale(!m_syncEntries.empty() ? 590 : 576, dpi);
+        int height = DpiHelper::Scale(!m_syncEntries.empty() ? 574 : 576, dpi);
 
         bool sizeChanged = (m_lastW != width || m_lastH != height);
         m_lastW = width;

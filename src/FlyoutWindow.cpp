@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "FlyoutWindow.h"
 #include "FlyoutWindow.xaml.h"
+#include "MonitorManager.h"
+#include "Settings.h"
 
 FlyoutWindow g_FlyoutWindow;
 
@@ -143,8 +145,67 @@ void FlyoutWindow::OnThemeChanged()
     if (auto* p = GetImplIfCreated(s_separateFlyoutWindow)) p->UpdateTheme();
 }
 
+static bool IsMonitorAvailableForFlyout(const std::wstring& monId)
+{
+    if (monId.empty() || _wcsicmp(monId.c_str(), L"__SYNC__") == 0) return true;
+    for (const auto& mon : g_MonitorManager.GetMonitors())
+    {
+        if (_wcsicmp(mon.id.c_str(), monId.c_str()) == 0)
+        {
+            const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
+            return (!cfg || cfg->enabled);
+        }
+    }
+    return false;
+}
+
+void FlyoutWindow::RefreshOnDisplayChange()
+{
+    if (auto* p = GetImplIfCreated(s_mainFlyoutWindow))
+    {
+        p->RefreshLayoutInPlace();
+    }
+    if (auto* p = GetImplIfCreated(s_separateFlyoutWindow))
+    {
+        if (p->IsWindowVisible())
+        {
+            if (IsMonitorAvailableForFlyout(p->GetTargetMonitor()))
+            {
+                p->RefreshLayoutInPlace();
+            }
+            else
+            {
+                p->HideWindow();
+            }
+        }
+    }
+}
+
 void FlyoutWindow::ResetGraphicsResources()
 {
+    bool mainWasVisible = false;
+    bool sepWasVisible = false;
+    std::wstring sepTarget;
+
+    if (auto* p = GetImplIfCreated(s_mainFlyoutWindow))
+    {
+        mainWasVisible = p->IsWindowVisible();
+    }
+    if (auto* p = GetImplIfCreated(s_separateFlyoutWindow))
+    {
+        sepWasVisible = p->IsWindowVisible();
+        sepTarget = p->GetTargetMonitor();
+    }
+
     Destroy();
     Create();
+
+    if (mainWasVisible)
+    {
+        Show(nullptr, L"");
+    }
+    else if (sepWasVisible && IsMonitorAvailableForFlyout(sepTarget))
+    {
+        Show(nullptr, sepTarget);
+    }
 }

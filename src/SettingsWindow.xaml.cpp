@@ -667,6 +667,7 @@ namespace winrt::BrightnessApp::implementation
                 // Monitors & Per-Monitor Controls
                 { g_Loc.Get(L"Opt_MainMonitor", L"Main Display").c_str(), catMon, L"main display primary monitor reference sync", L"Monitors", MainMonitorComboBox() },
                 { g_Loc.Get(L"Opt_SyncLaptopFnKeys", L"Sync External Monitors with Laptop Fn Keys").c_str(), catMon, L"laptop fn keys internal display sync external", L"Monitors", SyncLaptopFnKeysToggle() },
+                { g_Loc.Get(L"Opt_ShowSeparateInMultiFlyout", L"Show Separate Monitors in Multi-Monitor Flyout").c_str(), catMon, L"separate monitors multi monitor flyout show hide sliders", L"Monitors", ShowSeparateInMultiFlyoutToggle() },
                 { g_Loc.Get(L"Opt_SyncOverscrollMax", L"Overscroll when a display is at 100%").c_str(), catMon, L"overscroll 100 max sync offset", L"Monitors", SyncOverscrollMaxToggle() },
                 { g_Loc.Get(L"Opt_SyncOverscrollMin", L"Overscroll when a display is at 0%").c_str(), catMon, L"overscroll 0 min sync offset", L"Monitors", SyncOverscrollMinToggle() },
                 { g_Loc.Get(L"Opt_ConfigMonitor", L"Selected Display").c_str(), catMon, L"monitor display select configure", L"Monitors", ConfigMonitorComboBox() },
@@ -699,7 +700,7 @@ namespace winrt::BrightnessApp::implementation
                 { g_Loc.Get(L"Opt_OverlayCustomAccent", L"Custom Accent Color").c_str(), catMon, L"osd overlay custom accent color picker", L"Monitors_OSD", OverlayAccentColorPickerButton() },
 
                 // System Tray (under Monitors)
-                { g_Loc.Get(L"Opt_TrayShowPercentage", L"Percentage Icon").c_str(), catMon, L"tray percentage icon show disable colored follow windows font number live", L"Monitors_Tray", TrayPercentageModeComboBox() },
+                { g_Loc.Get(L"Opt_TrayShowPercentage", L"Tray Icon").c_str(), catMon, L"tray icon percentage show disable colored hide follow windows font number live", L"Monitors_Tray", TrayPercentageModeComboBox() },
                 { g_Loc.Get(L"Opt_TrayIconColor", L"Icon Color").c_str(), catMon, L"tray icon percentage custom color picker light mode", L"Monitors_Tray", TrayIconColorPickerButton() },
                 { g_Loc.Get(L"Opt_TrayIconDualColor", L"Separate Dark & Light Colors").c_str(), catMon, L"tray icon percentage dual separate dark light color", L"Monitors_Tray", TrayIconDualColorToggle() },
                 { g_Loc.Get(L"Opt_TrayIconColorDark", L"Dark Mode Color").c_str(), catMon, L"tray icon percentage custom dark mode color picker", L"Monitors_Tray", TrayIconDarkColorPickerButton() },
@@ -946,7 +947,12 @@ namespace winrt::BrightnessApp::implementation
                 g_Settings.mainMonitorId = m_cachedMonitorIds[idx];
                 if (g_Settings.FindMonitorConfig(g_Settings.mainMonitorId))
                 {
-                    g_Settings.GetOrCreateMonitorConfig(g_Settings.mainMonitorId).controlMode = 0;
+                    auto& mainCfg = g_Settings.GetOrCreateMonitorConfig(g_Settings.mainMonitorId);
+                    mainCfg.controlMode = 0;
+                    if (mainCfg.trayPercentageMode == 3)
+                    {
+                        mainCfg.trayPercentageMode = 0; // Follow Windows
+                    }
                 }
                 g_MonitorManager.UpdateFnSyncListener();
                 PopulateMonitorsSelectionList();
@@ -964,6 +970,17 @@ namespace winrt::BrightnessApp::implementation
             SyncLaptopFnKeysStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
             g_MonitorManager.UpdateFnSyncListener();
             ApplyAndSave();
+        });
+
+        // Show Separate Monitors in Multi-Monitor Flyout
+        ShowSeparateInMultiFlyoutToggle().Toggled([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            bool on = ShowSeparateInMultiFlyoutToggle().IsOn();
+            g_Settings.showSeparateInMultiFlyout = on;
+            ShowSeparateInMultiFlyoutStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+            ApplyAndSave();
+            g_FlyoutWindow.RefreshOnDisplayChange();
         });
 
         // Config Monitor Selector ComboBox
@@ -1008,6 +1025,10 @@ namespace winrt::BrightnessApp::implementation
             cfg.controlMode = (idx == 1) ? 1 : 0;
             if (prevMode != 1 && cfg.controlMode == 1)
             {
+                if (cfg.trayPercentageMode == 3)
+                {
+                    cfg.trayPercentageMode = 0; // Follow Windows
+                }
                 for (const auto& kv : g_Settings.monitorConfigs)
                 {
                     if (_wcsicmp(kv.first.c_str(), m_selectedConfigMonitorId.c_str()) == 0) continue;
@@ -1065,17 +1086,6 @@ namespace winrt::BrightnessApp::implementation
             bool on = SyncOverscrollMinToggle().IsOn();
             g_Settings.GetOrCreateMonitorConfig(m_selectedConfigMonitorId).syncOverscrollMin = on;
             SyncOverscrollMinStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
-            ApplyAndSave();
-        });
-
-        // Sync-mode Separate Tray Icon Toggle
-        SyncSeparateTrayIconToggle().Toggled([this](auto&&, auto&&)
-        {
-            if (m_isUpdatingUI || m_selectedConfigMonitorId.empty()) return;
-            auto& cfg = g_Settings.GetOrCreateMonitorConfig(m_selectedConfigMonitorId);
-            cfg.syncSeparateTrayIcon = SyncSeparateTrayIconToggle().IsOn();
-            SyncSeparateTrayIconStatusText().Text(cfg.syncSeparateTrayIcon ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
-            TrayAppearanceCustomSection().Visibility(cfg.syncSeparateTrayIcon ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
             ApplyAndSave();
         });
 
@@ -1464,10 +1474,10 @@ namespace winrt::BrightnessApp::implementation
             if (oTheme >= 0 && oTheme <= 2)
             {
                 g_Settings.overlayTheme = oTheme;
+                ApplyAndSave();
                 g_OverlayWindow.OnThemeChanged();
                 g_FlyoutWindow.OnThemeChanged();
                 g_TrayIcon.OnThemeChanged();
-                ApplyAndSave();
             }
         });
 
@@ -1494,10 +1504,16 @@ namespace winrt::BrightnessApp::implementation
             ApplyAndSave();
         });
 
-        // Overlay Use Windows Accent Color Toggle
+        // Overlay Use Windows Accent Color & Dual Colors Toggle
         auto updateOverlayAccentUI = [this](bool useWinAccent)
         {
-            OverlayAccentColorCard().Visibility(useWinAccent ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible);
+            auto vis = useWinAccent ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible;
+            OverlayAccentColorCard().Visibility(vis);
+            OverlayDualColorCard().Visibility(vis);
+            OverlayDarkColorCard().Visibility((!useWinAccent && g_Settings.overlayUseDualColors) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+            OverlayCustomAccentTitleText().Text(g_Settings.overlayUseDualColors
+                ? g_Loc.Get(L"Opt_TrayIconColorLight", L"Light Mode Color")
+                : g_Loc.Get(L"Opt_OverlayCustomAccent", L"Custom Accent Color"));
         };
 
         OverlayUseWindowsAccentToggle().Toggled([this, updateOverlayAccentUI](auto&&, auto&&)
@@ -1511,20 +1527,39 @@ namespace winrt::BrightnessApp::implementation
             g_OverlayWindow.OnThemeChanged();
         });
 
-        // Tray Percentage Icon Mode ComboBox (0 = Follow Windows, 1 = Colored, 2 = Disabled)
+        OverlayDualColorToggle().Toggled([this, updateOverlayAccentUI](auto&&, auto&&)
+        {
+            bool on = OverlayDualColorToggle().IsOn();
+            OverlayDualColorStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+            if (m_isUpdatingUI) return;
+            g_Settings.overlayUseDualColors = on;
+            updateOverlayAccentUI(g_Settings.overlayUseWindowsAccent);
+            ApplyAndSave();
+            g_OverlayWindow.OnThemeChanged();
+        });
+
+        // Tray Percentage Icon Mode ComboBox (0 = Follow Windows, 1 = Colored, 2 = Disabled, 3 = Hide)
         TrayPercentageModeComboBox().SelectionChanged([this](auto&&, auto&&)
         {
             if (m_isUpdatingUI) return;
             int idx = TrayPercentageModeComboBox().SelectedIndex();
-            if (idx >= 0 && idx <= 2)
+            bool isMain = (_wcsicmp(m_selectedConfigMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
+            if (isMain && idx == 3)
+            {
+                idx = 0;
+                m_isUpdatingUI = true;
+                TrayPercentageModeComboBox().SelectedIndex(0);
+                m_isUpdatingUI = false;
+            }
+            if (idx >= 0 && idx <= 3)
             {
                 g_Settings.trayPercentageMode = idx;
                 TrayIconColorCard().Visibility(idx == 1 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
                 TrayIconDualColorCard().Visibility(idx == 1 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
                 TrayIconDarkColorCard().Visibility((idx == 1 && g_Settings.trayIconUseDualColors) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
-                TrayTypographyPanel().Visibility(idx != 2 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
-                g_TrayIcon.OnThemeChanged();
+                TrayTypographyPanel().Visibility((idx == 0 || idx == 1) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
                 ApplyAndSave();
+                g_TrayIcon.OnThemeChanged();
             }
         });
 
@@ -1537,8 +1572,8 @@ namespace winrt::BrightnessApp::implementation
             if (m_isUpdatingUI) return;
             g_Settings.trayIconUseDualColors = on;
             TrayIconDarkColorCard().Visibility((g_Settings.trayPercentageMode == 1 && on) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
-            g_TrayIcon.OnThemeChanged();
             ApplyAndSave();
+            g_TrayIcon.OnThemeChanged();
         });
 
         // Tray Font ComboBox
@@ -1549,8 +1584,8 @@ namespace winrt::BrightnessApp::implementation
             {
                 auto selectedFont = unbox_value<hstring>(TrayFontComboBox().SelectedItem());
                 g_Settings.trayFont = selectedFont.c_str();
-                g_TrayIcon.OnThemeChanged();
                 ApplyAndSave();
+                g_TrayIcon.OnThemeChanged();
             }
         });
 
@@ -1563,8 +1598,8 @@ namespace winrt::BrightnessApp::implementation
             TrayFontWeightNumberBox().Value(val);
             m_isUpdatingUI = false;
             g_Settings.trayFontWeight = val;
-            g_TrayIcon.OnThemeChanged();
             ApplyAndSave();
+            g_TrayIcon.OnThemeChanged();
         });
 
         TrayFontWeightNumberBox().ValueChanged([this](auto&&, winrt::Microsoft::UI::Xaml::Controls::NumberBoxValueChangedEventArgs const& e)
@@ -1577,8 +1612,8 @@ namespace winrt::BrightnessApp::implementation
             TrayFontWeightSlider().Value(val);
             m_isUpdatingUI = false;
             g_Settings.trayFontWeight = val;
-            g_TrayIcon.OnThemeChanged();
             ApplyAndSave();
+            g_TrayIcon.OnThemeChanged();
         });
 
         // Tray Font Size Slider <-> NumberBox synchronization
@@ -1590,8 +1625,8 @@ namespace winrt::BrightnessApp::implementation
             TrayFontSizeNumberBox().Value(val);
             m_isUpdatingUI = false;
             g_Settings.trayFontSize = val;
-            g_TrayIcon.OnThemeChanged();
             ApplyAndSave();
+            g_TrayIcon.OnThemeChanged();
         });
 
         TrayFontSizeNumberBox().ValueChanged([this](auto&&, auto&&)
@@ -1602,8 +1637,8 @@ namespace winrt::BrightnessApp::implementation
             TrayFontSizeSlider().Value(val);
             m_isUpdatingUI = false;
             g_Settings.trayFontSize = val;
-            g_TrayIcon.OnThemeChanged();
             ApplyAndSave();
+            g_TrayIcon.OnThemeChanged();
         });
 
         // Tray Font Size 100 Slider <-> NumberBox synchronization
@@ -1615,8 +1650,8 @@ namespace winrt::BrightnessApp::implementation
             TrayFontSize100NumberBox().Value(val);
             m_isUpdatingUI = false;
             g_Settings.trayFontSize100 = val;
-            g_TrayIcon.OnThemeChanged();
             ApplyAndSave();
+            g_TrayIcon.OnThemeChanged();
         });
 
         TrayFontSize100NumberBox().ValueChanged([this](auto&&, auto&&)
@@ -1627,8 +1662,8 @@ namespace winrt::BrightnessApp::implementation
             TrayFontSize100Slider().Value(val);
             m_isUpdatingUI = false;
             g_Settings.trayFontSize100 = val;
-            g_TrayIcon.OnThemeChanged();
             ApplyAndSave();
+            g_TrayIcon.OnThemeChanged();
         });
 
         // Tray Y Offset Slider & TextBox sync
@@ -1641,8 +1676,8 @@ namespace winrt::BrightnessApp::implementation
             m_isUpdatingUI = true;
             TrayYOffsetTextBox().Text(AppSettings::FormatYOffset(val, g_Settings.trayYOffsetUseComma));
             m_isUpdatingUI = false;
-            g_TrayIcon.OnThemeChanged();
             ApplyAndSave();
+            g_TrayIcon.OnThemeChanged();
         });
 
         TrayYOffsetTextBox().TextChanged([this](auto&&, auto&&)
@@ -1656,8 +1691,8 @@ namespace winrt::BrightnessApp::implementation
             m_isUpdatingUI = true;
             TrayYOffsetSlider().Value(val);
             m_isUpdatingUI = false;
-            g_TrayIcon.OnThemeChanged();
             ApplyAndSave();
+            g_TrayIcon.OnThemeChanged();
         });
 
         // Tray Wheel Toggle
@@ -1809,7 +1844,13 @@ namespace winrt::BrightnessApp::implementation
         // Flyout Use Windows Accent Color Toggle
         auto updateFlyoutAccentUI = [this](bool useWinAccent)
         {
-            FlyoutAccentColorCard().Visibility(useWinAccent ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible);
+            auto vis = useWinAccent ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible;
+            FlyoutAccentColorCard().Visibility(vis);
+            FlyoutDualColorCard().Visibility(vis);
+            FlyoutDarkColorCard().Visibility((!useWinAccent && g_Settings.flyoutUseDualColors) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+            FlyoutCustomAccentTitleText().Text(g_Settings.flyoutUseDualColors
+                ? g_Loc.Get(L"Opt_TrayIconColorLight", L"Light Mode Color")
+                : g_Loc.Get(L"Opt_FlyoutCustomAccent", L"Custom Accent Color"));
         };
 
         // Flyout Scroll Enabled Toggle
@@ -1927,6 +1968,17 @@ namespace winrt::BrightnessApp::implementation
             g_FlyoutWindow.OnThemeChanged();
         });
 
+        FlyoutDualColorToggle().Toggled([this, updateFlyoutAccentUI](auto&&, auto&&)
+        {
+            bool on = FlyoutDualColorToggle().IsOn();
+            FlyoutDualColorStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+            if (m_isUpdatingUI) return;
+            g_Settings.flyoutUseDualColors = on;
+            updateFlyoutAccentUI(g_Settings.flyoutUseWindowsAccent);
+            ApplyAndSave();
+            g_FlyoutWindow.OnThemeChanged();
+        });
+
         // Color Control Helper
         auto setupColorControl = [this](
             winrt::Microsoft::UI::Xaml::Controls::ColorPicker const& picker,
@@ -1974,9 +2026,15 @@ namespace winrt::BrightnessApp::implementation
         setupColorControl(OverlayAccentColorPicker(), OverlayAccentColorTextBox(), OverlayAccentColorPreview(), g_Settings.overlayAccentColor, []() {
             g_OverlayWindow.OnThemeChanged();
         });
+        setupColorControl(OverlayDarkColorPicker(), OverlayDarkColorTextBox(), OverlayDarkColorPreview(), g_Settings.overlayAccentColorDark, []() {
+            g_OverlayWindow.OnThemeChanged();
+        });
 
         // Flyout Accent Color
         setupColorControl(FlyoutAccentColorPicker(), FlyoutAccentColorTextBox(), FlyoutAccentColorPreview(), g_Settings.flyoutAccentColor, []() {
+            g_FlyoutWindow.OnThemeChanged();
+        });
+        setupColorControl(FlyoutDarkColorPicker(), FlyoutDarkColorTextBox(), FlyoutDarkColorPreview(), g_Settings.flyoutAccentColorDark, []() {
             g_FlyoutWindow.OnThemeChanged();
         });
 
@@ -2031,8 +2089,12 @@ namespace winrt::BrightnessApp::implementation
             g_Settings.overlayTimeoutMs = 2000;
             g_Settings.overlayUseWindowsAccent = true;
             g_Settings.overlayAccentColor = RGB(0, 120, 212);
+            g_Settings.overlayUseDualColors = false;
+            g_Settings.overlayAccentColorDark = RGB(96, 205, 255);
             g_Settings.flyoutUseWindowsAccent = true;
             g_Settings.flyoutAccentColor = RGB(0, 120, 212);
+            g_Settings.flyoutUseDualColors = false;
+            g_Settings.flyoutAccentColorDark = RGB(96, 205, 255);
             g_Settings.flyoutScrollEnabled = true;
             g_Settings.flyoutScrollStep = 5;
             g_Settings.flyoutKeyboardEnabled = false;
@@ -2062,6 +2124,7 @@ namespace winrt::BrightnessApp::implementation
             g_Settings.language = L"default";
             g_Settings.selectedMonitors = L"all";
             g_Settings.syncExternalWithLaptopFnKeys = false;
+            g_Settings.showSeparateInMultiFlyout = true;
             for (auto& [monId, cfg] : g_Settings.monitorConfigs)
             {
                 cfg.enabled = true;
@@ -2070,6 +2133,10 @@ namespace winrt::BrightnessApp::implementation
                 cfg.syncOverscrollMax = true;
                 cfg.syncOverscrollMin = true;
                 g_Settings.CopyCustomizationToMonitor(cfg);
+                if (!g_Settings.mainMonitorId.empty() && _wcsicmp(monId.c_str(), g_Settings.mainMonitorId.c_str()) != 0)
+                {
+                    cfg.trayPercentageMode = 3;
+                }
             }
             g_MonitorManager.UpdateFnSyncListener();
             g_Loc.SetLanguage(L"default");
@@ -2354,6 +2421,8 @@ namespace winrt::BrightnessApp::implementation
         SyncLaptopFnKeysCard().Visibility(isMainInternal ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         SyncLaptopFnKeysToggle().IsOn(g_Settings.syncExternalWithLaptopFnKeys);
         SyncLaptopFnKeysStatusText().Text(g_Settings.syncExternalWithLaptopFnKeys ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+        ShowSeparateInMultiFlyoutToggle().IsOn(g_Settings.showSeparateInMultiFlyout);
+        ShowSeparateInMultiFlyoutStatusText().Text(g_Settings.showSeparateInMultiFlyout ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
 
         m_isUpdatingUI = prevUpdating;
     }
@@ -2428,8 +2497,9 @@ namespace winrt::BrightnessApp::implementation
 
         ShortcutsCustomSection().Visibility(showShortcuts ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         OsdAccentCustomSection().Visibility(showOsd ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
-        SyncSeparateTrayIconSection().Visibility((showTray && isSyncNonMain) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
-        TrayAppearanceCustomSection().Visibility((showTray && (!isSyncNonMain || (cfg && cfg->syncSeparateTrayIcon))) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        TrayAppearanceCustomSection().Visibility(showTray ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        TrayPctHideItem().Visibility(isMain ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible);
+        TrayPctHideItem().IsEnabled(!isMain);
         TrayWheelCustomSection().Visibility((showTray && !isSyncNonMain) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         FlyoutBehaviorCustomSection().Visibility((showFlyout && !isSyncNonMain) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         FlyoutAccentCustomSection().Visibility(showFlyout ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
@@ -2439,6 +2509,7 @@ namespace winrt::BrightnessApp::implementation
             hostChildren.Clear();
             m_monitorsSubpageView.Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
             hostChildren.Append(m_monitorsSubpageView);
+            SettingsScrollViewer().ChangeView(nullptr, 0.0, nullptr, true);
         }
     }
 
@@ -2498,6 +2569,7 @@ namespace winrt::BrightnessApp::implementation
             hostChildren.Clear();
             m_timingsSubpageView.Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
             hostChildren.Append(m_timingsSubpageView);
+            SettingsScrollViewer().ChangeView(nullptr, 0.0, nullptr, true);
         }
     }
 
@@ -2524,6 +2596,10 @@ namespace winrt::BrightnessApp::implementation
         {
             g_Settings.GetOrCreateMonitorConfig(m_selectedConfigMonitorId).controlMode = 0;
         }
+        if (isMain && cfg->trayPercentageMode == 3)
+        {
+            g_Settings.GetOrCreateMonitorConfig(m_selectedConfigMonitorId).trayPercentageMode = 0;
+        }
 
         MonitorEnabledToggle().IsOn(cfg->enabled);
         MonitorEnabledStatusText().Text(cfg->enabled ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
@@ -2532,10 +2608,11 @@ namespace winrt::BrightnessApp::implementation
         MonitorControlModeComboBox().IsEnabled(!isMain);
         MonitorControlModeComboBox().SelectedIndex((isMain || cfg->controlMode == 0) ? 0 : 1);
 
+        bool isSync = (isMain || cfg->controlMode == 0);
         bool isSyncNonMain = (!isMain && cfg->controlMode == 0);
         MonitorOffsetCard().Visibility(isSyncNonMain ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
-        SyncOverscrollMaxCard().Visibility(isSyncNonMain ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
-        SyncOverscrollMinCard().Visibility(isSyncNonMain ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        SyncOverscrollMaxCard().Visibility(isSync ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        SyncOverscrollMinCard().Visibility(isSync ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         MonitorSyncNoticeBanner().Visibility(isSyncNonMain ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         MonitorsShortcutsCard().Visibility(isSyncNonMain ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible);
 
@@ -2547,8 +2624,6 @@ namespace winrt::BrightnessApp::implementation
         SyncOverscrollMaxStatusText().Text(cfg->syncOverscrollMax ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
         SyncOverscrollMinToggle().IsOn(cfg->syncOverscrollMin);
         SyncOverscrollMinStatusText().Text(cfg->syncOverscrollMin ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
-        SyncSeparateTrayIconToggle().IsOn(cfg->syncSeparateTrayIcon);
-        SyncSeparateTrayIconStatusText().Text(cfg->syncSeparateTrayIcon ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
 
         g_Settings.ApplyMonitorCustomizationToLegacy(*cfg);
         m_isUpdatingUI = prevUpdating;
@@ -2663,6 +2738,8 @@ namespace winrt::BrightnessApp::implementation
         MainMonitorDescText().Text(g_Loc.Get(L"Desc_MainMonitor", L"Primary reference display used for brightness offsets and Sync mode"));
         SyncLaptopFnKeysTitleText().Text(g_Loc.Get(L"Opt_SyncLaptopFnKeys", L"Sync External Monitors with Laptop Fn Keys"));
         SyncLaptopFnKeysDescText().Text(g_Loc.Get(L"Desc_SyncLaptopFnKeys", L"Automatically sync external Sync-mode monitors when adjusting internal display brightness via laptop Fn keys"));
+        ShowSeparateInMultiFlyoutTitleText().Text(g_Loc.Get(L"Opt_ShowSeparateInMultiFlyout", L"Show Separate Monitors in Multi-Monitor Flyout"));
+        ShowSeparateInMultiFlyoutDescText().Text(g_Loc.Get(L"Desc_ShowSeparateInMultiFlyout", L"Include Separate-mode displays with their individual preset buttons in the main multi-monitor flyout"));
         MonitorConfigSectionTitle().Text(g_Loc.Get(L"Sec_MonitorConfig", L"Display Configuration"));
         ConfigMonitorSelectTitleText().Text(g_Loc.Get(L"Opt_ConfigMonitor", L"Selected Display"));
         ConfigMonitorSelectDescText().Text(g_Loc.Get(L"Desc_ConfigMonitor", L"Choose a detected display to configure its mode, name, and controls"));
@@ -2680,9 +2757,6 @@ namespace winrt::BrightnessApp::implementation
         SyncOverscrollMaxDescText().Text(g_Loc.Get(L"Desc_SyncOverscrollMax", L"Continue increasing other synced displays even when at least one synced display is already at 100%"));
         SyncOverscrollMinTitleText().Text(g_Loc.Get(L"Opt_SyncOverscrollMin", L"Overscroll when a display is at 0%"));
         SyncOverscrollMinDescText().Text(g_Loc.Get(L"Desc_SyncOverscrollMin", L"Continue decreasing other synced displays even when at least one synced display is already at 0%"));
-        SyncTraySectionTitle().Text(g_Loc.Get(L"Sec_TrayAppearance", L"System Tray Icon"));
-        SyncSeparateTrayIconTitleText().Text(g_Loc.Get(L"Opt_SyncSeparateTrayIcon", L"Separate Tray Icon"));
-        SyncSeparateTrayIconDescText().Text(g_Loc.Get(L"Desc_SyncSeparateTrayIcon", L"Show a dedicated system tray brightness icon for this Sync-mode display"));
         MonitorSyncNoticeText().Text(g_Loc.Get(L"Monitor_SyncNotice", L"This display is in Sync mode and uses the Main Display's shortcuts and wheel controls. You can customize its OSD color, Flyout color, and optional tray icon below."));
 
         TimingsHeaderTitle().Text(g_Loc.Get(L"Timings_Title", L"Timings & Global"));
@@ -2786,11 +2860,12 @@ namespace winrt::BrightnessApp::implementation
 
         // System Tray
         TrayAppearanceSectionTitle().Text(g_Loc.Get(L"Sec_TrayAppearance", L"System Tray Icon"));
-        TrayShowPercentageTitleText().Text(g_Loc.Get(L"Opt_TrayShowPercentage", L"Percentage Icon"));
+        TrayShowPercentageTitleText().Text(g_Loc.Get(L"Opt_TrayShowPercentage", L"Tray Icon"));
         TrayShowPercentageDescText().Text(g_Loc.Get(L"Desc_TrayShowPercentage", L"Choose how the brightness percentage is displayed on the system tray icon"));
         TrayPctFollowWindowsItem().Content(box_value(g_Loc.Get(L"Opt_TrayPctFollowWindows", L"Follow Windows")));
         TrayPctColoredItem().Content(box_value(g_Loc.Get(L"Opt_TrayPctColored", L"Colored")));
         TrayPctDisabledItem().Content(box_value(g_Loc.Get(L"Opt_TrayPctDisabled", L"Disabled")));
+        TrayPctHideItem().Content(box_value(g_Loc.Get(L"Opt_TrayPctHide", L"Hide")));
         TrayIconColorTitleText().Text(TrayIconDualColorToggle().IsOn() ? g_Loc.Get(L"Opt_TrayIconColorLight", L"Light Mode Color") : g_Loc.Get(L"Opt_TrayIconColor", L"Icon Color"));
         TrayIconColorDescText().Text(g_Loc.Get(L"Desc_TrayIconColor", L"Custom color for the system tray percentage text"));
         TrayIconDualColorTitleText().Text(g_Loc.Get(L"Opt_TrayIconDualColor", L"Separate Dark & Light Colors"));
@@ -3222,10 +3297,21 @@ namespace winrt::BrightnessApp::implementation
 
         OverlayUseWindowsAccentToggle().IsOn(g_Settings.overlayUseWindowsAccent);
         OverlayUseWindowsAccentStatusText().Text(g_Settings.overlayUseWindowsAccent ? L"On" : L"Off");
+        OverlayDualColorToggle().IsOn(g_Settings.overlayUseDualColors);
+        OverlayDualColorStatusText().Text(g_Settings.overlayUseDualColors ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
         OverlayAccentColorCard().Visibility(g_Settings.overlayUseWindowsAccent ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible);
+        OverlayDualColorCard().Visibility(g_Settings.overlayUseWindowsAccent ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible);
+        OverlayDarkColorCard().Visibility((!g_Settings.overlayUseWindowsAccent && g_Settings.overlayUseDualColors) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        OverlayCustomAccentTitleText().Text(g_Settings.overlayUseDualColors
+            ? g_Loc.Get(L"Opt_TrayIconColorLight", L"Light Mode Color")
+            : g_Loc.Get(L"Opt_OverlayCustomAccent", L"Custom Accent Color"));
 
         // Tray Percentage Icon Mode
-        int pctMode = (g_Settings.trayPercentageMode >= 0 && g_Settings.trayPercentageMode <= 2) ? g_Settings.trayPercentageMode : 0;
+        bool isMain = (_wcsicmp(m_selectedConfigMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
+        int pctMode = (g_Settings.trayPercentageMode >= 0 && g_Settings.trayPercentageMode <= 3) ? g_Settings.trayPercentageMode : 0;
+        if (isMain && pctMode == 3) pctMode = 0;
+        TrayPctHideItem().Visibility(isMain ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible);
+        TrayPctHideItem().IsEnabled(!isMain);
         TrayPercentageModeComboBox().SelectedIndex(pctMode);
         TrayIconDualColorToggle().IsOn(g_Settings.trayIconUseDualColors);
         TrayIconDualColorStatusText().Text(g_Settings.trayIconUseDualColors ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
@@ -3233,7 +3319,7 @@ namespace winrt::BrightnessApp::implementation
         TrayIconColorCard().Visibility(pctMode == 1 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         TrayIconDualColorCard().Visibility(pctMode == 1 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         TrayIconDarkColorCard().Visibility((pctMode == 1 && g_Settings.trayIconUseDualColors) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
-        TrayTypographyPanel().Visibility(pctMode != 2 ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        TrayTypographyPanel().Visibility((pctMode == 0 || pctMode == 1) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
 
         // Tray Font Weight
         int weightVal = (std::clamp)(g_Settings.trayFontWeight, 100, 900);
@@ -3337,13 +3423,22 @@ namespace winrt::BrightnessApp::implementation
 
         // Accent Colors
         loadColorToUI(OverlayAccentColorPicker(), OverlayAccentColorTextBox(), OverlayAccentColorPreview(), g_Settings.overlayAccentColor);
+        loadColorToUI(OverlayDarkColorPicker(), OverlayDarkColorTextBox(), OverlayDarkColorPreview(), g_Settings.overlayAccentColorDark);
         loadColorToUI(TrayIconColorPicker(), TrayIconColorTextBox(), TrayIconColorPreview(), g_Settings.trayIconColor);
         loadColorToUI(TrayIconDarkColorPicker(), TrayIconDarkColorTextBox(), TrayIconDarkColorPreview(), g_Settings.trayIconColorDark);
 
         FlyoutUseWindowsAccentToggle().IsOn(g_Settings.flyoutUseWindowsAccent);
         FlyoutUseWindowsAccentStatusText().Text(g_Settings.flyoutUseWindowsAccent ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+        FlyoutDualColorToggle().IsOn(g_Settings.flyoutUseDualColors);
+        FlyoutDualColorStatusText().Text(g_Settings.flyoutUseDualColors ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
         FlyoutAccentColorCard().Visibility(g_Settings.flyoutUseWindowsAccent ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible);
+        FlyoutDualColorCard().Visibility(g_Settings.flyoutUseWindowsAccent ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible);
+        FlyoutDarkColorCard().Visibility((!g_Settings.flyoutUseWindowsAccent && g_Settings.flyoutUseDualColors) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        FlyoutCustomAccentTitleText().Text(g_Settings.flyoutUseDualColors
+            ? g_Loc.Get(L"Opt_TrayIconColorLight", L"Light Mode Color")
+            : g_Loc.Get(L"Opt_FlyoutCustomAccent", L"Custom Accent Color"));
         loadColorToUI(FlyoutAccentColorPicker(), FlyoutAccentColorTextBox(), FlyoutAccentColorPreview(), g_Settings.flyoutAccentColor);
+        loadColorToUI(FlyoutDarkColorPicker(), FlyoutDarkColorTextBox(), FlyoutDarkColorPreview(), g_Settings.flyoutAccentColorDark);
 
         FlyoutScrollEnabledToggle().IsOn(g_Settings.flyoutScrollEnabled);
         FlyoutScrollEnabledStatusText().Text(g_Settings.flyoutScrollEnabled ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));

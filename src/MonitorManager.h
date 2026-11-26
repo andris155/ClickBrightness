@@ -51,6 +51,7 @@ public:
     int GetMonitorBrightnessById(const std::wstring& monitorId);
     int GetTargetControlBrightness(const std::wstring& targetMonitorId);
     void GetTargetBounds(const std::wstring& targetMonitorId, int& outMin, int& outMax) const;
+    int GetEffectiveSyncedBrightness(const std::wstring& monitorId, int baseBrightness) const;
     int GetCachedBrightness() const {
         std::lock_guard<std::mutex> lock(m_mutex);
         return m_cachedBrightness;
@@ -77,6 +78,8 @@ private:
     void WorkerLoop();
     void StartWorkerThread();
     void StopWorkerThread();
+    void GetSyncFirstHitBoundsLocked(int& outFirstHit100, int& outFirstHit0) const;
+    int GetEffectiveSyncedBrightnessLocked(const std::wstring& monitorId, int baseBrightness) const;
 
     mutable std::mutex m_mutex;
     std::vector<PHYSICAL_MONITOR> m_rawMonitors;

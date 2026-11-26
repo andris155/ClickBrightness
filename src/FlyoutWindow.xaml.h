@@ -16,6 +16,7 @@ namespace winrt::BrightnessApp::implementation
         void SetTargetMonitor(const std::wstring& targetMonitorId) { m_targetMonitorId = targetMonitorId; }
         const std::wstring& GetTargetMonitor() const { return m_targetMonitorId; }
         void Prewarm();
+        void RefreshLayoutInPlace();
         void ShowWindow(const POINT* pTrayPos);
         void HideWindow();
         void DestroyWindow();

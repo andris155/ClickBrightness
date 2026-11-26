@@ -17,7 +17,6 @@ struct MonitorControlConfig {
     int offset = 0;      // -100 to +100 relative to Main Display when Sync
     bool syncOverscrollMax = true;     // Allow overscrolling when a synced display is already at 100%
     bool syncOverscrollMin = true;     // Allow overscrolling when a synced display is already at 0%
-    bool syncSeparateTrayIcon = false; // If true, Sync monitor also displays its own tray percentage icon
 
     // Shortcuts (without timings)
     bool hotkeyAdjustEnabled = false;
@@ -47,9 +46,11 @@ struct MonitorControlConfig {
     // OSD (without theme/timings)
     bool overlayUseWindowsAccent = true;
     COLORREF overlayAccentColor = RGB(0, 120, 212);
+    bool overlayUseDualColors = false;
+    COLORREF overlayAccentColorDark = RGB(96, 205, 255);
 
     // Tray (without timings)
-    int trayPercentageMode = 0; // 0 = Follow Windows, 1 = Colored, 2 = Disabled
+    int trayPercentageMode = 0; // 0 = Follow Windows, 1 = Colored, 2 = Disabled, 3 = Hide
     COLORREF trayIconColor = RGB(0, 120, 212);
     bool trayIconUseDualColors = false;
     COLORREF trayIconColorDark = RGB(96, 205, 255);
@@ -71,6 +72,8 @@ struct MonitorControlConfig {
     // Flyout (without timings/keyboard toggle)
     bool flyoutUseWindowsAccent = true;
     COLORREF flyoutAccentColor = RGB(0, 120, 212);
+    bool flyoutUseDualColors = false;
+    COLORREF flyoutAccentColorDark = RGB(96, 205, 255);
     bool flyoutScrollEnabled = true;
     int flyoutScrollStep = 5;
 
@@ -124,7 +127,7 @@ struct AppSettings {
     int hotkeyRepeatIntervalMs = 90;   // Default: 90 ms (~11 steps/sec, ~1.8s for 0-100% with step=5)
 
     // Tray Appearance
-    int trayPercentageMode = 0;                        // 0 = Follow Windows, 1 = Colored, 2 = Disabled
+    int trayPercentageMode = 0;                        // 0 = Follow Windows, 1 = Colored, 2 = Disabled, 3 = Hide
     COLORREF trayIconColor = RGB(0, 120, 212);         // Default: #0078D4 (used when trayPercentageMode == 1)
     bool trayIconUseDualColors = false;                // Default: OFF (Separate color for dark taskbar)
     COLORREF trayIconColorDark = RGB(96, 205, 255);    // Default: #60CDFF (used on dark taskbar when dual colors ON)
@@ -162,6 +165,7 @@ struct AppSettings {
     // Multi-Monitor Sync & Separate Configuration
     std::wstring mainMonitorId;
     bool syncExternalWithLaptopFnKeys = false; // Default: OFF
+    bool showSeparateInMultiFlyout = true;     // Default: ON
     std::map<std::wstring, MonitorControlConfig> monitorConfigs;
 
     // OSD & Tray Menu Theme (0 = Follow Windows (system), 1 = Dark, 2 = Light)
@@ -169,10 +173,14 @@ struct AppSettings {
     int overlayTimeoutMs = 2000;             // Default: 2000 ms (2 seconds)
     bool overlayUseWindowsAccent = true;     // Default: Use Windows accent color
     COLORREF overlayAccentColor = RGB(0, 120, 212); // Default: #0078D4
+    bool overlayUseDualColors = false;
+    COLORREF overlayAccentColorDark = RGB(96, 205, 255); // Default: #60CDFF
 
     // Flyout Settings - Accent Color & Debounce
     bool flyoutUseWindowsAccent = true;      // Default: Use Windows accent color
     COLORREF flyoutAccentColor = RGB(0, 120, 212);  // Default: #0078D4
+    bool flyoutUseDualColors = false;
+    COLORREF flyoutAccentColorDark = RGB(96, 205, 255); // Default: #60CDFF
     bool flyoutScrollEnabled = true;         // Default: ON
     int flyoutScrollStep = 5;                // Default: 5%
     bool flyoutKeyboardEnabled = false;      // Default: OFF (Keyboard buttons support: Up/Down arrow, Page Up/Down, Home/End)

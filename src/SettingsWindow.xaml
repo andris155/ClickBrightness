@@ -96,7 +96,7 @@
             </NavigationView.FooterMenuItems>
 
             <NavigationView.Content>
-                <ScrollViewer Padding="24,4,24,16" VerticalScrollBarVisibility="Visible">
+                <ScrollViewer x:Name="SettingsScrollViewer" Padding="24,4,24,16" VerticalScrollBarVisibility="Visible">
                     <Grid x:Name="SubmenuContainer" MaxWidth="680" HorizontalAlignment="Stretch">
                         <Grid.ChildrenTransitions>
                             <TransitionCollection>
@@ -341,6 +341,29 @@
                                 </Grid>
                             </Border>
 
+                            <!-- Show Separate Monitors in Multi-Monitor Flyout -->
+                            <Border x:Name="ShowSeparateInMultiFlyoutCard"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE7F4;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="ShowSeparateInMultiFlyoutTitleText" Text="Show Separate Monitors in Multi-Monitor Flyout" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="ShowSeparateInMultiFlyoutDescText" Text="Include Separate-mode displays with their individual preset buttons in the main multi-monitor flyout" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <TextBlock x:Name="ShowSeparateInMultiFlyoutStatusText" Text="On" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                                        <ToggleSwitch x:Name="ShowSeparateInMultiFlyoutToggle" MinWidth="0" OnContent="" OffContent="" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
                             <!-- Section: Per-Monitor Configuration -->
                             <TextBlock x:Name="MonitorConfigSectionTitle" Text="Display Configuration" FontSize="14" FontWeight="SemiBold" Margin="0,18,0,6"/>
 
@@ -500,10 +523,14 @@
                                     Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                     BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,6,0,4">
-                                <StackPanel Orientation="Horizontal" Spacing="12">
-                                    <FontIcon Glyph="&#xE946;" FontSize="16" VerticalAlignment="Center" Foreground="{ThemeResource AccentAAFillColorDefaultBrush}"/>
-                                    <TextBlock x:Name="MonitorSyncNoticeText" Text="This display is in Sync mode and uses the Main Display's shortcuts and wheel controls. You can customize its OSD color, Flyout color, and optional tray icon below." FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                                </StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE946;" FontSize="16" Margin="0,0,12,0" VerticalAlignment="Center" Foreground="{ThemeResource AccentAAFillColorDefaultBrush}"/>
+                                    <TextBlock x:Name="MonitorSyncNoticeText" Grid.Column="1" Text="This display is in Sync mode and uses the Main Display's shortcuts and wheel controls. You can customize its OSD color, Flyout color, and optional tray icon below." FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                </Grid>
                             </Border>
 
                             <!-- Windows Settings-style Submenu Navigation Cards -->
@@ -1029,31 +1056,57 @@
                                 </Grid>
                             </Border>
 
-                            </StackPanel>
+                            <!-- Separate Dark & Light Colors Toggle (Overlay) -->
+                            <Border x:Name="OverlayDualColorCard" Visibility="Collapsed" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE708;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="OverlayDualColorTitleText" Text="Separate Dark &amp; Light Colors" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="OverlayDualColorDescText" Text="Use a different overlay accent color when OSD is in dark mode" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <TextBlock x:Name="OverlayDualColorStatusText" Text="Off" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                                        <ToggleSwitch x:Name="OverlayDualColorToggle" MinWidth="0" OnContent="" OffContent="" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
 
-                            <!-- Sync Mode Separate Tray Icon Toggle -->
-                            <StackPanel x:Name="SyncSeparateTrayIconSection" Spacing="0" Visibility="Collapsed">
-                                <TextBlock x:Name="SyncTraySectionTitle" Text="System Tray Icon" FontSize="14" FontWeight="SemiBold" Margin="0,18,0,6"/>
-                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                        BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <FontIcon Glyph="&#xE718;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                                            <TextBlock x:Name="SyncSeparateTrayIconTitleText" Text="Separate Tray Icon" FontSize="14" FontWeight="Normal"/>
-                                            <TextBlock x:Name="SyncSeparateTrayIconDescText" Text="Show a dedicated system tray brightness icon for this Sync-mode display" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                            <TextBlock x:Name="SyncSeparateTrayIconStatusText" Text="Off" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
-                                            <ToggleSwitch x:Name="SyncSeparateTrayIconToggle" MinWidth="0" OnContent="" OffContent="" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Right"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
+                            <!-- Custom Dark Mode Accent Color (Overlay) -->
+                            <Border x:Name="OverlayDarkColorCard" Visibility="Collapsed" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE790;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="OverlayDarkColorTitleText" Text="Dark Mode Color" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="OverlayDarkColorDescText" Text="Custom accent color for the overlay brightness bar in dark mode" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Button x:Name="OverlayDarkColorPickerButton" Padding="0" Width="32" Height="32" CornerRadius="4" ToolTipService.ToolTip="Choose color">
+                                            <Border x:Name="OverlayDarkColorPreview" Width="24" Height="24" CornerRadius="3" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"/>
+                                            <Button.Flyout>
+                                                <Flyout Placement="Bottom">
+                                                    <ColorPicker x:Name="OverlayDarkColorPicker" IsAlphaEnabled="False" IsColorSpectrumVisible="True" IsColorChannelTextInputVisible="False"/>
+                                                </Flyout>
+                                            </Button.Flyout>
+                                        </Button>
+                                        <TextBox x:Name="OverlayDarkColorTextBox" Width="95" VerticalAlignment="Center" MaxLength="9"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
                             </StackPanel>
 
                             <StackPanel x:Name="TrayAppearanceCustomSection" Spacing="0">
@@ -1072,13 +1125,14 @@
                                     </Grid.ColumnDefinitions>
                                     <FontIcon Glyph="&#xE9D2;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                                        <TextBlock x:Name="TrayShowPercentageTitleText" Text="Percentage Icon" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="TrayShowPercentageTitleText" Text="Tray Icon" FontSize="14" FontWeight="Normal"/>
                                         <TextBlock x:Name="TrayShowPercentageDescText" Text="Choose how the brightness percentage is displayed on the system tray icon" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <ComboBox x:Name="TrayPercentageModeComboBox" Grid.Column="2" Width="210" VerticalAlignment="Center">
                                         <ComboBoxItem x:Name="TrayPctFollowWindowsItem" Content="Follow Windows"/>
                                         <ComboBoxItem x:Name="TrayPctColoredItem" Content="Colored"/>
                                         <ComboBoxItem x:Name="TrayPctDisabledItem" Content="Disabled"/>
+                                        <ComboBoxItem x:Name="TrayPctHideItem" Content="Hide"/>
                                     </ComboBox>
                                 </Grid>
                             </Border>
@@ -1522,6 +1576,57 @@
                                             </Button.Flyout>
                                         </Button>
                                         <TextBox x:Name="FlyoutAccentColorTextBox" Width="95" VerticalAlignment="Center" MaxLength="9"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Separate Dark & Light Colors Toggle (Flyout) -->
+                            <Border x:Name="FlyoutDualColorCard" Visibility="Collapsed" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE708;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="FlyoutDualColorTitleText" Text="Separate Dark &amp; Light Colors" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="FlyoutDualColorDescText" Text="Use a different flyout accent color when the flyout is in dark mode" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <TextBlock x:Name="FlyoutDualColorStatusText" Text="Off" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                                        <ToggleSwitch x:Name="FlyoutDualColorToggle" MinWidth="0" OnContent="" OffContent="" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Custom Dark Mode Accent Color (Flyout) -->
+                            <Border x:Name="FlyoutDarkColorCard" Visibility="Collapsed" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE790;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="FlyoutDarkColorTitleText" Text="Dark Mode Color" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="FlyoutDarkColorDescText" Text="Custom accent color for the flyout slider track in dark mode" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Button x:Name="FlyoutDarkColorPickerButton" Padding="0" Width="32" Height="32" CornerRadius="4" ToolTipService.ToolTip="Choose color">
+                                            <Border x:Name="FlyoutDarkColorPreview" Width="24" Height="24" CornerRadius="3" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"/>
+                                            <Button.Flyout>
+                                                <Flyout Placement="Bottom">
+                                                    <ColorPicker x:Name="FlyoutDarkColorPicker" IsAlphaEnabled="False" IsColorSpectrumVisible="True" IsColorChannelTextInputVisible="False"/>
+                                                </Flyout>
+                                            </Button.Flyout>
+                                        </Button>
+                                        <TextBox x:Name="FlyoutDarkColorTextBox" Width="95" VerticalAlignment="Center" MaxLength="9"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>

@@ -30,7 +30,7 @@ public:
 
     bool UpdateBrightness(int brightness);
     bool UpdateBrightnessForTarget(const std::wstring& targetMonitorId, int brightness);
-    void SyncExtraTrayIcons();
+    void SyncExtraTrayIcons(bool forceRefresh = false);
     std::wstring GetTargetMonitorByTrayId(UINT uId) const;
     const std::vector<ExtraTraySlot>& GetExtraSlots() const { return m_extraSlots; }
     void ShowContextMenu(UINT uId = 1);

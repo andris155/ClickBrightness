@@ -193,11 +193,17 @@ void AppSettings::Load() {
     wchar_t colBuf[64] = { 0 };
     GetPrivateProfileStringW(L"Overlay", L"AccentColor", L"#0078D4", colBuf, 64, ini.c_str());
     overlayAccentColor = ParseColor(colBuf, RGB(0, 120, 212));
+    overlayUseDualColors = (GetPrivateProfileIntW(L"Overlay", L"UseDualColors", 0, ini.c_str()) != 0);
+    GetPrivateProfileStringW(L"Overlay", L"AccentColorDark", L"#60CDFF", colBuf, 64, ini.c_str());
+    overlayAccentColorDark = ParseColor(colBuf, RGB(96, 205, 255));
 
     flyoutUseWindowsAccent = GetPrivateProfileIntW(L"Flyout", L"UseWindowsAccent", 1, ini.c_str()) != 0;
 
     GetPrivateProfileStringW(L"Flyout", L"AccentColor", L"#0078D4", colBuf, 64, ini.c_str());
     flyoutAccentColor = ParseColor(colBuf, RGB(0, 120, 212));
+    flyoutUseDualColors = (GetPrivateProfileIntW(L"Flyout", L"UseDualColors", 0, ini.c_str()) != 0);
+    GetPrivateProfileStringW(L"Flyout", L"AccentColorDark", L"#60CDFF", colBuf, 64, ini.c_str());
+    flyoutAccentColorDark = ParseColor(colBuf, RGB(96, 205, 255));
 
     flyoutScrollEnabled = (GetPrivateProfileIntW(L"Flyout", L"ScrollEnabled", 1, ini.c_str()) != 0);
     flyoutScrollStep = GetPrivateProfileIntW(L"Flyout", L"ScrollStep", 5, ini.c_str());
@@ -224,6 +230,7 @@ void AppSettings::Load() {
     GetPrivateProfileStringW(L"Monitors", L"MainId", L"", mainMonBuf, 256, ini.c_str());
     mainMonitorId = mainMonBuf;
     syncExternalWithLaptopFnKeys = (GetPrivateProfileIntW(L"Monitors", L"SyncLaptopFnKeys", 0, ini.c_str()) != 0);
+    showSeparateInMultiFlyout = (GetPrivateProfileIntW(L"Monitors", L"ShowSeparateInMultiFlyout", 1, ini.c_str()) != 0);
 
     monitorConfigs.clear();
     wchar_t cfgIdsBuf[2048] = { 0 };
@@ -252,7 +259,7 @@ void AppSettings::Load() {
         cfg.offset = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"Offset", 0, ini.c_str()), -100, 100);
         cfg.syncOverscrollMax = (GetPrivateProfileIntW(sec.c_str(), L"SyncOverscrollMax", 1, ini.c_str()) != 0);
         cfg.syncOverscrollMin = (GetPrivateProfileIntW(sec.c_str(), L"SyncOverscrollMin", 1, ini.c_str()) != 0);
-        cfg.syncSeparateTrayIcon = (GetPrivateProfileIntW(sec.c_str(), L"SyncSeparateTrayIcon", 0, ini.c_str()) != 0);
+        bool legacySyncSeparateTray = (GetPrivateProfileIntW(sec.c_str(), L"SyncSeparateTrayIcon", 0, ini.c_str()) != 0);
 
         // Shortcuts
         cfg.hotkeyAdjustEnabled = (GetPrivateProfileIntW(sec.c_str(), L"HotkeyAdjustEnabled", cfg.hotkeyAdjustEnabled ? 1 : 0, ini.c_str()) != 0);
@@ -281,9 +288,17 @@ void AppSettings::Load() {
         cfg.overlayUseWindowsAccent = (GetPrivateProfileIntW(sec.c_str(), L"OsdUseWindowsAccent", cfg.overlayUseWindowsAccent ? 1 : 0, ini.c_str()) != 0);
         GetPrivateProfileStringW(sec.c_str(), L"OsdAccentColor", FormatColor(cfg.overlayAccentColor).c_str(), colBuf, 64, ini.c_str());
         cfg.overlayAccentColor = ParseColor(colBuf, cfg.overlayAccentColor);
+        cfg.overlayUseDualColors = (GetPrivateProfileIntW(sec.c_str(), L"OsdUseDualColors", cfg.overlayUseDualColors ? 1 : 0, ini.c_str()) != 0);
+        GetPrivateProfileStringW(sec.c_str(), L"OsdAccentColorDark", FormatColor(cfg.overlayAccentColorDark).c_str(), colBuf, 64, ini.c_str());
+        cfg.overlayAccentColorDark = ParseColor(colBuf, cfg.overlayAccentColorDark);
 
         // Tray
-        cfg.trayPercentageMode = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"TrayPercentageMode", cfg.trayPercentageMode, ini.c_str()), 0, 2);
+        bool isMainMon = (!mainMonitorId.empty() && _wcsicmp(monId.c_str(), mainMonitorId.c_str()) == 0);
+        int defaultPctMode = (!isMainMon && cfg.controlMode == 0 && !legacySyncSeparateTray) ? 3 : cfg.trayPercentageMode;
+        cfg.trayPercentageMode = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"TrayPercentageMode", defaultPctMode, ini.c_str()), 0, 3);
+        if (isMainMon && cfg.trayPercentageMode == 3) {
+            cfg.trayPercentageMode = 0;
+        }
         GetPrivateProfileStringW(sec.c_str(), L"TrayIconColor", FormatColor(cfg.trayIconColor).c_str(), colBuf, 64, ini.c_str());
         cfg.trayIconColor = ParseColor(colBuf, cfg.trayIconColor);
         cfg.trayIconUseDualColors = (GetPrivateProfileIntW(sec.c_str(), L"TrayUseDualColors", cfg.trayIconUseDualColors ? 1 : 0, ini.c_str()) != 0);
@@ -311,6 +326,9 @@ void AppSettings::Load() {
         cfg.flyoutUseWindowsAccent = (GetPrivateProfileIntW(sec.c_str(), L"FlyoutUseWindowsAccent", cfg.flyoutUseWindowsAccent ? 1 : 0, ini.c_str()) != 0);
         GetPrivateProfileStringW(sec.c_str(), L"FlyoutAccentColor", FormatColor(cfg.flyoutAccentColor).c_str(), colBuf, 64, ini.c_str());
         cfg.flyoutAccentColor = ParseColor(colBuf, cfg.flyoutAccentColor);
+        cfg.flyoutUseDualColors = (GetPrivateProfileIntW(sec.c_str(), L"FlyoutUseDualColors", cfg.flyoutUseDualColors ? 1 : 0, ini.c_str()) != 0);
+        GetPrivateProfileStringW(sec.c_str(), L"FlyoutAccentColorDark", FormatColor(cfg.flyoutAccentColorDark).c_str(), colBuf, 64, ini.c_str());
+        cfg.flyoutAccentColorDark = ParseColor(colBuf, cfg.flyoutAccentColorDark);
         cfg.flyoutScrollEnabled = (GetPrivateProfileIntW(sec.c_str(), L"FlyoutScrollEnabled", cfg.flyoutScrollEnabled ? 1 : 0, ini.c_str()) != 0);
         cfg.flyoutScrollStep = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"FlyoutScrollStep", cfg.flyoutScrollStep, ini.c_str()), 1, 50);
 
@@ -386,6 +404,7 @@ void AppSettings::Save() const {
     addLine(L"SelectedMonitors", selectedMonitors);
     addLine(L"MainId", mainMonitorId);
     addLine(L"SyncLaptopFnKeys", syncExternalWithLaptopFnKeys ? L"1" : L"0");
+    addLine(L"ShowSeparateInMultiFlyout", showSeparateInMultiFlyout ? L"1" : L"0");
     addLine(L"ConfiguredIds", cfgIds);
 
     addSec(L"Hotkeys");
@@ -421,6 +440,8 @@ void AppSettings::Save() const {
     addLine(L"TimeoutMs", std::to_wstring(overlayTimeoutMs));
     addLine(L"UseWindowsAccent", overlayUseWindowsAccent ? L"1" : L"0");
     addLine(L"AccentColor", FormatColor(overlayAccentColor));
+    addLine(L"UseDualColors", overlayUseDualColors ? L"1" : L"0");
+    addLine(L"AccentColorDark", FormatColor(overlayAccentColorDark));
 
     addSec(L"Tray");
     addLine(L"PercentageMode", std::to_wstring(trayPercentageMode));
@@ -444,6 +465,8 @@ void AppSettings::Save() const {
     addSec(L"Flyout");
     addLine(L"UseWindowsAccent", flyoutUseWindowsAccent ? L"1" : L"0");
     addLine(L"AccentColor", FormatColor(flyoutAccentColor));
+    addLine(L"UseDualColors", flyoutUseDualColors ? L"1" : L"0");
+    addLine(L"AccentColorDark", FormatColor(flyoutAccentColorDark));
     addLine(L"ScrollEnabled", flyoutScrollEnabled ? L"1" : L"0");
     addLine(L"ScrollStep", std::to_wstring(flyoutScrollStep));
     addLine(L"KeyboardEnabled", flyoutKeyboardEnabled ? L"1" : L"0");
@@ -465,7 +488,6 @@ void AppSettings::Save() const {
         addLine(L"Offset", std::to_wstring(cfg.offset));
         addLine(L"SyncOverscrollMax", cfg.syncOverscrollMax ? L"1" : L"0");
         addLine(L"SyncOverscrollMin", cfg.syncOverscrollMin ? L"1" : L"0");
-        addLine(L"SyncSeparateTrayIcon", cfg.syncSeparateTrayIcon ? L"1" : L"0");
         addLine(L"HotkeyAdjustEnabled", cfg.hotkeyAdjustEnabled ? L"1" : L"0");
         addLine(L"HotkeyAdjustShowOsd", cfg.hotkeyAdjustShowOsd ? L"1" : L"0");
         addLine(L"HotkeyUpMods", std::to_wstring(cfg.hotkeyUpMods));
@@ -489,6 +511,8 @@ void AppSettings::Save() const {
         addLine(L"HotkeyStep", std::to_wstring(cfg.hotkeyStep));
         addLine(L"OsdUseWindowsAccent", cfg.overlayUseWindowsAccent ? L"1" : L"0");
         addLine(L"OsdAccentColor", FormatColor(cfg.overlayAccentColor));
+        addLine(L"OsdUseDualColors", cfg.overlayUseDualColors ? L"1" : L"0");
+        addLine(L"OsdAccentColorDark", FormatColor(cfg.overlayAccentColorDark));
         addLine(L"TrayPercentageMode", std::to_wstring(cfg.trayPercentageMode));
         addLine(L"TrayIconColor", FormatColor(cfg.trayIconColor));
         addLine(L"TrayUseDualColors", cfg.trayIconUseDualColors ? L"1" : L"0");
@@ -506,6 +530,8 @@ void AppSettings::Save() const {
         addLine(L"TrayMiddleClickBrightness", std::to_wstring(cfg.trayMiddleClickBrightness));
         addLine(L"FlyoutUseWindowsAccent", cfg.flyoutUseWindowsAccent ? L"1" : L"0");
         addLine(L"FlyoutAccentColor", FormatColor(cfg.flyoutAccentColor));
+        addLine(L"FlyoutUseDualColors", cfg.flyoutUseDualColors ? L"1" : L"0");
+        addLine(L"FlyoutAccentColorDark", FormatColor(cfg.flyoutAccentColorDark));
         addLine(L"FlyoutScrollEnabled", cfg.flyoutScrollEnabled ? L"1" : L"0");
         addLine(L"FlyoutScrollStep", std::to_wstring(cfg.flyoutScrollStep));
         addLine(L"CachedBrightness", std::to_wstring(cfg.cachedBrightness));
@@ -521,13 +547,7 @@ void AppSettings::Save() const {
 }
 
 void AppSettings::SaveBrightnessOnly() const {
-    std::wstring ini = GetIniFilePath();
-    WritePrivateProfileStringW(L"State", L"Brightness", std::to_wstring(cachedBrightness).c_str(), ini.c_str());
-
-    for (const auto& kv : monitorConfigs) {
-        const std::wstring sec = L"Monitor_" + kv.first;
-        WritePrivateProfileStringW(sec.c_str(), L"CachedBrightness", std::to_wstring(kv.second.cachedBrightness).c_str(), ini.c_str());
-    }
+    Save();
 }
 
 bool AppSettings::IsStartWithWindowsEnabled() {
@@ -847,6 +867,7 @@ MonitorControlConfig& AppSettings::GetOrCreateMonitorConfig(const std::wstring& 
     CopyCustomizationToMonitor(cfg);
     if (!mainMonitorId.empty() && _wcsicmp(monitorId.c_str(), mainMonitorId.c_str()) != 0) {
         ClearHotkeys(cfg);
+        cfg.trayPercentageMode = 3; // Non-main Sync monitors default to Hide tray icon
     }
     cfg.enabled = IsMonitorSelected(monitorId);
     cfg.customName = SanitizeMonitorName(defaultName);
@@ -902,7 +923,8 @@ MonitorControlConfig AppSettings::GetEffectiveMonitorConfig(const std::wstring& 
         result = it->second;
     }
 
-    if (it != monitorConfigs.end() && _wcsicmp(monitorId.c_str(), mainMonitorId.c_str()) != 0) {
+    bool isMain = (mainMonitorId.empty() || _wcsicmp(monitorId.c_str(), mainMonitorId.c_str()) == 0);
+    if (it != monitorConfigs.end() && !isMain) {
         const auto& own = it->second;
         result.enabled = own.enabled;
         result.customName = own.customName;
@@ -910,11 +932,14 @@ MonitorControlConfig AppSettings::GetEffectiveMonitorConfig(const std::wstring& 
         result.offset = own.offset;
         result.syncOverscrollMax = own.syncOverscrollMax;
         result.syncOverscrollMin = own.syncOverscrollMin;
-        result.syncSeparateTrayIcon = own.syncSeparateTrayIcon;
         result.overlayUseWindowsAccent = own.overlayUseWindowsAccent;
         result.overlayAccentColor = own.overlayAccentColor;
+        result.overlayUseDualColors = own.overlayUseDualColors;
+        result.overlayAccentColorDark = own.overlayAccentColorDark;
         result.flyoutUseWindowsAccent = own.flyoutUseWindowsAccent;
         result.flyoutAccentColor = own.flyoutAccentColor;
+        result.flyoutUseDualColors = own.flyoutUseDualColors;
+        result.flyoutAccentColorDark = own.flyoutAccentColorDark;
         result.trayPercentageMode = own.trayPercentageMode;
         result.trayIconColor = own.trayIconColor;
         result.trayIconUseDualColors = own.trayIconUseDualColors;
@@ -926,6 +951,9 @@ MonitorControlConfig AppSettings::GetEffectiveMonitorConfig(const std::wstring& 
         result.trayYOffset = own.trayYOffset;
         result.trayYOffsetUseComma = own.trayYOffsetUseComma;
         result.cachedBrightness = own.cachedBrightness;
+    }
+    if (isMain && result.trayPercentageMode == 3) {
+        result.trayPercentageMode = 0;
     }
     return result;
 }
@@ -955,6 +983,8 @@ void AppSettings::CopyCustomizationToMonitor(MonitorControlConfig& dst) const {
 
     dst.overlayUseWindowsAccent = overlayUseWindowsAccent;
     dst.overlayAccentColor = overlayAccentColor;
+    dst.overlayUseDualColors = overlayUseDualColors;
+    dst.overlayAccentColorDark = overlayAccentColorDark;
 
     dst.trayPercentageMode = trayPercentageMode;
     dst.trayIconColor = trayIconColor;
@@ -975,6 +1005,8 @@ void AppSettings::CopyCustomizationToMonitor(MonitorControlConfig& dst) const {
 
     dst.flyoutUseWindowsAccent = flyoutUseWindowsAccent;
     dst.flyoutAccentColor = flyoutAccentColor;
+    dst.flyoutUseDualColors = flyoutUseDualColors;
+    dst.flyoutAccentColorDark = flyoutAccentColorDark;
     dst.flyoutScrollEnabled = flyoutScrollEnabled;
     dst.flyoutScrollStep = flyoutScrollStep;
     dst.cachedBrightness = cachedBrightness;
@@ -1005,6 +1037,8 @@ void AppSettings::ApplyMonitorCustomizationToLegacy(const MonitorControlConfig& 
 
     overlayUseWindowsAccent = src.overlayUseWindowsAccent;
     overlayAccentColor = src.overlayAccentColor;
+    overlayUseDualColors = src.overlayUseDualColors;
+    overlayAccentColorDark = src.overlayAccentColorDark;
 
     trayPercentageMode = src.trayPercentageMode;
     trayIconColor = src.trayIconColor;
@@ -1025,6 +1059,8 @@ void AppSettings::ApplyMonitorCustomizationToLegacy(const MonitorControlConfig& 
 
     flyoutUseWindowsAccent = src.flyoutUseWindowsAccent;
     flyoutAccentColor = src.flyoutAccentColor;
+    flyoutUseDualColors = src.flyoutUseDualColors;
+    flyoutAccentColorDark = src.flyoutAccentColorDark;
     flyoutScrollEnabled = src.flyoutScrollEnabled;
     flyoutScrollStep = src.flyoutScrollStep;
     cachedBrightness = src.cachedBrightness;

@@ -181,7 +181,7 @@ void TrayIcon::OnThemeChanged() {
     if (m_created) {
         int b = (m_lastBrightness >= 0) ? m_lastBrightness : g_Settings.cachedBrightness;
         UpdateBrightness(b);
-        SyncExtraTrayIcons();
+        SyncExtraTrayIcons(true);
         UpdateWheelHook();
     }
     if (s_trayMenuRoot && s_trayMenuFlyout) {
@@ -217,6 +217,24 @@ void TrayIcon::OnLanguageChanged() {
     }
 }
 
+static std::wstring GetMainMonitorDisplayName() {
+    if (!g_Settings.mainMonitorId.empty()) {
+        const auto* cfg = g_Settings.FindMonitorConfig(g_Settings.mainMonitorId);
+        if (cfg && !cfg->customName.empty()) {
+            return cfg->customName;
+        }
+        for (const auto& mon : g_MonitorManager.GetMonitors()) {
+            if (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0) {
+                std::wstring n = AppSettings::SanitizeMonitorName(mon.friendlyName, 20);
+                if (!n.empty()) return n;
+                break;
+            }
+        }
+    }
+    std::wstring fallback = g_Loc.Get(L"MainDisplay", L"Main");
+    return fallback.empty() ? L"Main" : fallback;
+}
+
 bool TrayIcon::Create(HWND hOwnerWnd, UINT uCallbackMsg, UINT uId) {
     m_hOwnerWnd = hOwnerWnd;
     m_uCallbackMsg = uCallbackMsg;
@@ -247,8 +265,8 @@ bool TrayIcon::Create(HWND hOwnerWnd, UINT uCallbackMsg, UINT uId) {
     nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP;
     nid.uCallbackMessage = m_uCallbackMsg;
     nid.hIcon = m_hBaseSunIcon ? m_hBaseSunIcon : LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
-    std::wstring tipFmt = g_Loc.Get(L"Tray_Tooltip", L"Brightness: %d%%");
-    StringCchPrintfW(nid.szTip, ARRAYSIZE(nid.szTip), tipFmt.c_str(), m_lastBrightness >= 0 ? m_lastBrightness : g_Settings.cachedBrightness);
+    std::wstring mainName = GetMainMonitorDisplayName();
+    StringCchPrintfW(nid.szTip, ARRAYSIZE(nid.szTip), L"%s: %d%%", mainName.c_str(), m_lastBrightness >= 0 ? m_lastBrightness : g_Settings.cachedBrightness);
 
     m_created = (Shell_NotifyIconW(NIM_ADD, &nid) == TRUE);
     if (m_created) {
@@ -532,6 +550,7 @@ bool TrayIcon::UpdateBrightnessForTarget(const std::wstring& targetMonitorId, in
                         _wcsicmp(targetMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0;
 
     if (isMainOrSync) {
+        brightness = g_MonitorManager.GetEffectiveSyncedBrightness(g_Settings.mainMonitorId, rawBrightness);
         m_lastBrightness = brightness;
         const auto& cfg = g_Settings.GetEffectiveMonitorConfig(g_Settings.mainMonitorId);
 
@@ -566,15 +585,14 @@ bool TrayIcon::UpdateBrightnessForTarget(const std::wstring& targetMonitorId, in
         nid.uID = m_uId;
         nid.uFlags = NIF_ICON | NIF_TIP | NIF_SHOWTIP;
         nid.hIcon = hNewIcon;
-        std::wstring tipFmt = g_Loc.Get(L"Tray_Tooltip", L"Brightness: %d%%");
-        StringCchPrintfW(nid.szTip, ARRAYSIZE(nid.szTip), tipFmt.c_str(), brightness);
+        std::wstring mainName = GetMainMonitorDisplayName();
+        StringCchPrintfW(nid.szTip, ARRAYSIZE(nid.szTip), L"%s: %d%%", mainName.c_str(), brightness);
         bool ok = (Shell_NotifyIconW(NIM_MODIFY, &nid) == TRUE);
 
         // Also update any Sync-mode separate tray icons with their offsetted brightness
         for (auto& slot : m_extraSlots) {
             if (slot.created && slot.isSyncSlot) {
-                const auto& syncCfg = g_Settings.GetEffectiveMonitorConfig(slot.monitorId);
-                int syncB = AppSettings::ComputeSyncedBrightness(rawBrightness, syncCfg);
+                int syncB = g_MonitorManager.GetEffectiveSyncedBrightness(slot.monitorId, rawBrightness);
                 UpdateBrightnessForTarget(slot.monitorId, syncB);
             }
         }
@@ -610,7 +628,7 @@ bool TrayIcon::UpdateBrightnessForTarget(const std::wstring& targetMonitorId, in
     return false;
 }
 
-void TrayIcon::SyncExtraTrayIcons() {
+void TrayIcon::SyncExtraTrayIcons(bool forceRefresh) {
     if (!m_created || !m_hOwnerWnd) return;
 
     struct DesiredSlot {
@@ -622,10 +640,8 @@ void TrayIcon::SyncExtraTrayIcons() {
         if (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0) continue;
         const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
         if (!cfg || !cfg->enabled) continue;
-        if (cfg->controlMode == 1) {
-            desired.push_back({ mon.id, false });
-        } else if (cfg->controlMode == 0 && cfg->syncSeparateTrayIcon) {
-            desired.push_back({ mon.id, true });
+        if (cfg->trayPercentageMode != 3) {
+            desired.push_back({ mon.id, cfg->controlMode == 0 });
         }
     }
 
@@ -681,7 +697,7 @@ void TrayIcon::SyncExtraTrayIcons() {
             slot.isSyncSlot = d.isSyncSlot;
             const auto& cfg = g_Settings.GetEffectiveMonitorConfig(id);
             int b = d.isSyncSlot
-                ? AppSettings::ComputeSyncedBrightness(mainB, cfg)
+                ? g_MonitorManager.GetEffectiveSyncedBrightness(id, mainB)
                 : g_MonitorManager.GetMonitorBrightnessById(id);
             slot.lastBrightness = b;
 
@@ -717,12 +733,11 @@ void TrayIcon::SyncExtraTrayIcons() {
         if (slot.created) {
             int b = slot.lastBrightness;
             if (slot.isSyncSlot) {
-                const auto& cfg = g_Settings.GetEffectiveMonitorConfig(slot.monitorId);
-                b = AppSettings::ComputeSyncedBrightness(mainB, cfg);
+                b = g_MonitorManager.GetEffectiveSyncedBrightness(slot.monitorId, mainB);
             } else if (b < 0) {
                 b = g_MonitorManager.GetMonitorBrightnessById(slot.monitorId);
             }
-            if (b != slot.lastBrightness || slot.lastBrightness < 0) {
+            if (forceRefresh || b != slot.lastBrightness || slot.lastBrightness < 0) {
                 UpdateBrightnessForTarget(slot.monitorId, b);
             }
         }

@@ -214,7 +214,7 @@ namespace winrt::BrightnessApp::implementation
         int curTrans = g_Settings.transparencyEnabled ? 1 : 0;
         COLORREF accCol = g_Settings.overlayUseWindowsAccent
             ? ThemeHelper::GetAccentColors().GetForTheme(!isDark)
-            : g_Settings.overlayAccentColor;
+            : ((g_Settings.overlayUseDualColors && isDark) ? g_Settings.overlayAccentColorDark : g_Settings.overlayAccentColor);
 
         if (m_lastTheme == (isDark ? 1 : 0) && m_lastTransparency == curTrans && m_lastAccentCol == accCol)
         {
