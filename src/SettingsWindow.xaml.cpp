@@ -288,6 +288,7 @@ namespace winrt::BrightnessApp::implementation
 
         this->Closed([this](auto&&, auto&&)
         {
+            FlushPendingSave();
             StopCapture(false);
             s_settingsWindow = nullptr;
             TrimProcessWorkingSetAsync();
@@ -446,6 +447,14 @@ namespace winrt::BrightnessApp::implementation
     {
         if (m_isUpdatingUI) return;
 
+        if (m_hwnd)
+        {
+            KillTimer(m_hwnd, 102);
+        }
+        m_pendingSave = false;
+        m_pendingSaveHotkeys = false;
+        m_pendingSaveTray = false;
+
         SaveCurrentMonitorConfigFromUI();
         g_Settings.Save();
         HWND hMain = FindWindowW(L"ClickBrightness_MessageWndClass", NULL);
@@ -454,6 +463,52 @@ namespace winrt::BrightnessApp::implementation
             g_HotkeyManager.RegisterAll(hMain);
         }
         g_TrayIcon.SyncExtraTrayIcons();
+    }
+
+    void SettingsWindow::ScheduleSave(bool reRegisterHotkeys, bool syncTray)
+    {
+        if (m_isUpdatingUI) return;
+        m_pendingSave = true;
+        m_pendingSaveHotkeys |= reRegisterHotkeys;
+        m_pendingSaveTray |= syncTray;
+        if (m_hwnd)
+        {
+            KillTimer(m_hwnd, 102);
+            SetTimer(m_hwnd, 102, 250, NULL);
+        }
+        else
+        {
+            FlushPendingSave();
+        }
+    }
+
+    void SettingsWindow::FlushPendingSave()
+    {
+        if (m_hwnd)
+        {
+            KillTimer(m_hwnd, 102);
+        }
+        if (!m_pendingSave) return;
+        bool doHotkeys = m_pendingSaveHotkeys;
+        bool doTray = m_pendingSaveTray;
+        m_pendingSave = false;
+        m_pendingSaveHotkeys = false;
+        m_pendingSaveTray = false;
+
+        SaveCurrentMonitorConfigFromUI();
+        g_Settings.Save();
+        if (doHotkeys)
+        {
+            HWND hMain = FindWindowW(L"ClickBrightness_MessageWndClass", NULL);
+            if (hMain)
+            {
+                g_HotkeyManager.RegisterAll(hMain);
+            }
+        }
+        if (doTray)
+        {
+            g_TrayIcon.SyncExtraTrayIcons();
+        }
     }
 
     void SettingsWindow::InitializeControls()
@@ -920,7 +975,7 @@ namespace winrt::BrightnessApp::implementation
             if (m_isUpdatingUI || m_selectedConfigMonitorId.empty()) return;
             auto& cfg = g_Settings.GetOrCreateMonitorConfig(m_selectedConfigMonitorId);
             cfg.customName = AppSettings::SanitizeMonitorName(MonitorCustomNameTextBox().Text().c_str(), 20);
-            ApplyAndSave();
+            ScheduleSave(false, true);
         });
 
         // Per-Monitor Control Mode ComboBox
@@ -957,7 +1012,7 @@ namespace winrt::BrightnessApp::implementation
             m_isUpdatingUI = true;
             MonitorOffsetNumberBox().Value(val);
             m_isUpdatingUI = false;
-            ApplyAndSave();
+            ScheduleSave(false, true);
         });
 
         MonitorOffsetNumberBox().ValueChanged([this](auto&&, auto&& e)
@@ -970,7 +1025,7 @@ namespace winrt::BrightnessApp::implementation
             m_isUpdatingUI = true;
             MonitorOffsetSlider().Value(val);
             m_isUpdatingUI = false;
-            ApplyAndSave();
+            ScheduleSave(false, true);
         });
 
         // Sync Overscroll Max (100%)
@@ -3019,6 +3074,11 @@ namespace winrt::BrightnessApp::implementation
                 DeleteObject(hbr);
                 return 1;
             }
+        }
+        else if (uMsg == WM_TIMER && wParam == 102)
+        {
+            pThis->FlushPendingSave();
+            return 0;
         }
         else if (uMsg == WM_NCDESTROY)
         {

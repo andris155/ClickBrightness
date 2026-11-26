@@ -4,25 +4,40 @@
 
 FlyoutWindow g_FlyoutWindow;
 
-static winrt::BrightnessApp::FlyoutWindow s_flyoutWindow{ nullptr };
+static winrt::BrightnessApp::FlyoutWindow s_mainFlyoutWindow{ nullptr };
+static winrt::BrightnessApp::FlyoutWindow s_separateFlyoutWindow{ nullptr };
 
-static winrt::BrightnessApp::implementation::FlyoutWindow* GetImpl()
+static winrt::BrightnessApp::implementation::FlyoutWindow* GetOrCreateImpl(winrt::BrightnessApp::FlyoutWindow& slot)
 {
-    if (!s_flyoutWindow)
+    if (!slot)
     {
         try
         {
-            s_flyoutWindow = winrt::make<winrt::BrightnessApp::implementation::FlyoutWindow>();
+            slot = winrt::make<winrt::BrightnessApp::implementation::FlyoutWindow>();
         }
         catch (...)
         {
         }
     }
-    if (s_flyoutWindow)
+    if (slot)
     {
-        return winrt::get_self<winrt::BrightnessApp::implementation::FlyoutWindow>(s_flyoutWindow);
+        return winrt::get_self<winrt::BrightnessApp::implementation::FlyoutWindow>(slot);
     }
     return nullptr;
+}
+
+static winrt::BrightnessApp::implementation::FlyoutWindow* GetImplIfCreated(winrt::BrightnessApp::FlyoutWindow const& slot)
+{
+    if (slot)
+    {
+        return winrt::get_self<winrt::BrightnessApp::implementation::FlyoutWindow>(slot);
+    }
+    return nullptr;
+}
+
+static bool IsSeparateTarget(const std::wstring& targetMonitorId)
+{
+    return !targetMonitorId.empty() && _wcsicmp(targetMonitorId.c_str(), L"__SYNC__") != 0;
 }
 
 FlyoutWindow::~FlyoutWindow()
@@ -32,12 +47,25 @@ FlyoutWindow::~FlyoutWindow()
 
 bool FlyoutWindow::Create()
 {
-    return (GetImpl() != nullptr);
+    auto* p = GetOrCreateImpl(s_mainFlyoutWindow);
+    if (p)
+    {
+        p->Prewarm();
+        return true;
+    }
+    return false;
 }
 
 void FlyoutWindow::Show(const POINT* pTrayPos, const std::wstring& targetMonitorId)
 {
-    auto p = GetImpl();
+    bool isSeparate = IsSeparateTarget(targetMonitorId);
+    auto* other = GetImplIfCreated(isSeparate ? s_mainFlyoutWindow : s_separateFlyoutWindow);
+    if (other && other->IsWindowVisible())
+    {
+        other->HideWindow();
+    }
+
+    auto* p = GetOrCreateImpl(isSeparate ? s_separateFlyoutWindow : s_mainFlyoutWindow);
     if (p)
     {
         p->SetTargetMonitor(targetMonitorId);
@@ -47,41 +75,43 @@ void FlyoutWindow::Show(const POINT* pTrayPos, const std::wstring& targetMonitor
 
 void FlyoutWindow::Hide()
 {
-    if (s_flyoutWindow)
-    {
-        auto p = winrt::get_self<winrt::BrightnessApp::implementation::FlyoutWindow>(s_flyoutWindow);
-        if (p) p->HideWindow();
-    }
+    if (auto* p = GetImplIfCreated(s_mainFlyoutWindow)) p->HideWindow();
+    if (auto* p = GetImplIfCreated(s_separateFlyoutWindow)) p->HideWindow();
 }
 
 void FlyoutWindow::Destroy()
 {
-    if (s_flyoutWindow)
-    {
-        auto p = winrt::get_self<winrt::BrightnessApp::implementation::FlyoutWindow>(s_flyoutWindow);
-        if (p) p->DestroyWindow();
-        s_flyoutWindow = nullptr;
-    }
+    if (auto* p = GetImplIfCreated(s_mainFlyoutWindow)) p->DestroyWindow();
+    s_mainFlyoutWindow = nullptr;
+    if (auto* p = GetImplIfCreated(s_separateFlyoutWindow)) p->DestroyWindow();
+    s_separateFlyoutWindow = nullptr;
 }
 
 bool FlyoutWindow::IsVisible() const
 {
-    if (s_flyoutWindow)
+    if (auto* p = GetImplIfCreated(s_mainFlyoutWindow))
     {
-        auto p = winrt::get_self<winrt::BrightnessApp::implementation::FlyoutWindow>(s_flyoutWindow);
-        if (p) return p->IsWindowVisible();
+        if (p->IsWindowVisible()) return true;
+    }
+    if (auto* p = GetImplIfCreated(s_separateFlyoutWindow))
+    {
+        if (p->IsWindowVisible()) return true;
     }
     return false;
 }
 
 ULONGLONG FlyoutWindow::GetHideTick() const
 {
-    if (s_flyoutWindow)
+    ULONGLONG t = 0;
+    if (auto* p = GetImplIfCreated(s_mainFlyoutWindow))
     {
-        auto p = winrt::get_self<winrt::BrightnessApp::implementation::FlyoutWindow>(s_flyoutWindow);
-        if (p) return p->GetHideTick();
+        t = (std::max)(t, p->GetHideTick());
     }
-    return 0;
+    if (auto* p = GetImplIfCreated(s_separateFlyoutWindow))
+    {
+        t = (std::max)(t, p->GetHideTick());
+    }
+    return t;
 }
 
 void FlyoutWindow::SetBrightness(int brightness, bool notifyHardware)
@@ -91,29 +121,26 @@ void FlyoutWindow::SetBrightness(int brightness, bool notifyHardware)
 
 void FlyoutWindow::SetBrightnessForTarget(const std::wstring& targetMonitorId, int brightness, bool notifyHardware)
 {
-    if (s_flyoutWindow)
+    if (auto* p = GetImplIfCreated(s_mainFlyoutWindow))
     {
-        auto p = winrt::get_self<winrt::BrightnessApp::implementation::FlyoutWindow>(s_flyoutWindow);
-        if (p) p->SetBrightnessForTarget(targetMonitorId, brightness, notifyHardware);
+        p->SetBrightnessForTarget(targetMonitorId, brightness, notifyHardware);
+    }
+    if (auto* p = GetImplIfCreated(s_separateFlyoutWindow))
+    {
+        p->SetBrightnessForTarget(targetMonitorId, brightness, notifyHardware);
     }
 }
 
 void FlyoutWindow::ApplyPendingBrightness()
 {
-    if (s_flyoutWindow)
-    {
-        auto p = winrt::get_self<winrt::BrightnessApp::implementation::FlyoutWindow>(s_flyoutWindow);
-        if (p) p->ApplyPendingBrightness();
-    }
+    if (auto* p = GetImplIfCreated(s_mainFlyoutWindow)) p->ApplyPendingBrightness();
+    if (auto* p = GetImplIfCreated(s_separateFlyoutWindow)) p->ApplyPendingBrightness();
 }
 
 void FlyoutWindow::OnThemeChanged()
 {
-    if (s_flyoutWindow)
-    {
-        auto p = winrt::get_self<winrt::BrightnessApp::implementation::FlyoutWindow>(s_flyoutWindow);
-        if (p) p->UpdateTheme();
-    }
+    if (auto* p = GetImplIfCreated(s_mainFlyoutWindow)) p->UpdateTheme();
+    if (auto* p = GetImplIfCreated(s_separateFlyoutWindow)) p->UpdateTheme();
 }
 
 void FlyoutWindow::ResetGraphicsResources()

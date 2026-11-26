@@ -15,6 +15,7 @@ namespace winrt::BrightnessApp::implementation
 
         void SetTargetMonitor(const std::wstring& targetMonitorId) { m_targetMonitorId = targetMonitorId; }
         const std::wstring& GetTargetMonitor() const { return m_targetMonitorId; }
+        void Prewarm();
         void ShowWindow(const POINT* pTrayPos);
         void HideWindow();
         void DestroyWindow();
@@ -34,7 +35,7 @@ namespace winrt::BrightnessApp::implementation
         void DetachBackdrop();
         void InitializeButtons();
         void PopulatePresetButtons(winrt::Microsoft::UI::Xaml::Controls::StackPanel const& panel, std::function<void(int)> onClick);
-        void RebuildSyncMonitorsPanel();
+        bool RebuildSyncMonitorsPanel();
         void SetBrightnessVisual(int val);
         void ApplySliderBrushes();
         void ApplySliderBrushesForControl(winrt::Microsoft::UI::Xaml::Controls::Slider const& slider, const std::wstring& monitorId);
@@ -55,7 +56,9 @@ namespace winrt::BrightnessApp::implementation
         int m_syncBaseBrightness{ 45 };
         int m_pendingBrightness{ 45 };
         std::wstring m_targetMonitorId;
+        std::wstring m_lastSyncSignature;
         bool m_hasPendingBrightness{ false };
+        bool m_hasSeparatePendingSave{ false };
         bool m_isUpdatingSlider{ false };
         bool m_isDraggingSlider{ false };
         bool m_isVisible{ false };

@@ -498,6 +498,9 @@ void ExitApp()
     if (s_exiting) return;
     s_exiting = true;
 
+    // 0. Unhook mouse wheel hook and remove tray icons immediately so cursor never lags on exit
+    g_TrayIcon.Destroy();
+
     // 1. Terminate IPC listener thread
     s_ipcRunning = false;
     for (int i = 0; i < 4; ++i)

@@ -15,6 +15,8 @@ namespace winrt::BrightnessApp::implementation
         void HideWindow();
         void LoadSettingsToUI();
         void ApplyAndSave();
+        void ScheduleSave(bool reRegisterHotkeys = false, bool syncTray = false);
+        void FlushPendingSave();
         void ApplyTheme();
         void OnDisplayChanged();
 
@@ -65,6 +67,9 @@ namespace winrt::BrightnessApp::implementation
         UINT m_curPresetToggleKey{ 0x80 }; // VK_F17
         UINT m_curPresetToggleMods{ 0 };
         bool m_isUpdatingUI{ false };
+        bool m_pendingSave{ false };
+        bool m_pendingSaveHotkeys{ false };
+        bool m_pendingSaveTray{ false };
         bool m_isAppExiting{ false };
         bool m_isClosing{ false };
         bool m_trayTabLoaded{ false };
