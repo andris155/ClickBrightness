@@ -4,6 +4,7 @@
 #include "FlyoutWindow.xaml.g.h"
 #include <winrt/Microsoft.UI.Windowing.h>
 #include <winrt/Microsoft.UI.Composition.SystemBackdrops.h>
+#include <functional>
 
 namespace winrt::BrightnessApp::implementation
 {
@@ -32,12 +33,14 @@ namespace winrt::BrightnessApp::implementation
         void SetupBackdrop();
         void DetachBackdrop();
         void InitializeButtons();
+        void PopulatePresetButtons(winrt::Microsoft::UI::Xaml::Controls::StackPanel const& panel, std::function<void(int)> onClick);
         void RebuildSyncMonitorsPanel();
         void SetBrightnessVisual(int val);
         void ApplySliderBrushes();
         void ApplySliderBrushesForControl(winrt::Microsoft::UI::Xaml::Controls::Slider const& slider, const std::wstring& monitorId);
         void CommitHardwareBrightness(int val);
         void ScheduleDebounce(int val, int delayMs);
+        void CancelPendingShow();
         void OnScrollAdjust(int val);
         void OnButtonClicked(int val);
 
@@ -49,6 +52,7 @@ namespace winrt::BrightnessApp::implementation
         winrt::Microsoft::UI::Composition::SystemBackdrops::SystemBackdropConfiguration m_backdropConfig{ nullptr };
 
         int m_brightness{ 45 };
+        int m_syncBaseBrightness{ 45 };
         int m_pendingBrightness{ 45 };
         std::wstring m_targetMonitorId;
         bool m_hasPendingBrightness{ false };
@@ -63,10 +67,16 @@ namespace winrt::BrightnessApp::implementation
         COLORREF m_lastAccentCol{ 0 };
         int m_lastW{ 0 };
         int m_lastH{ 0 };
+        winrt::event_token m_showRenderToken{};
+        int m_pendingShowFrames{ 0 };
+        int m_pendingShowX{ 0 };
+        int m_pendingShowY{ 0 };
 
         struct SyncSliderEntry
         {
             std::wstring monitorId;
+            std::wstring displayName;
+            bool isSeparate{ false };
             winrt::Microsoft::UI::Xaml::Controls::TextBlock header{ nullptr };
             winrt::Microsoft::UI::Xaml::Controls::Slider slider{ nullptr };
         };

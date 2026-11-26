@@ -217,6 +217,8 @@ void AppSettings::Load() {
     if (cachedBrightness < 0) cachedBrightness = 0;
     if (cachedBrightness > 100) cachedBrightness = 100;
 
+    simulateMonitorsCount = (std::clamp)((int)GetPrivateProfileIntW(L"Debug", L"SimulateMonitors", 0, ini.c_str()), 0, 16);
+
     // Multi-Monitor Sync & Separate Configs
     wchar_t mainMonBuf[256] = { 0 };
     GetPrivateProfileStringW(L"Monitors", L"MainId", L"", mainMonBuf, 256, ini.c_str());
@@ -238,6 +240,9 @@ void AppSettings::Load() {
         std::wstring sec = L"Monitor_" + monId;
         MonitorControlConfig cfg;
         CopyCustomizationToMonitor(cfg);
+        if (!mainMonitorId.empty() && _wcsicmp(monId.c_str(), mainMonitorId.c_str()) != 0) {
+            ClearHotkeys(cfg);
+        }
         cfg.enabled = (GetPrivateProfileIntW(sec.c_str(), L"Enabled", 1, ini.c_str()) != 0);
         wchar_t nameBuf[128] = { 0 };
         GetPrivateProfileStringW(sec.c_str(), L"CustomName", L"", nameBuf, 128, ini.c_str());
@@ -245,7 +250,8 @@ void AppSettings::Load() {
         cfg.controlMode = GetPrivateProfileIntW(sec.c_str(), L"ControlMode", 0, ini.c_str());
         if (cfg.controlMode < 0 || cfg.controlMode > 1) cfg.controlMode = 0;
         cfg.offset = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"Offset", 0, ini.c_str()), -100, 100);
-        cfg.syncZeroWhenMainZero = (GetPrivateProfileIntW(sec.c_str(), L"SyncZeroWhenMainZero", 0, ini.c_str()) != 0);
+        cfg.syncOverscrollMax = (GetPrivateProfileIntW(sec.c_str(), L"SyncOverscrollMax", 1, ini.c_str()) != 0);
+        cfg.syncOverscrollMin = (GetPrivateProfileIntW(sec.c_str(), L"SyncOverscrollMin", 1, ini.c_str()) != 0);
         cfg.syncSeparateTrayIcon = (GetPrivateProfileIntW(sec.c_str(), L"SyncSeparateTrayIcon", 0, ini.c_str()) != 0);
 
         // Shortcuts
@@ -426,60 +432,67 @@ void AppSettings::Save() const {
 
         const std::wstring sec = L"Monitor_" + kv.first;
         const MonitorControlConfig& cfg = kv.second;
-        WritePrivateProfileStringW(sec.c_str(), L"Enabled", cfg.enabled ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"CustomName", cfg.customName.c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"ControlMode", std::to_wstring(cfg.controlMode).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"Offset", std::to_wstring(cfg.offset).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"SyncZeroWhenMainZero", cfg.syncZeroWhenMainZero ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"SyncSeparateTrayIcon", cfg.syncSeparateTrayIcon ? L"1" : L"0", ini.c_str());
 
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyAdjustEnabled", cfg.hotkeyAdjustEnabled ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyAdjustShowOsd", cfg.hotkeyAdjustShowOsd ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyUpMods", std::to_wstring(cfg.hotkeyUpMods).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyUpKey", std::to_wstring(cfg.hotkeyUpKey).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyDownMods", std::to_wstring(cfg.hotkeyDownMods).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyDownKey", std::to_wstring(cfg.hotkeyDownKey).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPresetsEnabled", cfg.hotkeyPresetsEnabled ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPresetsShowOsd", cfg.hotkeyPresetsShowOsd ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPreset1Mods", std::to_wstring(cfg.hotkeyPreset1Mods).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPreset1Key", std::to_wstring(cfg.hotkeyPreset1Key).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPreset1Brightness", std::to_wstring(cfg.hotkeyPreset1Brightness).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPreset2Mods", std::to_wstring(cfg.hotkeyPreset2Mods).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPreset2Key", std::to_wstring(cfg.hotkeyPreset2Key).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPreset2Brightness", std::to_wstring(cfg.hotkeyPreset2Brightness).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPresetToggleEnabled", cfg.hotkeyPresetToggleEnabled ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPresetToggleShowOsd", cfg.hotkeyPresetToggleShowOsd ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPresetToggleMods", std::to_wstring(cfg.hotkeyPresetToggleMods).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPresetToggleKey", std::to_wstring(cfg.hotkeyPresetToggleKey).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPresetToggle1Brightness", std::to_wstring(cfg.hotkeyPresetToggle1Brightness).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPresetToggle2Brightness", std::to_wstring(cfg.hotkeyPresetToggle2Brightness).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyStep", std::to_wstring(cfg.hotkeyStep).c_str(), ini.c_str());
+        std::wstring secBuf;
+        auto addKv = [&](const wchar_t* k, const std::wstring& v) {
+            secBuf += k;
+            secBuf += L"=";
+            secBuf += v;
+            secBuf.push_back(L'\0');
+        };
+        addKv(L"Enabled", cfg.enabled ? L"1" : L"0");
+        addKv(L"CustomName", cfg.customName);
+        addKv(L"ControlMode", std::to_wstring(cfg.controlMode));
+        addKv(L"Offset", std::to_wstring(cfg.offset));
+        addKv(L"SyncOverscrollMax", cfg.syncOverscrollMax ? L"1" : L"0");
+        addKv(L"SyncOverscrollMin", cfg.syncOverscrollMin ? L"1" : L"0");
+        addKv(L"SyncSeparateTrayIcon", cfg.syncSeparateTrayIcon ? L"1" : L"0");
+        addKv(L"HotkeyAdjustEnabled", cfg.hotkeyAdjustEnabled ? L"1" : L"0");
+        addKv(L"HotkeyAdjustShowOsd", cfg.hotkeyAdjustShowOsd ? L"1" : L"0");
+        addKv(L"HotkeyUpMods", std::to_wstring(cfg.hotkeyUpMods));
+        addKv(L"HotkeyUpKey", std::to_wstring(cfg.hotkeyUpKey));
+        addKv(L"HotkeyDownMods", std::to_wstring(cfg.hotkeyDownMods));
+        addKv(L"HotkeyDownKey", std::to_wstring(cfg.hotkeyDownKey));
+        addKv(L"HotkeyPresetsEnabled", cfg.hotkeyPresetsEnabled ? L"1" : L"0");
+        addKv(L"HotkeyPresetsShowOsd", cfg.hotkeyPresetsShowOsd ? L"1" : L"0");
+        addKv(L"HotkeyPreset1Mods", std::to_wstring(cfg.hotkeyPreset1Mods));
+        addKv(L"HotkeyPreset1Key", std::to_wstring(cfg.hotkeyPreset1Key));
+        addKv(L"HotkeyPreset1Brightness", std::to_wstring(cfg.hotkeyPreset1Brightness));
+        addKv(L"HotkeyPreset2Mods", std::to_wstring(cfg.hotkeyPreset2Mods));
+        addKv(L"HotkeyPreset2Key", std::to_wstring(cfg.hotkeyPreset2Key));
+        addKv(L"HotkeyPreset2Brightness", std::to_wstring(cfg.hotkeyPreset2Brightness));
+        addKv(L"HotkeyPresetToggleEnabled", cfg.hotkeyPresetToggleEnabled ? L"1" : L"0");
+        addKv(L"HotkeyPresetToggleShowOsd", cfg.hotkeyPresetToggleShowOsd ? L"1" : L"0");
+        addKv(L"HotkeyPresetToggleMods", std::to_wstring(cfg.hotkeyPresetToggleMods));
+        addKv(L"HotkeyPresetToggleKey", std::to_wstring(cfg.hotkeyPresetToggleKey));
+        addKv(L"HotkeyPresetToggle1Brightness", std::to_wstring(cfg.hotkeyPresetToggle1Brightness));
+        addKv(L"HotkeyPresetToggle2Brightness", std::to_wstring(cfg.hotkeyPresetToggle2Brightness));
+        addKv(L"HotkeyStep", std::to_wstring(cfg.hotkeyStep));
+        addKv(L"OsdUseWindowsAccent", cfg.overlayUseWindowsAccent ? L"1" : L"0");
+        addKv(L"OsdAccentColor", FormatColor(cfg.overlayAccentColor));
+        addKv(L"TrayPercentageMode", std::to_wstring(cfg.trayPercentageMode));
+        addKv(L"TrayIconColor", FormatColor(cfg.trayIconColor));
+        addKv(L"TrayUseDualColors", cfg.trayIconUseDualColors ? L"1" : L"0");
+        addKv(L"TrayIconColorDark", FormatColor(cfg.trayIconColorDark));
+        addKv(L"TrayFont", cfg.trayFont);
+        addKv(L"TrayFontWeight", std::to_wstring(cfg.trayFontWeight));
+        addKv(L"TrayFontSize", std::to_wstring(cfg.trayFontSize));
+        addKv(L"TrayFontSize100", std::to_wstring(cfg.trayFontSize100));
+        addKv(L"TrayYOffset", FormatYOffset(cfg.trayYOffset, cfg.trayYOffsetUseComma));
+        addKv(L"TrayWheelEnabled", cfg.trayWheelEnabled ? L"1" : L"0");
+        addKv(L"TrayWheelStep", std::to_wstring(cfg.trayWheelStep));
+        addKv(L"TrayWheelShowOsd", cfg.trayWheelShowOsd ? L"1" : L"0");
+        addKv(L"TrayMiddleClickEnabled", cfg.trayMiddleClickEnabled ? L"1" : L"0");
+        addKv(L"TrayMiddleClickShowOsd", cfg.trayMiddleClickShowOsd ? L"1" : L"0");
+        addKv(L"TrayMiddleClickBrightness", std::to_wstring(cfg.trayMiddleClickBrightness));
+        addKv(L"FlyoutUseWindowsAccent", cfg.flyoutUseWindowsAccent ? L"1" : L"0");
+        addKv(L"FlyoutAccentColor", FormatColor(cfg.flyoutAccentColor));
+        addKv(L"FlyoutScrollEnabled", cfg.flyoutScrollEnabled ? L"1" : L"0");
+        addKv(L"FlyoutScrollStep", std::to_wstring(cfg.flyoutScrollStep));
+        addKv(L"CachedBrightness", std::to_wstring(cfg.cachedBrightness));
+        secBuf.push_back(L'\0');
 
-        WritePrivateProfileStringW(sec.c_str(), L"OsdUseWindowsAccent", cfg.overlayUseWindowsAccent ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"OsdAccentColor", FormatColor(cfg.overlayAccentColor).c_str(), ini.c_str());
-
-        WritePrivateProfileStringW(sec.c_str(), L"TrayPercentageMode", std::to_wstring(cfg.trayPercentageMode).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayIconColor", FormatColor(cfg.trayIconColor).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayUseDualColors", cfg.trayIconUseDualColors ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayIconColorDark", FormatColor(cfg.trayIconColorDark).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayFont", cfg.trayFont.c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayFontWeight", std::to_wstring(cfg.trayFontWeight).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayFontSize", std::to_wstring(cfg.trayFontSize).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayFontSize100", std::to_wstring(cfg.trayFontSize100).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayYOffset", FormatYOffset(cfg.trayYOffset, cfg.trayYOffsetUseComma).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayWheelEnabled", cfg.trayWheelEnabled ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayWheelStep", std::to_wstring(cfg.trayWheelStep).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayWheelShowOsd", cfg.trayWheelShowOsd ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayMiddleClickEnabled", cfg.trayMiddleClickEnabled ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayMiddleClickShowOsd", cfg.trayMiddleClickShowOsd ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayMiddleClickBrightness", std::to_wstring(cfg.trayMiddleClickBrightness).c_str(), ini.c_str());
-
-        WritePrivateProfileStringW(sec.c_str(), L"FlyoutUseWindowsAccent", cfg.flyoutUseWindowsAccent ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"FlyoutAccentColor", FormatColor(cfg.flyoutAccentColor).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"FlyoutScrollEnabled", cfg.flyoutScrollEnabled ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"FlyoutScrollStep", std::to_wstring(cfg.flyoutScrollStep).c_str(), ini.c_str());
-
-        WritePrivateProfileStringW(sec.c_str(), L"CachedBrightness", std::to_wstring(cfg.cachedBrightness).c_str(), ini.c_str());
+        WritePrivateProfileSectionW(sec.c_str(), secBuf.c_str(), ini.c_str());
     }
     WritePrivateProfileStringW(L"Monitors", L"ConfiguredIds", cfgIds.c_str(), ini.c_str());
 }
@@ -488,73 +501,10 @@ void AppSettings::SaveBrightnessOnly() const {
     std::wstring ini = GetIniFilePath();
     WritePrivateProfileStringW(L"State", L"Brightness", std::to_wstring(cachedBrightness).c_str(), ini.c_str());
 
-    // Multi-Monitor Sync & Separate Configs
-    WritePrivateProfileStringW(L"Monitors", L"MainId", mainMonitorId.c_str(), ini.c_str());
-    WritePrivateProfileStringW(L"Monitors", L"SyncLaptopFnKeys", syncExternalWithLaptopFnKeys ? L"1" : L"0", ini.c_str());
-
-    std::wstring cfgIds;
     for (const auto& kv : monitorConfigs) {
-        if (!cfgIds.empty()) cfgIds += L";";
-        cfgIds += kv.first;
-
         const std::wstring sec = L"Monitor_" + kv.first;
-        const MonitorControlConfig& cfg = kv.second;
-        WritePrivateProfileStringW(sec.c_str(), L"Enabled", cfg.enabled ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"CustomName", cfg.customName.c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"ControlMode", std::to_wstring(cfg.controlMode).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"Offset", std::to_wstring(cfg.offset).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"SyncZeroWhenMainZero", cfg.syncZeroWhenMainZero ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"SyncSeparateTrayIcon", cfg.syncSeparateTrayIcon ? L"1" : L"0", ini.c_str());
-
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyAdjustEnabled", cfg.hotkeyAdjustEnabled ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyAdjustShowOsd", cfg.hotkeyAdjustShowOsd ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyUpMods", std::to_wstring(cfg.hotkeyUpMods).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyUpKey", std::to_wstring(cfg.hotkeyUpKey).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyDownMods", std::to_wstring(cfg.hotkeyDownMods).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyDownKey", std::to_wstring(cfg.hotkeyDownKey).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPresetsEnabled", cfg.hotkeyPresetsEnabled ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPresetsShowOsd", cfg.hotkeyPresetsShowOsd ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPreset1Mods", std::to_wstring(cfg.hotkeyPreset1Mods).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPreset1Key", std::to_wstring(cfg.hotkeyPreset1Key).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPreset1Brightness", std::to_wstring(cfg.hotkeyPreset1Brightness).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPreset2Mods", std::to_wstring(cfg.hotkeyPreset2Mods).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPreset2Key", std::to_wstring(cfg.hotkeyPreset2Key).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPreset2Brightness", std::to_wstring(cfg.hotkeyPreset2Brightness).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPresetToggleEnabled", cfg.hotkeyPresetToggleEnabled ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPresetToggleShowOsd", cfg.hotkeyPresetToggleShowOsd ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPresetToggleMods", std::to_wstring(cfg.hotkeyPresetToggleMods).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPresetToggleKey", std::to_wstring(cfg.hotkeyPresetToggleKey).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPresetToggle1Brightness", std::to_wstring(cfg.hotkeyPresetToggle1Brightness).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyPresetToggle2Brightness", std::to_wstring(cfg.hotkeyPresetToggle2Brightness).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"HotkeyStep", std::to_wstring(cfg.hotkeyStep).c_str(), ini.c_str());
-
-        WritePrivateProfileStringW(sec.c_str(), L"OsdUseWindowsAccent", cfg.overlayUseWindowsAccent ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"OsdAccentColor", FormatColor(cfg.overlayAccentColor).c_str(), ini.c_str());
-
-        WritePrivateProfileStringW(sec.c_str(), L"TrayPercentageMode", std::to_wstring(cfg.trayPercentageMode).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayIconColor", FormatColor(cfg.trayIconColor).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayUseDualColors", cfg.trayIconUseDualColors ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayIconColorDark", FormatColor(cfg.trayIconColorDark).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayFont", cfg.trayFont.c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayFontWeight", std::to_wstring(cfg.trayFontWeight).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayFontSize", std::to_wstring(cfg.trayFontSize).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayFontSize100", std::to_wstring(cfg.trayFontSize100).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayYOffset", FormatYOffset(cfg.trayYOffset, cfg.trayYOffsetUseComma).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayWheelEnabled", cfg.trayWheelEnabled ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayWheelStep", std::to_wstring(cfg.trayWheelStep).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayWheelShowOsd", cfg.trayWheelShowOsd ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayMiddleClickEnabled", cfg.trayMiddleClickEnabled ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayMiddleClickShowOsd", cfg.trayMiddleClickShowOsd ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"TrayMiddleClickBrightness", std::to_wstring(cfg.trayMiddleClickBrightness).c_str(), ini.c_str());
-
-        WritePrivateProfileStringW(sec.c_str(), L"FlyoutUseWindowsAccent", cfg.flyoutUseWindowsAccent ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"FlyoutAccentColor", FormatColor(cfg.flyoutAccentColor).c_str(), ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"FlyoutScrollEnabled", cfg.flyoutScrollEnabled ? L"1" : L"0", ini.c_str());
-        WritePrivateProfileStringW(sec.c_str(), L"FlyoutScrollStep", std::to_wstring(cfg.flyoutScrollStep).c_str(), ini.c_str());
-
-        WritePrivateProfileStringW(sec.c_str(), L"CachedBrightness", std::to_wstring(cfg.cachedBrightness).c_str(), ini.c_str());
+        WritePrivateProfileStringW(sec.c_str(), L"CachedBrightness", std::to_wstring(kv.second.cachedBrightness).c_str(), ini.c_str());
     }
-    WritePrivateProfileStringW(L"Monitors", L"ConfiguredIds", cfgIds.c_str(), ini.c_str());
 }
 
 bool AppSettings::IsStartWithWindowsEnabled() {
@@ -872,6 +822,9 @@ MonitorControlConfig& AppSettings::GetOrCreateMonitorConfig(const std::wstring& 
     }
     MonitorControlConfig cfg;
     CopyCustomizationToMonitor(cfg);
+    if (!mainMonitorId.empty() && _wcsicmp(monitorId.c_str(), mainMonitorId.c_str()) != 0) {
+        ClearHotkeys(cfg);
+    }
     cfg.enabled = IsMonitorSelected(monitorId);
     cfg.customName = SanitizeMonitorName(defaultName);
     cfg.controlMode = 0;
@@ -886,11 +839,29 @@ const MonitorControlConfig* AppSettings::FindMonitorConfig(const std::wstring& m
 }
 
 int AppSettings::ComputeSyncedBrightness(int mainBrightness, const MonitorControlConfig& cfg) {
-    mainBrightness = (std::clamp)(mainBrightness, 0, 100);
-    if (cfg.syncZeroWhenMainZero && mainBrightness == 0) {
-        return 0;
-    }
     return (std::clamp)(mainBrightness + cfg.offset, 0, 100);
+}
+
+void AppSettings::ClearHotkeys(MonitorControlConfig& cfg) {
+    cfg.hotkeyUpKey = 0;
+    cfg.hotkeyUpMods = 0;
+    cfg.hotkeyDownKey = 0;
+    cfg.hotkeyDownMods = 0;
+    cfg.hotkeyPreset1Key = 0;
+    cfg.hotkeyPreset1Mods = 0;
+    cfg.hotkeyPreset2Key = 0;
+    cfg.hotkeyPreset2Mods = 0;
+    cfg.hotkeyPresetToggleKey = 0;
+    cfg.hotkeyPresetToggleMods = 0;
+}
+
+void AppSettings::ClearMatchingHotkey(MonitorControlConfig& cfg, UINT vk, UINT mods) {
+    if (vk == 0) return;
+    if (cfg.hotkeyUpKey == vk && cfg.hotkeyUpMods == mods) { cfg.hotkeyUpKey = 0; cfg.hotkeyUpMods = 0; }
+    if (cfg.hotkeyDownKey == vk && cfg.hotkeyDownMods == mods) { cfg.hotkeyDownKey = 0; cfg.hotkeyDownMods = 0; }
+    if (cfg.hotkeyPreset1Key == vk && cfg.hotkeyPreset1Mods == mods) { cfg.hotkeyPreset1Key = 0; cfg.hotkeyPreset1Mods = 0; }
+    if (cfg.hotkeyPreset2Key == vk && cfg.hotkeyPreset2Mods == mods) { cfg.hotkeyPreset2Key = 0; cfg.hotkeyPreset2Mods = 0; }
+    if (cfg.hotkeyPresetToggleKey == vk && cfg.hotkeyPresetToggleMods == mods) { cfg.hotkeyPresetToggleKey = 0; cfg.hotkeyPresetToggleMods = 0; }
 }
 
 MonitorControlConfig AppSettings::GetEffectiveMonitorConfig(const std::wstring& monitorId) const {
@@ -914,7 +885,8 @@ MonitorControlConfig AppSettings::GetEffectiveMonitorConfig(const std::wstring& 
         result.customName = own.customName;
         result.controlMode = own.controlMode;
         result.offset = own.offset;
-        result.syncZeroWhenMainZero = own.syncZeroWhenMainZero;
+        result.syncOverscrollMax = own.syncOverscrollMax;
+        result.syncOverscrollMin = own.syncOverscrollMin;
         result.syncSeparateTrayIcon = own.syncSeparateTrayIcon;
         result.overlayUseWindowsAccent = own.overlayUseWindowsAccent;
         result.overlayAccentColor = own.overlayAccentColor;

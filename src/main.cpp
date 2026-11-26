@@ -3,6 +3,7 @@
 #include "resource.h"
 #include "CliParser.h"
 #include "MonitorManager.h"
+#include "Settings.h"
 
 #pragma comment(lib, "dwmapi.lib")
 #pragma comment(lib, "dxva2.lib")
@@ -19,11 +20,33 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     // Ensure Per-Monitor V2 DPI awareness is active
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
+    // Parse optional --simulate-monitors=N / --simulate-monitors N / --sim=N before GUI or CLI monitor actions
+    std::wstring fullCmd = (pCmdLine ? pCmdLine : L"");
+    {
+        auto tryParseSim = [&](const std::wstring& cmdStr) {
+            std::wstring lower = cmdStr;
+            if (!lower.empty()) CharLowerBuffW(&lower[0], (DWORD)lower.size());
+            const wchar_t* keys[] = { L"--simulate-monitors=", L"--simulate-monitors ", L"--sim=", L"--sim " };
+            for (const wchar_t* k : keys) {
+                size_t pos = lower.find(k);
+                if (pos != std::wstring::npos) {
+                    size_t valPos = pos + wcslen(k);
+                    while (valPos < cmdStr.size() && cmdStr[valPos] == L' ') valPos++;
+                    int val = _wtoi(cmdStr.c_str() + valPos);
+                    if (val >= 0 && val <= 16) {
+                        g_Settings.cliSimulateMonitorsOverride = val;
+                    }
+                    break;
+                }
+            }
+        };
+        tryParseSim(fullCmd);
+    }
+
     // Single instance mutex check & message forwarding
     HANDLE hMutex = CreateMutexW(NULL, TRUE, L"ClickBrightness_v1.0.9_SingleInstance_Mutex");
     if (GetLastError() == ERROR_ALREADY_EXISTS)
     {
-        std::wstring fullCmd = (pCmdLine ? pCmdLine : L"");
         CliCommand cmd = ParseCommandLine(fullCmd);
 
         if (cmd.action == CliAction::Help)
@@ -91,7 +114,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     }
 
     // App is NOT running: handle standalone CLI-only requests before starting GUI
-    std::wstring fullCmd = (pCmdLine ? pCmdLine : L"");
     CliCommand cmd = ParseCommandLine(fullCmd);
 
     if (cmd.action == CliAction::Help)

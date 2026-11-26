@@ -15,7 +15,8 @@ struct MonitorControlConfig {
     std::wstring customName;
     int controlMode = 0; // 0 = Sync, 1 = Separate
     int offset = 0;      // -100 to +100 relative to Main Display when Sync
-    bool syncZeroWhenMainZero = false; // If true, Sync target 0% sets this monitor to 0% regardless of positive offset
+    bool syncOverscrollMax = true;     // Allow overscrolling when a synced display is already at 100%
+    bool syncOverscrollMin = true;     // Allow overscrolling when a synced display is already at 0%
     bool syncSeparateTrayIcon = false; // If true, Sync monitor also displays its own tray percentage icon
 
     // Shortcuts (without timings)
@@ -186,6 +187,10 @@ struct AppSettings {
     // Start with Windows (Startup Registry)
     bool startWithWindows = false;
 
+    // Debug / Simulation Mode (0 = disabled, 1-16 = simulated monitors)
+    int simulateMonitorsCount = 0;
+    int cliSimulateMonitorsOverride = -1;
+
     void Load();
     void Save() const;
     void SaveBrightnessOnly() const;
@@ -206,6 +211,8 @@ struct AppSettings {
 
     static std::wstring SanitizeMonitorName(const std::wstring& name, size_t maxLen = 20);
     static int ComputeSyncedBrightness(int mainBrightness, const MonitorControlConfig& cfg);
+    static void ClearHotkeys(MonitorControlConfig& cfg);
+    static void ClearMatchingHotkey(MonitorControlConfig& cfg, UINT vk, UINT mods);
     MonitorControlConfig& GetOrCreateMonitorConfig(const std::wstring& monitorId, const std::wstring& defaultName = L"");
     const MonitorControlConfig* FindMonitorConfig(const std::wstring& monitorId) const;
     MonitorControlConfig GetEffectiveMonitorConfig(const std::wstring& monitorId) const;

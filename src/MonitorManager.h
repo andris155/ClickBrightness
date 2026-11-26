@@ -49,6 +49,8 @@ public:
 
     int GetCurrentBrightness();
     int GetMonitorBrightnessById(const std::wstring& monitorId);
+    int GetTargetControlBrightness(const std::wstring& targetMonitorId);
+    void GetTargetBounds(const std::wstring& targetMonitorId, int& outMin, int& outMax) const;
     int GetCachedBrightness() const {
         std::lock_guard<std::mutex> lock(m_mutex);
         return m_cachedBrightness;
@@ -80,6 +82,7 @@ private:
     std::vector<PHYSICAL_MONITOR> m_rawMonitors;
     std::vector<PhysicalMonitorInfo> m_monitors;
     int m_cachedBrightness;
+    int m_syncBaseBrightness{ 45 };
     std::atomic<bool> m_driverAvailable;
     std::atomic<bool> m_displayPoweredOn;
     std::atomic<int> m_consecutiveFailures;

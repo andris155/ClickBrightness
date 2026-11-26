@@ -25,10 +25,23 @@
                 <ColumnDefinition Width="144"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Left App Title & Icon -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Spacing="10" Padding="16,0,16,0" IsHitTestVisible="False">
-                <Image x:Name="AppTitleBarIcon" Width="16" Height="16" VerticalAlignment="Center"/>
-                <TextBlock x:Name="AppTitleBarText" Text="ClickBrightness settings" FontSize="13" FontWeight="Normal" VerticalAlignment="Center" Margin="0,-1.5,0,0"/>
+            <!-- Left Back Button + App Title & Icon -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Spacing="6" Padding="8,0,16,0">
+                <Button x:Name="TitleBarBackButton"
+                        Width="36" Height="32"
+                        Padding="0"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        CornerRadius="4"
+                        IsEnabled="False"
+                        VerticalAlignment="Center"
+                        ToolTipService.ToolTip="Back">
+                    <FontIcon Glyph="&#xE72B;" FontSize="12"/>
+                </Button>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="10" IsHitTestVisible="False">
+                    <Image x:Name="AppTitleBarIcon" Width="16" Height="16" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="AppTitleBarText" Text="ClickBrightness settings" FontSize="13" FontWeight="Normal" VerticalAlignment="Center" Margin="0,-1.5,0,0"/>
+                </StackPanel>
             </StackPanel>
 
             <!-- Centered Search Box -->
@@ -263,11 +276,15 @@
                         <!-- SUBMENU 2: MONITORS                        -->
                         <!-- ========================================== -->
                         <StackPanel x:Name="MonitorsPanel" Visibility="Collapsed" Spacing="0">
-                            <StackPanel.ChildrenTransitions>
-                                <TransitionCollection>
-                                    <EntranceThemeTransition FromVerticalOffset="20"/>
-                                </TransitionCollection>
-                            </StackPanel.ChildrenTransitions>
+                            <Grid x:Name="MonitorsViewHost">
+                                <Grid.ChildrenTransitions>
+                                    <TransitionCollection>
+                                        <EntranceThemeTransition x:Name="MonitorsViewTransition" FromHorizontalOffset="0" FromVerticalOffset="20"/>
+                                    </TransitionCollection>
+                                </Grid.ChildrenTransitions>
+
+                            <!-- Main Monitors View -->
+                            <StackPanel x:Name="MonitorsMainView" Spacing="0">
                             <!-- Page Title & Header Banner -->
                             <Grid Padding="4,4,4,12" Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
@@ -431,8 +448,8 @@
                                 </Grid>
                             </Border>
 
-                            <!-- Set to 0% when Main Display is 0% (Sync mode, non-Main) -->
-                            <Border x:Name="MonitorOffsetZeroCard" Visibility="Collapsed"
+                            <!-- Sync Overscroll Max (100%) (Sync mode, non-Main) -->
+                            <Border x:Name="SyncOverscrollMaxCard" Visibility="Collapsed"
                                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                     BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
@@ -442,14 +459,37 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <FontIcon Glyph="&#xE708;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <FontIcon Glyph="&#xE74A;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                                        <TextBlock x:Name="MonitorOffsetZeroTitleText" Text="Set to 0% when Main Display is 0%" FontSize="14" FontWeight="Normal"/>
-                                        <TextBlock x:Name="MonitorOffsetZeroDescText" Text="Allow this display to drop to 0% when the Main Display is at 0%, even with a positive offset" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="SyncOverscrollMaxTitleText" Text="Overscroll when a display is at 100%" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="SyncOverscrollMaxDescText" Text="Continue increasing other synced displays even when at least one synced display is already at 100%" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                        <TextBlock x:Name="MonitorOffsetZeroStatusText" Text="Off" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
-                                        <ToggleSwitch x:Name="MonitorOffsetZeroToggle" MinWidth="0" OnContent="" OffContent="" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                        <TextBlock x:Name="SyncOverscrollMaxStatusText" Text="On" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                                        <ToggleSwitch x:Name="SyncOverscrollMaxToggle" MinWidth="0" OnContent="" OffContent="" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Sync Overscroll Min (0%) (Sync mode, non-Main) -->
+                            <Border x:Name="SyncOverscrollMinCard" Visibility="Collapsed"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE74B;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="SyncOverscrollMinTitleText" Text="Overscroll when a display is at 0%" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="SyncOverscrollMinDescText" Text="Continue decreasing other synced displays even when at least one synced display is already at 0%" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <TextBlock x:Name="SyncOverscrollMinStatusText" Text="On" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                                        <ToggleSwitch x:Name="SyncOverscrollMinToggle" MinWidth="0" OnContent="" OffContent="" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Right"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -461,11 +501,106 @@
                                     BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,6,0,4">
                                 <StackPanel Orientation="Horizontal" Spacing="12">
                                     <FontIcon Glyph="&#xE946;" FontSize="16" VerticalAlignment="Center" Foreground="{ThemeResource AccentAAFillColorDefaultBrush}"/>
-                                    <TextBlock x:Name="MonitorSyncNoticeText" Text="This display is in Sync mode and uses the Main Display's shortcuts, OSD color, system tray, and flyout slider settings." FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="MonitorSyncNoticeText" Text="This display is in Sync mode and uses the Main Display's shortcuts and wheel controls. You can customize its OSD color, Flyout color, and optional tray icon below." FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Border>
 
-                            <!-- Per-Monitor Customizations -->
+                            <!-- Windows Settings-style Submenu Navigation Cards -->
+                            <TextBlock x:Name="MonitorSubmenusSectionTitle" Text="Customization &amp; Controls" FontSize="14" FontWeight="SemiBold" Margin="0,18,0,6"/>
+
+                            <Button x:Name="MonitorsShortcutsCard" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE765;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="SubmenuShortcutsTitleText" Text="Keyboard Shortcuts" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="SubmenuShortcutsDescText" Text="Global hotkeys for brightness stepping and preset jumping" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <FontIcon Grid.Column="2" Glyph="&#xE76C;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                </Grid>
+                            </Button>
+
+                            <Button x:Name="MonitorsOsdCard" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE7F4;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="SubmenuOsdTitleText" Text="On-Screen Display (OSD)" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="SubmenuOsdDescText" Text="Overlay accent color for this display" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <FontIcon Grid.Column="2" Glyph="&#xE76C;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                </Grid>
+                            </Button>
+
+                            <Button x:Name="MonitorsTrayCard" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE718;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="SubmenuTrayTitleText" Text="System Tray Icon" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="SubmenuTrayDescText" Text="Taskbar percentage icon, typography, and mouse actions" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <FontIcon Grid.Column="2" Glyph="&#xE76C;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                </Grid>
+                            </Button>
+
+                            <Button x:Name="MonitorsFlyoutCard" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE9E9;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="SubmenuFlyoutTitleText" Text="Flyout Slider" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="SubmenuFlyoutDescText" Text="Flyout scrolling and slider accent color" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <FontIcon Grid.Column="2" Glyph="&#xE76C;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                </Grid>
+                            </Button>
+                            </StackPanel>
+
+                            <!-- Subpage View (Breadcrumb + Customizations) -->
+                            <StackPanel x:Name="MonitorsSubpageView" Visibility="Collapsed" Spacing="0">
+
+                                <!-- Subpage Breadcrumb Header -->
+                                <StackPanel x:Name="MonitorsBreadcrumbHeader" Spacing="2" Margin="0,0,0,12">
+                                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <Button x:Name="MonitorsBreadcrumbRootButton" Background="Transparent" BorderThickness="0" Padding="4,2" CornerRadius="4" VerticalAlignment="Center">
+                                            <TextBlock x:Name="MonitorsBreadcrumbRootText" Text="Monitors" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                        </Button>
+                                        <FontIcon Glyph="&#xE76C;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,2,0,0"/>
+                                        <TextBlock x:Name="MonitorsBreadcrumbCurrentText" Text="Shortcuts" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="MonitorsBreadcrumbTargetText" Text="" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="4,0,0,0"/>
+                                </StackPanel>
+
+                            <!-- Per-Monitor Customizations (Subpage Container) -->
                             <StackPanel x:Name="MonitorCustomizationsPanel" Spacing="0">
                             <StackPanel x:Name="ShortcutsCustomSection" Spacing="0">
                             <!-- Section: Stepping Shortcuts -->
@@ -1392,17 +1527,23 @@
 
                             </StackPanel>
                             </StackPanel>
+                            </StackPanel>
+                            </Grid>
                         </StackPanel>
 
                         <!-- ========================================== -->
                         <!-- SUBMENU 3: TIMINGS & GLOBAL                -->
                         <!-- ========================================== -->
                         <StackPanel x:Name="TimingsPanel" Visibility="Collapsed" Spacing="0">
-                            <StackPanel.ChildrenTransitions>
-                                <TransitionCollection>
-                                    <EntranceThemeTransition FromVerticalOffset="20"/>
-                                </TransitionCollection>
-                            </StackPanel.ChildrenTransitions>
+                            <Grid x:Name="TimingsViewHost">
+                                <Grid.ChildrenTransitions>
+                                    <TransitionCollection>
+                                        <EntranceThemeTransition x:Name="TimingsViewTransition" FromHorizontalOffset="0" FromVerticalOffset="20"/>
+                                    </TransitionCollection>
+                                </Grid.ChildrenTransitions>
+
+                            <!-- Main Timings View -->
+                            <StackPanel x:Name="TimingsMainView" Spacing="0">
                             <!-- Page Title & Header Banner -->
                             <Grid Padding="4,4,4,12" Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
@@ -1416,56 +1557,11 @@
                                 </StackPanel>
                             </Grid>
 
-                            <!-- Global OSD & Flyout Section -->
-                            <TextBlock x:Name="GlobalOsdFlyoutSectionTitle" Text="OSD &amp; Flyout Global" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                            <!-- Submenu Cards: Shortcuts, Flyout, OSD, System Tray -->
+                            <TextBlock x:Name="TimingsSubmenusSectionTitle" Text="Feature Settings &amp; Delays" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,6"/>
 
-                            <!-- OSD Theme -->
-                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <FontIcon Glyph="&#xE771;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                                        <TextBlock x:Name="OverlayThemeTitleText" Text="OSD Banner Theme" FontSize="14" FontWeight="Normal"/>
-                                        <TextBlock x:Name="OverlayThemeDescText" Text="Visual appearance and color theme of the brightness overlay banner" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
-                                    </StackPanel>
-                                    <ComboBox x:Name="OverlayThemeComboBox" Grid.Column="2" Width="210" VerticalAlignment="Center">
-                                        <ComboBoxItem x:Name="OverlayThemeItemFollowWindows" Content="Follow Windows (system)"/>
-                                        <ComboBoxItem x:Name="OverlayThemeItemDark" Content="Dark"/>
-                                        <ComboBoxItem x:Name="OverlayThemeItemLight" Content="Light"/>
-                                    </ComboBox>
-                                </Grid>
-                            </Border>
-
-                            <!-- Hide Time -->
-                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <FontIcon Glyph="&#xE890;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                                        <TextBlock x:Name="OverlayTimeoutTitleText" Text="Hide Time (ms)" FontSize="14" FontWeight="Normal"/>
-                                        <TextBlock x:Name="OverlayTimeoutDescText" Text="Auto-hide timeout for banner overlay" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                        <Slider x:Name="OverlayTimeoutSlider" Minimum="500" Maximum="10000" StepFrequency="250" Width="160" VerticalAlignment="Center"/>
-                                        <NumberBox x:Name="OverlayTimeoutNumberBox" Minimum="500" Maximum="10000" Width="90" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-
-                            <!-- Enable Keyboard Navigation Toggle -->
-                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            <Button x:Name="TimingsShortcutsCard" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                     BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
                                 <Grid>
@@ -1476,18 +1572,86 @@
                                     </Grid.ColumnDefinitions>
                                     <FontIcon Glyph="&#xE765;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                                        <TextBlock x:Name="FlyoutKeyboardEnabledTitleText" Text="Keyboard Controls" FontSize="14" FontWeight="Normal"/>
-                                        <TextBlock x:Name="FlyoutKeyboardEnabledDescText" Text="Adjust brightness using keyboard arrow keys, Page Up/Down, and Home/End" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="SubmenuTimingsShortcutsTitleText" Text="Keyboard Shortcuts" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="SubmenuTimingsShortcutsDescText" Text="Hotkey debounce delay and key hold repeat interval" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                                     </StackPanel>
-                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                        <TextBlock x:Name="FlyoutKeyboardEnabledStatusText" Text="Off" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
-                                        <ToggleSwitch x:Name="FlyoutKeyboardEnabledToggle" MinWidth="0" OnContent="" OffContent="" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Right"/>
-                                    </StackPanel>
+                                    <FontIcon Grid.Column="2" Glyph="&#xE76C;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                 </Grid>
-                            </Border>
+                            </Button>
 
-                            <!-- Shortcuts Timing & Hardware Delay -->
-                            <TextBlock x:Name="TimingDelaySectionTitle" Text="Shortcuts Timing &amp; Hardware Delay" FontSize="14" FontWeight="SemiBold" Margin="0,18,0,6"/>
+                            <Button x:Name="TimingsFlyoutCard" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE9E9;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="SubmenuTimingsFlyoutTitleText" Text="Flyout Slider" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="SubmenuTimingsFlyoutDescText" Text="Keyboard controls, scrolling delay, and button debounce delay" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <FontIcon Grid.Column="2" Glyph="&#xE76C;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                </Grid>
+                            </Button>
+
+                            <Button x:Name="TimingsOsdCard" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE7F4;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="SubmenuTimingsOsdTitleText" Text="On-Screen Display (OSD)" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="SubmenuTimingsOsdDescText" Text="OSD banner theme and auto-hide duration" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <FontIcon Grid.Column="2" Glyph="&#xE76C;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                </Grid>
+                            </Button>
+
+                            <Button x:Name="TimingsTrayCard" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE718;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="SubmenuTimingsTrayTitleText" Text="System Tray" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="SubmenuTimingsTrayDescText" Text="Mouse wheel scrolling debounce delay on the tray icon" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <FontIcon Grid.Column="2" Glyph="&#xE76C;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                </Grid>
+                            </Button>
+                            </StackPanel>
+
+                            <!-- Timings Subpage View -->
+                            <StackPanel x:Name="TimingsSubpageView" Visibility="Collapsed" Spacing="0">
+                                <StackPanel x:Name="TimingsBreadcrumbHeader" Spacing="2" Margin="0,0,0,12">
+                                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <Button x:Name="TimingsBreadcrumbRootButton" Background="Transparent" BorderThickness="0" Padding="4,2" CornerRadius="4" VerticalAlignment="Center">
+                                            <TextBlock x:Name="TimingsBreadcrumbRootText" Text="Timings &amp; Global" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                        </Button>
+                                        <FontIcon Glyph="&#xE76C;" FontSize="12" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,2,0,0"/>
+                                        <TextBlock x:Name="TimingsBreadcrumbCurrentText" Text="Flyout Slider" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                            <!-- Subpage: Keyboard Shortcuts -->
+                            <StackPanel x:Name="TimingsShortcutsSection" Spacing="0">
+                            <TextBlock x:Name="TimingDelaySectionTitle" Text="Shortcuts Timing &amp; Hardware Delay" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,6"/>
 
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
@@ -1551,9 +1715,60 @@
                                     </StackPanel>
                                 </Grid>
                             </Border>
+                            </StackPanel>
 
+                            <!-- Subpage: On-Screen Display (OSD) -->
+                            <StackPanel x:Name="TimingsOsdSection" Spacing="0">
+                            <TextBlock x:Name="GlobalOsdFlyoutSectionTitle" Text="On-Screen Display (OSD)" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,6"/>
+
+                            <!-- OSD Theme -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE771;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="OverlayThemeTitleText" Text="OSD Banner Theme" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="OverlayThemeDescText" Text="Visual appearance and color theme of the brightness overlay banner" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <ComboBox x:Name="OverlayThemeComboBox" Grid.Column="2" Width="210" VerticalAlignment="Center">
+                                        <ComboBoxItem x:Name="OverlayThemeItemFollowWindows" Content="Follow Windows (system)"/>
+                                        <ComboBoxItem x:Name="OverlayThemeItemDark" Content="Dark"/>
+                                        <ComboBoxItem x:Name="OverlayThemeItemLight" Content="Light"/>
+                                    </ComboBox>
+                                </Grid>
+                            </Border>
+
+                            <!-- Hide Time -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE890;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="OverlayTimeoutTitleText" Text="Hide Time (ms)" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="OverlayTimeoutDescText" Text="Auto-hide timeout for banner overlay" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Slider x:Name="OverlayTimeoutSlider" Minimum="500" Maximum="10000" StepFrequency="250" Width="160" VerticalAlignment="Center"/>
+                                        <NumberBox x:Name="OverlayTimeoutNumberBox" Minimum="500" Maximum="10000" Width="90" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                            </StackPanel>
+                            <StackPanel x:Name="TimingsTraySection" Spacing="0">
                             <!-- System Tray Timing & Hardware Delay -->
-                            <TextBlock x:Name="TrayTimingDelaySectionTitle" Text="System Tray Timing &amp; Hardware Delay" FontSize="14" FontWeight="SemiBold" Margin="0,18,0,6"/>
+                            <TextBlock x:Name="TrayTimingDelaySectionTitle" Text="System Tray Timing &amp; Hardware Delay" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,6"/>
 
                             <Border x:Name="TrayWheelDelayCard" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
@@ -1597,8 +1812,32 @@
                                 </Grid>
                             </Border>
 
+                            </StackPanel>
+                            <StackPanel x:Name="TimingsFlyoutSection" Spacing="0">
                             <!-- Flyout Slider Timing & Hardware Delay -->
-                            <TextBlock x:Name="FlyoutTimingDelaySectionTitle" Text="Flyout Slider Timing &amp; Hardware Delay" FontSize="14" FontWeight="SemiBold" Margin="0,18,0,6"/>
+                            <TextBlock x:Name="FlyoutTimingDelaySectionTitle" Text="Flyout Slider" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,6"/>
+
+                            <!-- Enable Keyboard Navigation Toggle -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE765;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock x:Name="FlyoutKeyboardEnabledTitleText" Text="Keyboard Controls" FontSize="14" FontWeight="Normal"/>
+                                        <TextBlock x:Name="FlyoutKeyboardEnabledDescText" Text="Adjust brightness using keyboard arrow keys, Page Up/Down, and Home/End" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <TextBlock x:Name="FlyoutKeyboardEnabledStatusText" Text="Off" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                                        <ToggleSwitch x:Name="FlyoutKeyboardEnabledToggle" MinWidth="0" OnContent="" OffContent="" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
 
                             <Border x:Name="FlyoutScrollDelayCard" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
@@ -1683,6 +1922,9 @@
                                     </StackPanel>
                                 </Grid>
                             </Border>
+                            </StackPanel>
+                            </StackPanel>
+                            </Grid>
                         </StackPanel>
 
                         <!-- ========================================== -->

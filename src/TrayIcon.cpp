@@ -524,8 +524,8 @@ bool TrayIcon::UpdateBrightness(int brightness) {
 bool TrayIcon::UpdateBrightnessForTarget(const std::wstring& targetMonitorId, int brightness) {
     if (!m_created) return false;
 
-    if (brightness < 0) brightness = 0;
-    if (brightness > 100) brightness = 100;
+    int rawBrightness = brightness;
+    brightness = (std::clamp)(brightness, 0, 100);
 
     bool isMainOrSync = targetMonitorId.empty() ||
                         _wcsicmp(targetMonitorId.c_str(), L"__SYNC__") == 0 ||
@@ -574,7 +574,7 @@ bool TrayIcon::UpdateBrightnessForTarget(const std::wstring& targetMonitorId, in
         for (auto& slot : m_extraSlots) {
             if (slot.created && slot.isSyncSlot) {
                 const auto& syncCfg = g_Settings.GetEffectiveMonitorConfig(slot.monitorId);
-                int syncB = AppSettings::ComputeSyncedBrightness(brightness, syncCfg);
+                int syncB = AppSettings::ComputeSyncedBrightness(rawBrightness, syncCfg);
                 UpdateBrightnessForTarget(slot.monitorId, syncB);
             }
         }
@@ -712,7 +712,7 @@ void TrayIcon::SyncExtraTrayIcons() {
         }
     }
 
-    // Refresh icons for all active extra slots
+    // Refresh icons for all active extra slots only when brightness changed
     for (auto& slot : m_extraSlots) {
         if (slot.created) {
             int b = slot.lastBrightness;
@@ -722,7 +722,9 @@ void TrayIcon::SyncExtraTrayIcons() {
             } else if (b < 0) {
                 b = g_MonitorManager.GetMonitorBrightnessById(slot.monitorId);
             }
-            UpdateBrightnessForTarget(slot.monitorId, b);
+            if (b != slot.lastBrightness || slot.lastBrightness < 0) {
+                UpdateBrightnessForTarget(slot.monitorId, b);
+            }
         }
     }
     UpdateWheelHook();

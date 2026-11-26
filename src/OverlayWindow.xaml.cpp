@@ -570,8 +570,10 @@ namespace winrt::BrightnessApp::implementation
             ApplyPendingBrightness();
         }
         m_pendingTargetMonitorId = targetMonitorId;
-        int cur = m_hasPendingChange ? m_pendingBrightness : g_MonitorManager.GetMonitorBrightnessById(targetMonitorId);
-        int target = (std::clamp)(cur + delta, 0, 100);
+        int minB = 0, maxB = 100;
+        g_MonitorManager.GetTargetBounds(targetMonitorId, minB, maxB);
+        int cur = m_hasPendingChange ? m_pendingBrightness : g_MonitorManager.GetTargetControlBrightness(targetMonitorId);
+        int target = (std::clamp)(cur + delta, minB, maxB);
         m_displayedBrightness = target;
         m_pendingBrightness = target;
         m_hasPendingChange = true;
@@ -633,8 +635,10 @@ namespace winrt::BrightnessApp::implementation
             ApplyPendingBrightness();
         }
         m_pendingTargetMonitorId = targetMonitorId;
-        int cur = m_hasPendingChange ? m_pendingBrightness : g_MonitorManager.GetMonitorBrightnessById(targetMonitorId);
-        int target = (std::clamp)(cur + delta, 0, 100);
+        int minB = 0, maxB = 100;
+        g_MonitorManager.GetTargetBounds(targetMonitorId, minB, maxB);
+        int cur = m_hasPendingChange ? m_pendingBrightness : g_MonitorManager.GetTargetControlBrightness(targetMonitorId);
+        int target = (std::clamp)(cur + delta, minB, maxB);
         m_displayedBrightness = target;
         m_pendingBrightness = target;
         m_hasPendingChange = true;
@@ -699,8 +703,10 @@ namespace winrt::BrightnessApp::implementation
             ApplyPendingBrightness();
         }
         m_pendingTargetMonitorId = targetMonitorId;
-        target = (std::clamp)(target, 0, 100);
-        int cur = g_MonitorManager.GetMonitorBrightnessById(targetMonitorId);
+        int minB = 0, maxB = 100;
+        g_MonitorManager.GetTargetBounds(targetMonitorId, minB, maxB);
+        target = (std::clamp)(target, minB, maxB);
+        int cur = g_MonitorManager.GetTargetControlBrightness(targetMonitorId);
         bool changed = (cur != target);
 
         m_displayedBrightness = target;
@@ -750,8 +756,13 @@ namespace winrt::BrightnessApp::implementation
                 KillTimer(m_hwnd, IDT_HOTKEY_DEBOUNCE);
             }
             g_MonitorManager.SetMonitorBrightnessTarget(m_pendingTargetMonitorId, m_pendingBrightness);
-            g_FlyoutWindow.SetBrightness(m_pendingBrightness, false);
-            g_Settings.cachedBrightness = m_pendingBrightness;
+            g_FlyoutWindow.SetBrightnessForTarget(m_pendingTargetMonitorId, m_pendingBrightness, false);
+            if (m_pendingTargetMonitorId.empty() ||
+                _wcsicmp(m_pendingTargetMonitorId.c_str(), L"__SYNC__") == 0 ||
+                _wcsicmp(m_pendingTargetMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0)
+            {
+                g_Settings.cachedBrightness = m_pendingBrightness;
+            }
             g_Settings.SaveBrightnessOnly();
         }
     }

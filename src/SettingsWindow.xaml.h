@@ -38,6 +38,8 @@ namespace winrt::BrightnessApp::implementation
         void UpdateMonitorsSelectionUI();
         void LoadMonitorConfigToUI();
         void SaveCurrentMonitorConfigFromUI();
+        void OpenMonitorsSubpage(const std::wstring& subpageTag);
+        void OpenTimingsSubpage(const std::wstring& subpageTag);
         void UpdateTitleBarDragRegions();
 
         void EnsureTrayTabLoaded();
@@ -69,10 +71,16 @@ namespace winrt::BrightnessApp::implementation
         bool m_aboutTabLoaded{ false };
         std::vector<std::wstring> m_cachedMonitorIds;
         std::wstring m_selectedConfigMonitorId;
+        std::wstring m_currentMonitorsSubpage;
+        std::wstring m_currentTimingsSubpage;
 
         winrt::Microsoft::UI::Xaml::Controls::StackPanel m_generalPanel{ nullptr };
         winrt::Microsoft::UI::Xaml::Controls::StackPanel m_monitorsPanel{ nullptr };
+        winrt::Microsoft::UI::Xaml::Controls::StackPanel m_monitorsMainView{ nullptr };
+        winrt::Microsoft::UI::Xaml::Controls::StackPanel m_monitorsSubpageView{ nullptr };
         winrt::Microsoft::UI::Xaml::Controls::StackPanel m_timingsPanel{ nullptr };
+        winrt::Microsoft::UI::Xaml::Controls::StackPanel m_timingsMainView{ nullptr };
+        winrt::Microsoft::UI::Xaml::Controls::StackPanel m_timingsSubpageView{ nullptr };
         winrt::Microsoft::UI::Xaml::Controls::StackPanel m_aboutPanel{ nullptr };
     };
 }

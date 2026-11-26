@@ -21,12 +21,19 @@ bool HotkeyManager::RegisterAll(HWND hwnd) {
 
     bool allOk = true;
     int nextId = 2001;
+    std::vector<std::pair<UINT, UINT>> usedKeys;
 
     auto registerGroup = [&](const std::wstring& targetMonId, const MonitorControlConfig& cfg) {
         auto regOne = [&](int action, UINT mods, UINT vk) {
             if (vk == 0) return true;
+            for (const auto& uk : usedKeys) {
+                if (uk.first == mods && uk.second == vk) {
+                    return true; // Skip duplicate hotkey so one hotkey is never used multiple times
+                }
+            }
             int id = nextId++;
             if (RegisterHotKey(hwnd, id, mods, vk)) {
+                usedKeys.push_back({ mods, vk });
                 m_bindings.push_back({ id, targetMonId, action, vk });
                 return true;
             }
