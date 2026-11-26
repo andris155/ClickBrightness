@@ -2,6 +2,7 @@
 #include "Settings.h"
 #include "ThemeHelper.h"
 #include "resource.h"
+#include <lowlevelmonitorconfigurationapi.h>
 #include <map>
 #include <wbemidl.h>
 #include <wrl/client.h>
@@ -289,6 +290,16 @@ struct EnumContext {
     std::map<std::wstring, std::vector<std::wstring>> friendlyNames;
 };
 
+static bool IsExternalMonitorPoweredOffVcp(HANDLE hPhysical) {
+    if (!hPhysical) return false;
+    DWORD currentPower = 0;
+    if (GetVCPFeatureAndVCPFeatureReply(hPhysical, 0xD6, NULL, &currentPower, NULL)) {
+        // VCP 0xD6 Power Mode: 0x01 = On, 0x02 = Standby, 0x03 = Suspend, 0x04 = Off, 0x05 = Power off
+        return (currentPower >= 2 && currentPower <= 5);
+    }
+    return false;
+}
+
 static BOOL CALLBACK MonitorEnumCallback(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData) {
     UNREFERENCED_PARAMETER(hdcMonitor);
     UNREFERENCED_PARAMETER(lprcMonitor);
@@ -339,6 +350,8 @@ static BOOL CALLBACK MonitorEnumCallback(HMONITOR hMonitor, HDC hdcMonitor, LPRE
                     info.currentBrightness = curB;
                     info.isPrimary = isPrimary;
                     info.isInternal = false;
+                    info.isPoweredOff = IsExternalMonitorPoweredOffVcp(phys[i].hPhysicalMonitor);
+                    info.consecutiveWriteFailures = 0;
                     ctx->monitors->push_back(info);
                 }
             }
@@ -595,6 +608,9 @@ int MonitorManager::GetCurrentBrightness() {
     // Query first selected monitor
     for (auto& mon : m_monitors) {
         if (g_Settings.IsMonitorSelected(mon.id)) {
+            if (g_Settings.disableTurnedOffControl && mon.isPoweredOff) {
+                continue;
+            }
             DWORD minB = 0, curB = 0, maxB = 100;
             bool ok = mon.isInternal
                 ? GetInternalBrightnessWmi(mon.wmiInstanceName, curB)
@@ -665,7 +681,7 @@ int MonitorManager::GetMonitorBrightnessById(const std::wstring& monitorId) {
     std::lock_guard<std::mutex> lock(m_mutex);
     for (auto& mon : m_monitors) {
         if (_wcsicmp(mon.id.c_str(), monitorId.c_str()) == 0) {
-            if (GetSimMonitorCount() > 0) {
+            if (GetSimMonitorCount() > 0 || (g_Settings.disableTurnedOffControl && mon.isPoweredOff)) {
                 int pct = SafeCalcBrightnessPercent(mon.currentBrightness, mon.minBrightness, mon.maxBrightness);
                 auto* cfg = const_cast<MonitorControlConfig*>(g_Settings.FindMonitorConfig(mon.id));
                 if (cfg) cfg->cachedBrightness = pct;
@@ -819,6 +835,7 @@ std::vector<BrightnessChangeEntry> MonitorManager::GetChangedMonitorsForTarget(c
         const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
         bool enabled = cfg ? cfg->enabled : true;
         if (!enabled) continue;
+        if (g_Settings.disableTurnedOffControl && mon.isPoweredOff) continue;
 
         bool isMain = (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
         int mode = cfg ? cfg->controlMode : 0;
@@ -830,14 +847,14 @@ std::vector<BrightnessChangeEntry> MonitorManager::GetChangedMonitorsForTarget(c
             COLORREF osdCol = (effCfg.overlayUseDualColors && isOverlayDark) ? effCfg.overlayAccentColorDark : effCfg.overlayAccentColor;
             std::wstring dispName = (cfg && !cfg->customName.empty()) ? cfg->customName : AppSettings::SanitizeMonitorName(mon.friendlyName);
             if (dispName.empty()) dispName = mon.id;
-            result.push_back({ mon.id, dispName, effB, effCfg.overlayUseWindowsAccent, osdCol });
+            result.push_back({ mon.id, dispName, effB, effCfg.overlayUseWindowsAccent, osdCol, mon.isPoweredOff });
         } else {
             if (_wcsicmp(mon.id.c_str(), targetMonitorId.c_str()) != 0) continue;
             const auto& effCfg = g_Settings.GetEffectiveMonitorConfig(mon.id);
             COLORREF osdCol = (effCfg.overlayUseDualColors && isOverlayDark) ? effCfg.overlayAccentColorDark : effCfg.overlayAccentColor;
             std::wstring dispName = (cfg && !cfg->customName.empty()) ? cfg->customName : AppSettings::SanitizeMonitorName(mon.friendlyName);
             if (dispName.empty()) dispName = mon.id;
-            result.push_back({ mon.id, dispName, targetBrightness, effCfg.overlayUseWindowsAccent, osdCol });
+            result.push_back({ mon.id, dispName, targetBrightness, effCfg.overlayUseWindowsAccent, osdCol, mon.isPoweredOff });
         }
     }
     return result;
@@ -944,11 +961,12 @@ void MonitorManager::WorkerLoop() {
         int targetBrightness = kNoPendingBrightness;
         std::wstring targetMonitorId;
         bool doReinit = false;
+        bool doPowerCheck = false;
 
         {
             std::unique_lock<std::mutex> lock(m_workerMutex);
             m_workerCv.wait(lock, [this]() {
-                return m_stopWorker || m_pendingTargetBrightness != kNoPendingBrightness || m_pendingReinit;
+                return m_stopWorker || m_pendingTargetBrightness != kNoPendingBrightness || m_pendingReinit || m_pendingPowerCheck;
             });
 
             if (m_stopWorker) {
@@ -958,6 +976,11 @@ void MonitorManager::WorkerLoop() {
             if (m_pendingReinit) {
                 m_pendingReinit = false;
                 doReinit = true;
+            }
+
+            if (m_pendingPowerCheck) {
+                m_pendingPowerCheck = false;
+                doPowerCheck = true;
             }
 
             if (m_pendingTargetBrightness != kNoPendingBrightness) {
@@ -974,6 +997,46 @@ void MonitorManager::WorkerLoop() {
                 EnumMonitorsInternal();
             }
             UpdateFnSyncListener();
+        } else if (doPowerCheck && GetSimMonitorCount() <= 0) {
+            struct ExtCheck {
+                std::wstring id;
+                HANDLE hPhysical;
+            };
+            std::vector<ExtCheck> toCheck;
+            {
+                std::lock_guard<std::mutex> lock(m_mutex);
+                for (const auto& mon : m_monitors) {
+                    if (!mon.isInternal && mon.hPhysical != NULL) {
+                        toCheck.push_back({ mon.id, mon.hPhysical });
+                    }
+                }
+            }
+            bool anyChanged = false;
+            ULONGLONG checkNow = GetTickCount64();
+            for (const auto& item : toCheck) {
+                bool isOff = IsExternalMonitorPoweredOffVcp(item.hPhysical);
+                std::lock_guard<std::mutex> lock(m_mutex);
+                for (auto& mon : m_monitors) {
+                    if (!mon.isInternal && mon.hPhysical == item.hPhysical) {
+                        mon.lastPowerCheckTick = checkNow;
+                        if (mon.isPoweredOff != isOff) {
+                            mon.isPoweredOff = isOff;
+                            anyChanged = true;
+                        }
+                        if (!isOff) {
+                            mon.consecutiveWriteFailures = 0;
+                        }
+                        break;
+                    }
+                }
+            }
+            if (anyChanged) {
+                HWND hMain = FindWindowW(L"ClickBrightness_MessageWndClass", L"ClickBrightness_HiddenMsgWindow");
+                if (!hMain) hMain = FindWindowW(L"ClickBrightness_MessageWndClass", NULL);
+                if (hMain) {
+                    PostMessageW(hMain, WM_APP_POWER_STATE_UPDATED, 0, 0);
+                }
+            }
         }
 
         if (targetBrightness != kNoPendingBrightness) {
@@ -1000,6 +1063,7 @@ void MonitorManager::WorkerLoop() {
                     for (const auto& mon : m_monitors) {
                         const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
                         if (cfg && !cfg->enabled) continue;
+                        if (g_Settings.disableTurnedOffControl && mon.isPoweredOff) continue;
 
                         bool isMain = (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
                         int mode = cfg ? cfg->controlMode : 0;
@@ -1020,7 +1084,7 @@ void MonitorManager::WorkerLoop() {
                 }
             }
 
-            bool allSuccess = true;
+            bool anySuccess = false;
             for (const auto& tgt : targets) {
                 // Check if a newer target brightness arrived while writing or worker is stopping
                 {
@@ -1071,27 +1135,75 @@ void MonitorManager::WorkerLoop() {
                     }
                 }
 
+                bool powerStateChanged = false;
                 if (ok) {
+                    anySuccess = true;
+                    bool isOff = false;
+                    bool didPowerCheck = false;
+                    ULONGLONG nowTick = GetTickCount64();
+                    if (!tgt.isInternal && !isSim) {
+                        bool shouldCheck = false;
+                        {
+                            std::lock_guard<std::mutex> lock(m_mutex);
+                            for (const auto& mon : m_monitors) {
+                                if (!mon.isInternal && mon.hPhysical == tgt.hPhysical) {
+                                    shouldCheck = (mon.isPoweredOff || (nowTick - mon.lastPowerCheckTick >= 1500));
+                                    break;
+                                }
+                            }
+                        }
+                        if (shouldCheck) {
+                            isOff = IsExternalMonitorPoweredOffVcp(tgt.hPhysical);
+                            didPowerCheck = true;
+                        }
+                    }
                     std::lock_guard<std::mutex> lock(m_mutex);
                     for (auto& mon : m_monitors) {
                         if (isSim ? (_wcsicmp(mon.id.c_str(), tgt.id.c_str()) == 0)
                                   : (tgt.isInternal ? (mon.isInternal && mon.wmiInstanceName == tgt.wmiInstanceName)
                                                     : (!mon.isInternal && mon.hPhysical == tgt.hPhysical))) {
                             mon.currentBrightness = tgt.targetVal;
+                            if (didPowerCheck) {
+                                mon.lastPowerCheckTick = nowTick;
+                                if (mon.isPoweredOff != isOff) {
+                                    mon.isPoweredOff = isOff;
+                                    powerStateChanged = true;
+                                }
+                            }
+                            mon.consecutiveWriteFailures = 0;
                             break;
                         }
                     }
-                } else {
-                    allSuccess = false;
+                } else if (!tgt.isInternal && !isSim) {
+                    bool vcpOff = IsExternalMonitorPoweredOffVcp(tgt.hPhysical);
+                    std::lock_guard<std::mutex> lock(m_mutex);
+                    for (auto& mon : m_monitors) {
+                        if (!mon.isInternal && mon.hPhysical == tgt.hPhysical) {
+                            mon.consecutiveWriteFailures++;
+                            bool nowOff = (vcpOff || mon.consecutiveWriteFailures >= 2);
+                            if (nowOff && !mon.isPoweredOff) {
+                                mon.isPoweredOff = true;
+                                powerStateChanged = true;
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (powerStateChanged) {
+                    HWND hMain = FindWindowW(L"ClickBrightness_MessageWndClass", L"ClickBrightness_HiddenMsgWindow");
+                    if (!hMain) hMain = FindWindowW(L"ClickBrightness_MessageWndClass", NULL);
+                    if (hMain) {
+                        PostMessageW(hMain, WM_APP_POWER_STATE_UPDATED, 0, 0);
+                    }
                 }
             }
 
             if (!targets.empty()) {
-                if (allSuccess) {
+                if (anySuccess) {
                     m_consecutiveFailures = 0;
                 } else {
                     int fails = ++m_consecutiveFailures;
-                    // Require 3 consecutive failed operations before declaring hardware/driver unavailable
+                    // Require 3 consecutive operations where all targets fail before declaring driver unavailable
                     if (fails >= 3) {
                         std::lock_guard<std::mutex> lock(m_mutex);
                         m_driverAvailable = false;
@@ -1100,6 +1212,25 @@ void MonitorManager::WorkerLoop() {
             }
         }
     }
+}
+
+bool MonitorManager::IsMonitorPoweredOff(const std::wstring& monitorId) const {
+    if (monitorId.empty()) return false;
+    std::lock_guard<std::mutex> lock(m_mutex);
+    for (const auto& mon : m_monitors) {
+        if (_wcsicmp(mon.id.c_str(), monitorId.c_str()) == 0) {
+            return mon.isPoweredOff;
+        }
+    }
+    return false;
+}
+
+void MonitorManager::RefreshExternalPowerStatesAsync() {
+    {
+        std::lock_guard<std::mutex> lock(m_workerMutex);
+        m_pendingPowerCheck = true;
+    }
+    m_workerCv.notify_one();
 }
 
 void MonitorManager::OnDisplayChanged() {
@@ -1126,6 +1257,7 @@ void MonitorManager::OnPowerSuspend() {
 }
 
 void MonitorManager::OnPowerResume() {
+    m_displayPoweredOn = true;
     {
         std::lock_guard<std::mutex> lock(m_workerMutex);
         m_pendingReinit = true;

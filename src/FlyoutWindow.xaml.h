@@ -83,6 +83,7 @@ namespace winrt::BrightnessApp::implementation
             bool isSeparate{ false };
             winrt::Microsoft::UI::Xaml::Controls::TextBlock header{ nullptr };
             winrt::Microsoft::UI::Xaml::Controls::Slider slider{ nullptr };
+            winrt::Microsoft::UI::Xaml::Controls::StackPanel sepButtons{ nullptr };
         };
         std::vector<SyncSliderEntry> m_syncEntries;
     };

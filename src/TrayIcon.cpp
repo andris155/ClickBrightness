@@ -235,6 +235,16 @@ static std::wstring GetMainMonitorDisplayName() {
     return fallback.empty() ? L"Main" : fallback;
 }
 
+static std::wstring FormatTrayTip(const std::wstring& name, int brightness, const std::wstring& monitorId) {
+    if (!monitorId.empty() && g_MonitorManager.IsMonitorPoweredOff(monitorId)) {
+        if (g_Settings.disableTurnedOffControl) {
+            return name + L": (" + g_Loc.Get(L"Common_Off", L"Off") + L")";
+        }
+        return name + L": " + std::to_wstring(brightness) + L"% (" + g_Loc.Get(L"Common_Off", L"Off") + L")";
+    }
+    return name + L": " + std::to_wstring(brightness) + L"%";
+}
+
 bool TrayIcon::Create(HWND hOwnerWnd, UINT uCallbackMsg, UINT uId) {
     m_hOwnerWnd = hOwnerWnd;
     m_uCallbackMsg = uCallbackMsg;
@@ -266,7 +276,9 @@ bool TrayIcon::Create(HWND hOwnerWnd, UINT uCallbackMsg, UINT uId) {
     nid.uCallbackMessage = m_uCallbackMsg;
     nid.hIcon = m_hBaseSunIcon ? m_hBaseSunIcon : LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
     std::wstring mainName = GetMainMonitorDisplayName();
-    StringCchPrintfW(nid.szTip, ARRAYSIZE(nid.szTip), L"%s: %d%%", mainName.c_str(), m_lastBrightness >= 0 ? m_lastBrightness : g_Settings.cachedBrightness);
+    int initB = m_lastBrightness >= 0 ? m_lastBrightness : g_Settings.cachedBrightness;
+    std::wstring tip = FormatTrayTip(mainName, initB, g_Settings.mainMonitorId);
+    StringCchCopyW(nid.szTip, ARRAYSIZE(nid.szTip), tip.c_str());
 
     m_created = (Shell_NotifyIconW(NIM_ADD, &nid) == TRUE);
     if (m_created) {
@@ -555,7 +567,9 @@ bool TrayIcon::UpdateBrightnessForTarget(const std::wstring& targetMonitorId, in
         const auto& cfg = g_Settings.GetEffectiveMonitorConfig(g_Settings.mainMonitorId);
 
         HICON hNewIcon = NULL;
-        if (cfg.trayPercentageMode != 2) {
+        bool hidePctIcon = (cfg.trayPercentageMode == 2) ||
+                           (g_Settings.disableTurnedOffControl && g_MonitorManager.IsMonitorPoweredOff(g_Settings.mainMonitorId));
+        if (!hidePctIcon) {
             hNewIcon = m_iconCache[brightness];
             if (!hNewIcon) {
                 hNewIcon = CreateBrightnessIconForConfig(brightness, cfg);
@@ -586,7 +600,8 @@ bool TrayIcon::UpdateBrightnessForTarget(const std::wstring& targetMonitorId, in
         nid.uFlags = NIF_ICON | NIF_TIP | NIF_SHOWTIP;
         nid.hIcon = hNewIcon;
         std::wstring mainName = GetMainMonitorDisplayName();
-        StringCchPrintfW(nid.szTip, ARRAYSIZE(nid.szTip), L"%s: %d%%", mainName.c_str(), brightness);
+        std::wstring tip = FormatTrayTip(mainName, brightness, g_Settings.mainMonitorId);
+        StringCchCopyW(nid.szTip, ARRAYSIZE(nid.szTip), tip.c_str());
         bool ok = (Shell_NotifyIconW(NIM_MODIFY, &nid) == TRUE);
 
         // Also update any Sync-mode separate tray icons with their offsetted brightness
@@ -604,7 +619,9 @@ bool TrayIcon::UpdateBrightnessForTarget(const std::wstring& targetMonitorId, in
             slot.lastBrightness = brightness;
             const auto& cfg = g_Settings.GetEffectiveMonitorConfig(slot.monitorId);
             HICON hNewIcon = NULL;
-            if (cfg.trayPercentageMode != 2) {
+            bool hidePctIcon = (cfg.trayPercentageMode == 2) ||
+                               (g_Settings.disableTurnedOffControl && g_MonitorManager.IsMonitorPoweredOff(slot.monitorId));
+            if (!hidePctIcon) {
                 hNewIcon = slot.iconCache[brightness];
                 if (!hNewIcon) {
                     hNewIcon = CreateBrightnessIconForConfig(brightness, cfg);
@@ -621,7 +638,8 @@ bool TrayIcon::UpdateBrightnessForTarget(const std::wstring& targetMonitorId, in
             nid.uFlags = NIF_ICON | NIF_TIP | NIF_SHOWTIP;
             nid.hIcon = hNewIcon;
             std::wstring name = !cfg.customName.empty() ? cfg.customName : slot.monitorId;
-            StringCchPrintfW(nid.szTip, ARRAYSIZE(nid.szTip), L"%s: %d%%", name.c_str(), brightness);
+            std::wstring tip = FormatTrayTip(name, brightness, slot.monitorId);
+            StringCchCopyW(nid.szTip, ARRAYSIZE(nid.szTip), tip.c_str());
             return (Shell_NotifyIconW(NIM_MODIFY, &nid) == TRUE);
         }
     }
@@ -640,6 +658,7 @@ void TrayIcon::SyncExtraTrayIcons(bool forceRefresh) {
         if (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0) continue;
         const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
         if (!cfg || !cfg->enabled) continue;
+        if (g_Settings.disableTurnedOffControl && mon.isPoweredOff) continue;
         if (cfg->trayPercentageMode != 3) {
             desired.push_back({ mon.id, cfg->controlMode == 0 });
         }
@@ -701,10 +720,12 @@ void TrayIcon::SyncExtraTrayIcons(bool forceRefresh) {
                 : g_MonitorManager.GetMonitorBrightnessById(id);
             slot.lastBrightness = b;
 
-            HICON hIcon = (cfg.trayPercentageMode != 2)
+            bool hidePctIcon = (cfg.trayPercentageMode == 2) ||
+                               (g_Settings.disableTurnedOffControl && g_MonitorManager.IsMonitorPoweredOff(id));
+            HICON hIcon = (!hidePctIcon)
                 ? CreateBrightnessIconForConfig(b, cfg)
                 : (m_hBaseSunIcon ? m_hBaseSunIcon : LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION));
-            if (cfg.trayPercentageMode != 2 && hIcon) {
+            if (!hidePctIcon && hIcon) {
                 slot.iconCache[b] = hIcon;
             }
 
@@ -715,14 +736,15 @@ void TrayIcon::SyncExtraTrayIcons(bool forceRefresh) {
             nid.uCallbackMessage = m_uCallbackMsg;
             nid.hIcon = hIcon ? hIcon : LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
             std::wstring name = !cfg.customName.empty() ? cfg.customName : id;
-            StringCchPrintfW(nid.szTip, ARRAYSIZE(nid.szTip), L"%s: %d%%", name.c_str(), b);
+            std::wstring tip = FormatTrayTip(name, b, id);
+            StringCchCopyW(nid.szTip, ARRAYSIZE(nid.szTip), tip.c_str());
 
             if (Shell_NotifyIconW(NIM_ADD, &nid) == TRUE) {
                 nid.uVersion = NOTIFYICON_VERSION_4;
                 Shell_NotifyIconW(NIM_SETVERSION, &nid);
                 slot.created = true;
                 m_extraSlots.push_back(slot);
-            } else if (hIcon && cfg.trayPercentageMode != 2) {
+            } else if (hIcon && !hidePctIcon) {
                 DestroyIcon(hIcon);
             }
         }

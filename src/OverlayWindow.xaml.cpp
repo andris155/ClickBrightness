@@ -8,6 +8,7 @@
 #include "TrayIcon.h"
 #include "FlyoutWindow.h"
 #include "Settings.h"
+#include "LocalizationManager.h"
 #include "DpiHelper.h"
 #include "ThemeHelper.h"
 #include "resource.h"
@@ -362,6 +363,7 @@ namespace winrt::BrightnessApp::implementation
                 : entries[0].accentColor;
             IndicatorBorder().Background(winrt::Microsoft::UI::Xaml::Media::SolidColorBrush(
                 winrt::Microsoft::UI::ColorHelper::FromArgb(255, GetRValue(accCol), GetGValue(accCol), GetBValue(accCol))));
+            PercentText().Opacity(entries[0].isPoweredOff ? 0.55 : 1.0);
             UpdateContent(entries[0].brightness);
             return;
         }
@@ -396,12 +398,21 @@ namespace winrt::BrightnessApp::implementation
             nameText.FontSize(11.5);
             nameText.Foreground(secBrush);
             nameText.TextTrimming(winrt::Microsoft::UI::Xaml::TextTrimming::CharacterEllipsis);
-            nameText.MaxWidth(155);
+            nameText.MaxWidth(entry.isPoweredOff ? 125 : 155);
             nameText.HorizontalAlignment(winrt::Microsoft::UI::Xaml::HorizontalAlignment::Left);
             nameText.VerticalAlignment(winrt::Microsoft::UI::Xaml::VerticalAlignment::Center);
 
             winrt::Microsoft::UI::Xaml::Controls::TextBlock pctText;
-            pctText.Text(std::to_wstring(entry.brightness) + L"%");
+            if (entry.isPoweredOff)
+            {
+                pctText.Text(std::to_wstring(entry.brightness) + L"% (" + g_Loc.Get(L"Common_Off", L"Off") + L")");
+                pctText.Opacity(0.55);
+            }
+            else
+            {
+                pctText.Text(std::to_wstring(entry.brightness) + L"%");
+                pctText.Opacity(1.0);
+            }
             pctText.FontSize(12);
             pctText.Foreground(fgBrush);
             pctText.HorizontalAlignment(winrt::Microsoft::UI::Xaml::HorizontalAlignment::Right);

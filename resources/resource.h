@@ -28,8 +28,10 @@
 #define IDT_OVERLAY_UNCLOAK             3005
 #define IDT_PRESET_TOGGLE_RELEASE       3006
 #define IDT_OVERLAY_ANIM                3007
+#define IDT_POWER_STATE_POLL            3008
 
 // Custom Windows Messages
 #define WM_APP_TRAYMSG                  (WM_APP + 1)
 #define WM_APP_BRIGHTNESS_UPDATED       (WM_APP + 2)
 #define WM_APP_TRAY_WHEEL               (WM_APP + 3)
+#define WM_APP_POWER_STATE_UPDATED      (WM_APP + 4)

@@ -17,6 +17,7 @@ struct BrightnessChangeEntry {
     int brightness;
     bool useWindowsAccent;
     COLORREF accentColor;
+    bool isPoweredOff = false;
 };
 
 struct PhysicalMonitorInfo {
@@ -31,6 +32,9 @@ struct PhysicalMonitorInfo {
     DWORD currentBrightness;
     bool isPrimary;
     bool isInternal;
+    bool isPoweredOff = false;
+    int consecutiveWriteFailures = 0;
+    ULONGLONG lastPowerCheckTick = 0;
 };
 
 class MonitorManager {
@@ -65,6 +69,8 @@ public:
     void HandleWmiBrightnessEvent(int brightness);
 
     bool IsDriverAvailable() const { return m_driverAvailable.load(); }
+    bool IsMonitorPoweredOff(const std::wstring& monitorId) const;
+    void RefreshExternalPowerStatesAsync();
 
     void OnDisplayChanged();
     void OnPowerSuspend();
@@ -98,6 +104,7 @@ private:
     int m_pendingTargetBrightness;
     std::wstring m_pendingTargetMonitorId; // empty = Main/Sync group
     bool m_pendingReinit;
+    bool m_pendingPowerCheck{ false };
     bool m_stopWorker;
 
     // Laptop Fn-key WMI event listener

@@ -146,6 +146,18 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
         return 0;
     }
 
+    case WM_APP_POWER_STATE_UPDATED:
+    {
+        g_TrayIcon.UpdateBrightness(g_MonitorManager.GetCachedBrightness());
+        g_TrayIcon.SyncExtraTrayIcons(true);
+        if (g_FlyoutWindow.IsVisible())
+        {
+            g_FlyoutWindow.RefreshOnDisplayChange();
+        }
+        OnSettingsDisplayChanged();
+        return 0;
+    }
+
     case WM_APP_TRAY_WHEEL:
     {
         int step = static_cast<int>(wParam);
@@ -167,9 +179,21 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
         static ULONGLONG s_lastTrayLeftClick = 0;
         static ULONGLONG s_lastTrayRightClick = 0;
         static ULONGLONG s_lastTrayMiddleClick = 0;
+        static ULONGLONG s_lastHoverPowerCheck = 0;
 
         switch (event)
         {
+        case WM_MOUSEMOVE:
+        case NIN_POPUPOPEN:
+        {
+            ULONGLONG now = GetTickCount64();
+            if (now - s_lastHoverPowerCheck >= 1500)
+            {
+                s_lastHoverPowerCheck = now;
+                g_MonitorManager.RefreshExternalPowerStatesAsync();
+            }
+            break;
+        }
         case WM_MBUTTONUP:
         {
             ULONGLONG now = GetTickCount64();
@@ -450,6 +474,14 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
             }
             return 0;
         }
+        else if (wParam == IDT_POWER_STATE_POLL)
+        {
+            if (g_Settings.disableTurnedOffControl && g_MonitorManager.IsDisplayPoweredOn())
+            {
+                g_MonitorManager.RefreshExternalPowerStatesAsync();
+            }
+            return 0;
+        }
         else if (wParam == IDT_PRESET_TOGGLE_RELEASE)
         {
             UINT vk = s_toggleHeldVk ? s_toggleHeldVk : g_Settings.hotkeyPresetToggleKey;
@@ -619,6 +651,9 @@ namespace winrt::BrightnessApp::implementation
 
                 // Register Hotkeys
                 g_HotkeyManager.RegisterAll(g_hMainWnd);
+
+                // Low-frequency (5s) background check for external monitor power state (VCP 0xD6)
+                SetTimer(g_hMainWnd, IDT_POWER_STATE_POLL, 5000, NULL);
             }
 
             // Pre-create flyout and overlay windows

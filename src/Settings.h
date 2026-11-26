@@ -166,6 +166,7 @@ struct AppSettings {
     std::wstring mainMonitorId;
     bool syncExternalWithLaptopFnKeys = false; // Default: OFF
     bool showSeparateInMultiFlyout = true;     // Default: ON
+    bool disableTurnedOffControl = false;      // Default: OFF
     std::map<std::wstring, MonitorControlConfig> monitorConfigs;
 
     // OSD & Tray Menu Theme (0 = Follow Windows (system), 1 = Dark, 2 = Light)

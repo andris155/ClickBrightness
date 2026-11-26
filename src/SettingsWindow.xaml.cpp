@@ -668,6 +668,7 @@ namespace winrt::BrightnessApp::implementation
                 { g_Loc.Get(L"Opt_MainMonitor", L"Main Display").c_str(), catMon, L"main display primary monitor reference sync", L"Monitors", MainMonitorComboBox() },
                 { g_Loc.Get(L"Opt_SyncLaptopFnKeys", L"Sync External Monitors with Laptop Fn Keys").c_str(), catMon, L"laptop fn keys internal display sync external", L"Monitors", SyncLaptopFnKeysToggle() },
                 { g_Loc.Get(L"Opt_ShowSeparateInMultiFlyout", L"Show Separate Monitors in Multi-Monitor Flyout").c_str(), catMon, L"separate monitors multi monitor flyout show hide sliders", L"Monitors", ShowSeparateInMultiFlyoutToggle() },
+                { g_Loc.Get(L"Opt_DisableTurnedOffControl", L"Disable Control for Turned-Off Monitors").c_str(), catMon, L"disable turned off monitor powered off standby brightness control", L"Monitors", DisableTurnedOffControlToggle() },
                 { g_Loc.Get(L"Opt_SyncOverscrollMax", L"Overscroll when a display is at 100%").c_str(), catMon, L"overscroll 100 max sync offset", L"Monitors", SyncOverscrollMaxToggle() },
                 { g_Loc.Get(L"Opt_SyncOverscrollMin", L"Overscroll when a display is at 0%").c_str(), catMon, L"overscroll 0 min sync offset", L"Monitors", SyncOverscrollMinToggle() },
                 { g_Loc.Get(L"Opt_ConfigMonitor", L"Selected Display").c_str(), catMon, L"monitor display select configure", L"Monitors", ConfigMonitorComboBox() },
@@ -948,6 +949,7 @@ namespace winrt::BrightnessApp::implementation
                 if (g_Settings.FindMonitorConfig(g_Settings.mainMonitorId))
                 {
                     auto& mainCfg = g_Settings.GetOrCreateMonitorConfig(g_Settings.mainMonitorId);
+                    mainCfg.enabled = true;
                     mainCfg.controlMode = 0;
                     if (mainCfg.trayPercentageMode == 3)
                     {
@@ -980,6 +982,23 @@ namespace winrt::BrightnessApp::implementation
             g_Settings.showSeparateInMultiFlyout = on;
             ShowSeparateInMultiFlyoutStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
             ApplyAndSave();
+            g_FlyoutWindow.RefreshOnDisplayChange();
+        });
+
+        // Disable Control for Turned-Off Monitors
+        DisableTurnedOffControlToggle().Toggled([this](auto&&, auto&&)
+        {
+            if (m_isUpdatingUI) return;
+            bool on = DisableTurnedOffControlToggle().IsOn();
+            g_Settings.disableTurnedOffControl = on;
+            DisableTurnedOffControlStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+            ApplyAndSave();
+            if (on)
+            {
+                g_MonitorManager.RefreshExternalPowerStatesAsync();
+            }
+            g_TrayIcon.UpdateBrightness(g_MonitorManager.GetCachedBrightness());
+            g_TrayIcon.SyncExtraTrayIcons(true);
             g_FlyoutWindow.RefreshOnDisplayChange();
         });
 
@@ -2125,6 +2144,7 @@ namespace winrt::BrightnessApp::implementation
             g_Settings.selectedMonitors = L"all";
             g_Settings.syncExternalWithLaptopFnKeys = false;
             g_Settings.showSeparateInMultiFlyout = true;
+            g_Settings.disableTurnedOffControl = false;
             for (auto& [monId, cfg] : g_Settings.monitorConfigs)
             {
                 cfg.enabled = true;
@@ -2377,6 +2397,10 @@ namespace winrt::BrightnessApp::implementation
             {
                 label += L" (" + g_Loc.Get(L"InternalBadge", L"Internal") + L")";
             }
+            if (mon.isPoweredOff)
+            {
+                label += L" (" + g_Loc.Get(L"Common_Off", L"Off") + L")";
+            }
             else if (mon.isPrimary)
             {
                 label += L" (" + g_Loc.Get(L"PrimaryBadge", L"Primary") + L")";
@@ -2423,6 +2447,8 @@ namespace winrt::BrightnessApp::implementation
         SyncLaptopFnKeysStatusText().Text(g_Settings.syncExternalWithLaptopFnKeys ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
         ShowSeparateInMultiFlyoutToggle().IsOn(g_Settings.showSeparateInMultiFlyout);
         ShowSeparateInMultiFlyoutStatusText().Text(g_Settings.showSeparateInMultiFlyout ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+        DisableTurnedOffControlToggle().IsOn(g_Settings.disableTurnedOffControl);
+        DisableTurnedOffControlStatusText().Text(g_Settings.disableTurnedOffControl ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
 
         m_isUpdatingUI = prevUpdating;
     }
@@ -2592,6 +2618,10 @@ namespace winrt::BrightnessApp::implementation
         }
 
         bool isMain = (_wcsicmp(m_selectedConfigMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
+        if (isMain && !cfg->enabled)
+        {
+            g_Settings.GetOrCreateMonitorConfig(m_selectedConfigMonitorId).enabled = true;
+        }
         if (isMain && cfg->controlMode != 0)
         {
             g_Settings.GetOrCreateMonitorConfig(m_selectedConfigMonitorId).controlMode = 0;
@@ -2601,6 +2631,7 @@ namespace winrt::BrightnessApp::implementation
             g_Settings.GetOrCreateMonitorConfig(m_selectedConfigMonitorId).trayPercentageMode = 0;
         }
 
+        MonitorEnabledCard().Visibility(isMain ? winrt::Microsoft::UI::Xaml::Visibility::Collapsed : winrt::Microsoft::UI::Xaml::Visibility::Visible);
         MonitorEnabledToggle().IsOn(cfg->enabled);
         MonitorEnabledStatusText().Text(cfg->enabled ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
         MonitorCustomNameTextBox().Text(cfg->customName);
@@ -2740,6 +2771,8 @@ namespace winrt::BrightnessApp::implementation
         SyncLaptopFnKeysDescText().Text(g_Loc.Get(L"Desc_SyncLaptopFnKeys", L"Automatically sync external Sync-mode monitors when adjusting internal display brightness via laptop Fn keys"));
         ShowSeparateInMultiFlyoutTitleText().Text(g_Loc.Get(L"Opt_ShowSeparateInMultiFlyout", L"Show Separate Monitors in Multi-Monitor Flyout"));
         ShowSeparateInMultiFlyoutDescText().Text(g_Loc.Get(L"Desc_ShowSeparateInMultiFlyout", L"Include Separate-mode displays with their individual preset buttons in the main multi-monitor flyout"));
+        DisableTurnedOffControlTitleText().Text(g_Loc.Get(L"Opt_DisableTurnedOffControl", L"Disable Control for Turned-Off Monitors"));
+        DisableTurnedOffControlDescText().Text(g_Loc.Get(L"Desc_DisableTurnedOffControl", L"Prevent brightness changes and OSD popups for displays detected as switched off"));
         MonitorConfigSectionTitle().Text(g_Loc.Get(L"Sec_MonitorConfig", L"Display Configuration"));
         ConfigMonitorSelectTitleText().Text(g_Loc.Get(L"Opt_ConfigMonitor", L"Selected Display"));
         ConfigMonitorSelectDescText().Text(g_Loc.Get(L"Desc_ConfigMonitor", L"Choose a detected display to configure its mode, name, and controls"));
@@ -3521,6 +3554,7 @@ void ShowSettingsWindow()
     if (impl)
     {
         impl->ShowWindow();
+        g_MonitorManager.RefreshExternalPowerStatesAsync();
     }
 }
 

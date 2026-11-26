@@ -376,6 +376,18 @@ namespace winrt::BrightnessApp::implementation
         }
     }
 
+    static void SetPanelButtonsEnabled(winrt::Microsoft::UI::Xaml::Controls::StackPanel const& panel, bool enabled)
+    {
+        if (!panel) return;
+        for (auto const& child : panel.Children())
+        {
+            if (auto ctrl = child.try_as<winrt::Microsoft::UI::Xaml::Controls::Control>())
+            {
+                ctrl.IsEnabled(enabled);
+            }
+        }
+    }
+
     void FlyoutWindow::PopulatePresetButtons(winrt::Microsoft::UI::Xaml::Controls::StackPanel const& panel, std::function<void(int)> onClick)
     {
         panel.Children().Clear();
@@ -559,12 +571,14 @@ namespace winrt::BrightnessApp::implementation
         {
             sig += g_Settings.mainMonitorId + L"|";
             sig += g_Settings.showSeparateInMultiFlyout ? L"1|" : L"0|";
+            sig += g_Settings.disableTurnedOffControl ? L"1|" : L"0|";
             for (const auto& mon : g_MonitorManager.GetMonitors())
             {
                 if (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0) continue;
                 const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
                 if (!cfg || !cfg->enabled) continue;
                 if (cfg->controlMode == 1 && !g_Settings.showSeparateInMultiFlyout) continue;
+                if (g_Settings.disableTurnedOffControl && mon.isPoweredOff) continue;
                 std::wstring monName = !cfg->customName.empty() ? cfg->customName : AppSettings::SanitizeMonitorName(mon.friendlyName, 20);
                 sig += mon.id + L":" + std::to_wstring(cfg->controlMode) + L":" + monName + L";";
             }
@@ -600,6 +614,7 @@ namespace winrt::BrightnessApp::implementation
                 if (!cfg || !cfg->enabled) continue;
                 bool isSeparate = (cfg->controlMode == 1);
                 if (isSeparate != wantSeparate) continue;
+                if (g_Settings.disableTurnedOffControl && mon.isPoweredOff) continue;
 
                 std::wstring monName = !cfg->customName.empty() ? cfg->customName : AppSettings::SanitizeMonitorName(mon.friendlyName, 20);
                 if (monName.empty()) monName = mon.id;
@@ -618,7 +633,23 @@ namespace winrt::BrightnessApp::implementation
                 {
                     hdr.Margin({ 25, 0, 0, 0 });
                 }
-                hdr.Text(monName + L"\n" + std::to_wstring(effB) + L"%");
+                if (mon.isPoweredOff)
+                {
+                    if (g_Settings.disableTurnedOffControl)
+                    {
+                        hdr.Text(monName + L"\n(" + g_Loc.Get(L"Common_Off", L"Off") + L")");
+                    }
+                    else
+                    {
+                        hdr.Text(monName + L"\n" + std::to_wstring(effB) + L"% (" + g_Loc.Get(L"Common_Off", L"Off") + L")");
+                    }
+                    hdr.Opacity(0.55);
+                }
+                else
+                {
+                    hdr.Text(monName + L"\n" + std::to_wstring(effB) + L"%");
+                    hdr.Opacity(1.0);
+                }
 
                 winrt::Microsoft::UI::Xaml::Controls::Slider sl;
                 sl.Orientation(winrt::Microsoft::UI::Xaml::Controls::Orientation::Vertical);
@@ -637,7 +668,16 @@ namespace winrt::BrightnessApp::implementation
                 {
                     if (m_isUpdatingSlider) return;
                     int v = (std::clamp)(static_cast<int>(std::round(e.NewValue())), 0, 100);
-                    hdr.Text(monName + L"\n" + std::to_wstring(v) + L"%");
+                    if (g_MonitorManager.IsMonitorPoweredOff(monIdCopy))
+                    {
+                        hdr.Text(monName + L"\n" + std::to_wstring(v) + L"% (" + g_Loc.Get(L"Common_Off", L"Off") + L")");
+                        hdr.Opacity(0.55);
+                    }
+                    else
+                    {
+                        hdr.Text(monName + L"\n" + std::to_wstring(v) + L"%");
+                        hdr.Opacity(1.0);
+                    }
                     g_MonitorManager.SetMonitorBrightnessTarget(monIdCopy, v, true);
                     g_TrayIcon.UpdateBrightnessForTarget(monIdCopy, v);
                     m_hasSeparatePendingSave = true;
@@ -650,6 +690,7 @@ namespace winrt::BrightnessApp::implementation
 
                 winrt::Microsoft::UI::Xaml::Controls::Grid colHost;
                 colHost.VerticalAlignment(winrt::Microsoft::UI::Xaml::VerticalAlignment::Top);
+                winrt::Microsoft::UI::Xaml::Controls::StackPanel sepButtons{ nullptr };
                 if (isSeparate)
                 {
                     colHost.Width(89);
@@ -663,11 +704,21 @@ namespace winrt::BrightnessApp::implementation
 
                     auto applySeparateValue = [this, monIdCopy, hdr, monName, sl](int val, bool saveNow)
                     {
+                        if (g_Settings.disableTurnedOffControl && g_MonitorManager.IsMonitorPoweredOff(monIdCopy)) return;
                         int clamped = (std::clamp)(val, 0, 100);
                         m_isUpdatingSlider = true;
                         sl.Value(clamped);
                         m_isUpdatingSlider = false;
-                        hdr.Text(monName + L"\n" + std::to_wstring(clamped) + L"%");
+                        if (g_MonitorManager.IsMonitorPoweredOff(monIdCopy))
+                        {
+                            hdr.Text(monName + L"\n" + std::to_wstring(clamped) + L"% (" + g_Loc.Get(L"Common_Off", L"Off") + L")");
+                            hdr.Opacity(0.55);
+                        }
+                        else
+                        {
+                            hdr.Text(monName + L"\n" + std::to_wstring(clamped) + L"%");
+                            hdr.Opacity(1.0);
+                        }
                         g_MonitorManager.SetMonitorBrightnessTarget(monIdCopy, clamped, true);
                         g_TrayIcon.UpdateBrightnessForTarget(monIdCopy, clamped);
                         if (saveNow)
@@ -684,6 +735,11 @@ namespace winrt::BrightnessApp::implementation
                     auto onSepWheel = [this, monIdCopy, sl, applySeparateValue](auto&&, winrt::Microsoft::UI::Xaml::Input::PointerRoutedEventArgs const& e)
                     {
                         if (e.Handled()) return;
+                        if (g_Settings.disableTurnedOffControl && g_MonitorManager.IsMonitorPoweredOff(monIdCopy))
+                        {
+                            e.Handled(true);
+                            return;
+                        }
                         const auto& sepCfg = g_Settings.GetEffectiveMonitorConfig(monIdCopy);
                         if (!sepCfg.flyoutScrollEnabled)
                         {
@@ -703,7 +759,7 @@ namespace winrt::BrightnessApp::implementation
                     sl.PointerWheelChanged(onSepWheel);
                     colHost.PointerWheelChanged(onSepWheel);
 
-                    winrt::Microsoft::UI::Xaml::Controls::StackPanel sepButtons;
+                    sepButtons = winrt::Microsoft::UI::Xaml::Controls::StackPanel();
                     sepButtons.Spacing(2);
                     sepButtons.VerticalAlignment(winrt::Microsoft::UI::Xaml::VerticalAlignment::Top);
                     PopulatePresetButtons(sepButtons, [applySeparateValue](int val)
@@ -725,9 +781,16 @@ namespace winrt::BrightnessApp::implementation
                     colHost.Children().Append(sl);
                 }
 
+                bool colEnabled = !(g_Settings.disableTurnedOffControl && mon.isPoweredOff);
+                auto colVis = colEnabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed;
+                sl.IsEnabled(colEnabled);
+                sl.Visibility(colVis);
+                SetPanelButtonsEnabled(sepButtons, colEnabled);
+                if (sepButtons) sepButtons.Visibility(colVis);
+
                 SyncHeadersPanel().Children().Append(hdr);
                 SyncMonitorsPanel().Children().Append(colHost);
-                m_syncEntries.push_back({ mon.id, monName, isSeparate, hdr, sl });
+                m_syncEntries.push_back({ mon.id, monName, isSeparate, hdr, sl, sepButtons });
                 ApplySliderBrushesForControl(sl, mon.id);
             }
         }
@@ -776,32 +839,103 @@ namespace winrt::BrightnessApp::implementation
         }
 
         std::wstring targetId = m_targetMonitorId.empty() ? g_Settings.mainMonitorId : m_targetMonitorId;
+        bool isTargetOff = g_MonitorManager.IsMonitorPoweredOff(targetId);
         const auto* cfg = g_Settings.FindMonitorConfig(targetId);
         if (enabledCount > 1 && cfg && !cfg->customName.empty())
         {
-            TitleText().Text(cfg->customName + L"\n" + std::to_wstring(m_brightness) + L"%");
+            std::wstring titleText = (isTargetOff && g_Settings.disableTurnedOffControl)
+                ? (cfg->customName + L"\n(" + g_Loc.Get(L"Common_Off", L"Off") + L")")
+                : (cfg->customName + L"\n" + std::to_wstring(m_brightness) + L"%");
+            if (isTargetOff)
+            {
+                if (!g_Settings.disableTurnedOffControl)
+                {
+                    titleText += L" (" + g_Loc.Get(L"Common_Off", L"Off") + L")";
+                }
+                TitleText().Opacity(0.55);
+            }
+            else
+            {
+                TitleText().Opacity(1.0);
+            }
+            TitleText().Text(titleText);
         }
         else
         {
             std::wstring fmt = g_Loc.Get(L"Flyout_Brightness", L"Brightness %d%%");
             wchar_t bbuf[64];
             swprintf_s(bbuf, fmt.c_str(), m_brightness);
-            TitleText().Text(bbuf);
+            std::wstring titleText = bbuf;
+            if (isTargetOff)
+            {
+                if (g_Settings.disableTurnedOffControl)
+                {
+                    titleText = L"(" + g_Loc.Get(L"Common_Off", L"Off") + L")";
+                }
+                else
+                {
+                    titleText += L" (" + g_Loc.Get(L"Common_Off", L"Off") + L")";
+                }
+                TitleText().Opacity(0.55);
+            }
+            else
+            {
+                TitleText().Opacity(1.0);
+            }
+            TitleText().Text(titleText);
         }
 
         m_isUpdatingSlider = true;
         BrightnessSlider().Value(m_brightness);
+        bool singleTargetEnabled = !(m_syncEntries.empty() && g_Settings.disableTurnedOffControl && isTargetOff);
+        auto singleVis = singleTargetEnabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed;
+        BrightnessSlider().IsEnabled(singleTargetEnabled);
+        BrightnessSlider().Visibility(singleVis);
+        SetPanelButtonsEnabled(ButtonStack(), singleTargetEnabled);
+        ButtonStack().Visibility(singleVis);
         if (!m_syncEntries.empty())
         {
             std::wstring mainName = (cfg && !cfg->customName.empty()) ? cfg->customName : g_Loc.Get(L"MainDisplay", L"Main").c_str();
-            MainColumnHeader().Text(mainName + L"\n" + std::to_wstring(m_brightness) + L"%");
+            if (g_MonitorManager.IsMonitorPoweredOff(g_Settings.mainMonitorId))
+            {
+                MainColumnHeader().Text(mainName + L"\n" + std::to_wstring(m_brightness) + L"% (" + g_Loc.Get(L"Common_Off", L"Off") + L")");
+                MainColumnHeader().Opacity(0.55);
+            }
+            else
+            {
+                MainColumnHeader().Text(mainName + L"\n" + std::to_wstring(m_brightness) + L"%");
+                MainColumnHeader().Opacity(1.0);
+            }
             for (const auto& entry : m_syncEntries)
             {
                 const auto* sCfg = g_Settings.FindMonitorConfig(entry.monitorId);
                 int effB = entry.isSeparate
                     ? (std::clamp)(g_MonitorManager.GetMonitorBrightnessById(entry.monitorId), 0, 100)
                     : g_MonitorManager.GetEffectiveSyncedBrightness(entry.monitorId, m_syncBaseBrightness);
-                entry.header.Text(entry.displayName + L"\n" + std::to_wstring(effB) + L"%");
+                bool isEntryOff = g_MonitorManager.IsMonitorPoweredOff(entry.monitorId);
+                if (isEntryOff)
+                {
+                    if (g_Settings.disableTurnedOffControl)
+                    {
+                        entry.header.Text(entry.displayName + L"\n(" + g_Loc.Get(L"Common_Off", L"Off") + L")");
+                    }
+                    else
+                    {
+                        entry.header.Text(entry.displayName + L"\n" + std::to_wstring(effB) + L"% (" + g_Loc.Get(L"Common_Off", L"Off") + L")");
+                    }
+                    entry.header.Opacity(0.55);
+                }
+                else
+                {
+                    entry.header.Text(entry.displayName + L"\n" + std::to_wstring(effB) + L"%");
+                    entry.header.Opacity(1.0);
+                }
+                bool colEnabled = !(g_Settings.disableTurnedOffControl && isEntryOff);
+                auto colVis = colEnabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed;
+                entry.slider.IsEnabled(colEnabled);
+                entry.slider.Visibility(colVis);
+                SetPanelButtonsEnabled(entry.sepButtons, colEnabled);
+                if (entry.sepButtons) entry.sepButtons.Visibility(colVis);
                 entry.slider.Value(effB);
             }
         }
@@ -1041,6 +1175,7 @@ namespace winrt::BrightnessApp::implementation
     void FlyoutWindow::ShowWindow(const POINT* pTrayPos)
     {
         CancelPendingShow();
+        g_MonitorManager.RefreshExternalPowerStatesAsync();
         g_OverlayWindow.ApplyPendingBrightness();
         ApplyPendingBrightness();
         m_syncBaseBrightness = g_MonitorManager.GetTargetControlBrightness(m_targetMonitorId);

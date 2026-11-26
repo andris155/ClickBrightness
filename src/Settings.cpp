@@ -231,6 +231,7 @@ void AppSettings::Load() {
     mainMonitorId = mainMonBuf;
     syncExternalWithLaptopFnKeys = (GetPrivateProfileIntW(L"Monitors", L"SyncLaptopFnKeys", 0, ini.c_str()) != 0);
     showSeparateInMultiFlyout = (GetPrivateProfileIntW(L"Monitors", L"ShowSeparateInMultiFlyout", 1, ini.c_str()) != 0);
+    disableTurnedOffControl = (GetPrivateProfileIntW(L"Monitors", L"DisableTurnedOffControl", 0, ini.c_str()) != 0);
 
     monitorConfigs.clear();
     wchar_t cfgIdsBuf[2048] = { 0 };
@@ -294,6 +295,10 @@ void AppSettings::Load() {
 
         // Tray
         bool isMainMon = (!mainMonitorId.empty() && _wcsicmp(monId.c_str(), mainMonitorId.c_str()) == 0);
+        if (isMainMon) {
+            cfg.enabled = true;
+            cfg.controlMode = 0;
+        }
         int defaultPctMode = (!isMainMon && cfg.controlMode == 0 && !legacySyncSeparateTray) ? 3 : cfg.trayPercentageMode;
         cfg.trayPercentageMode = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"TrayPercentageMode", defaultPctMode, ini.c_str()), 0, 3);
         if (isMainMon && cfg.trayPercentageMode == 3) {
@@ -405,6 +410,7 @@ void AppSettings::Save() const {
     addLine(L"MainId", mainMonitorId);
     addLine(L"SyncLaptopFnKeys", syncExternalWithLaptopFnKeys ? L"1" : L"0");
     addLine(L"ShowSeparateInMultiFlyout", showSeparateInMultiFlyout ? L"1" : L"0");
+    addLine(L"DisableTurnedOffControl", disableTurnedOffControl ? L"1" : L"0");
     addLine(L"ConfiguredIds", cfgIds);
 
     addSec(L"Hotkeys");
