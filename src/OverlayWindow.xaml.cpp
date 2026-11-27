@@ -115,15 +115,12 @@ namespace winrt::ClickBrightness::implementation
             BOOL darkMode = isDark ? TRUE : FALSE;
             DwmSetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &darkMode, sizeof(darkMode));
 
-            COLORREF captionColor = isDark ? RGB(32, 32, 32) : RGB(243, 243, 243);
-            DwmSetWindowAttribute(m_hwnd, DWMWA_CAPTION_COLOR, &captionColor, sizeof(captionColor));
-
             // 5. Border: native FlyoutWindow DWM border (DWMWA_COLOR_DEFAULT)
             COLORREF borderColor = DWMWA_COLOR_DEFAULT;
             DwmSetWindowAttribute(m_hwnd, DWMWA_BORDER_COLOR, &borderColor, sizeof(borderColor));
 
-            // 6. Native DWM Transient Acrylic (Windows 11 Volume / Shell OSD Backdrop)
-            int backdropType = g_Settings.transparencyEnabled ? DWMSBT_TRANSIENTWINDOW : DWMSBT_NONE;
+            // 6. Disable DWM system backdrop so DesktopAcrylicController owns transparency
+            int backdropType = DWMSBT_NONE;
             DwmSetWindowAttribute(m_hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdropType, sizeof(backdropType));
 
             // 7. Instant snappy display (no DWM open/close animation lag)
@@ -253,19 +250,6 @@ namespace winrt::ClickBrightness::implementation
             {
                 BOOL darkMode = isDark ? TRUE : FALSE;
                 DwmSetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &darkMode, sizeof(darkMode));
-
-                int backdropType = g_Settings.transparencyEnabled ? DWMSBT_TRANSIENTWINDOW : DWMSBT_NONE;
-                DwmSetWindowAttribute(m_hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdropType, sizeof(backdropType));
-
-                // Native FlyoutWindow DWM border
-                COLORREF borderColor = DWMWA_COLOR_DEFAULT;
-                DwmSetWindowAttribute(m_hwnd, DWMWA_BORDER_COLOR, &borderColor, sizeof(borderColor));
-
-                // Keep shadow effect under overlay
-                int ncPolicy = 0; // DWMNCRP_USEWINDOWSTYLE
-                DwmSetWindowAttribute(m_hwnd, DWMWA_NCRENDERING_POLICY, &ncPolicy, sizeof(ncPolicy));
-
-                SetWindowPos(m_hwnd, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE);
             }
 
             // Layout matching FlyoutWindow (no inner XAML border, native DWM border handles frame)
@@ -595,11 +579,6 @@ namespace winrt::ClickBrightness::implementation
             UpdateMultiContent(targetMonitorId, target);
             PositionWindow();
 
-            if (m_backdropConfig)
-            {
-                m_backdropConfig.IsInputActive(true);
-            }
-
             // Reset hide timer with deadline timestamp tracking to prevent timer race conditions
             int timeout = g_Settings.overlayTimeoutMs;
             if (timeout < 200) timeout = 500;
@@ -665,11 +644,6 @@ namespace winrt::ClickBrightness::implementation
             UpdateMultiContent(targetMonitorId, target);
             PositionWindow();
 
-            if (m_backdropConfig)
-            {
-                m_backdropConfig.IsInputActive(true);
-            }
-
             int timeout = g_Settings.overlayTimeoutMs;
             if (timeout < 200) timeout = 500;
 
@@ -731,11 +705,6 @@ namespace winrt::ClickBrightness::implementation
         {
             UpdateMultiContent(targetMonitorId, target);
             PositionWindow();
-
-            if (m_backdropConfig)
-            {
-                m_backdropConfig.IsInputActive(true);
-            }
 
             int timeout = g_Settings.overlayTimeoutMs;
             if (timeout < 200) timeout = 500;

@@ -855,29 +855,24 @@ namespace winrt::ClickBrightness::implementation
                 {
                     g_OverlayWindow.TriggerBrightnessSet(cmd.value, cmd.showOsd);
                 }
-                TrimProcessWorkingSetAsync();
                 break;
             case CliAction::StepUp:
             {
                 int delta = (cmd.value > 0) ? cmd.value : g_Settings.hotkeyStep;
                 g_OverlayWindow.TriggerBrightnessDelta(+delta, cmd.showOsd);
-                TrimProcessWorkingSetAsync();
                 break;
             }
             case CliAction::StepDown:
             {
                 int delta = (cmd.value > 0) ? cmd.value : g_Settings.hotkeyStep;
                 g_OverlayWindow.TriggerBrightnessDelta(-delta, cmd.showOsd);
-                TrimProcessWorkingSetAsync();
                 break;
             }
             case CliAction::Preset1:
                 g_OverlayWindow.TriggerBrightnessSet(g_Settings.hotkeyPreset1Brightness, cmd.showOsd);
-                TrimProcessWorkingSetAsync();
                 break;
             case CliAction::Preset2:
                 g_OverlayWindow.TriggerBrightnessSet(g_Settings.hotkeyPreset2Brightness, cmd.showOsd);
-                TrimProcessWorkingSetAsync();
                 break;
             case CliAction::Toggle:
             {
@@ -886,17 +881,12 @@ namespace winrt::ClickBrightness::implementation
                 int p2 = g_Settings.hotkeyPresetToggle2Brightness;
                 int target = (curB == p1) ? p2 : ((curB == p2) ? p1 : (abs(curB - p1) < abs(curB - p2) ? p2 : p1));
                 g_OverlayWindow.TriggerBrightnessSet(target, cmd.showOsd);
-                TrimProcessWorkingSetAsync();
                 break;
             }
             default:
                 if (cmdLine && (wcsstr(cmdLine, L"--settings") || wcsstr(cmdLine, L"-s")))
                 {
                     ShowSettingsWindow();
-                }
-                else
-                {
-                    TrimProcessWorkingSetAsync();
                 }
                 break;
             }

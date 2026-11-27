@@ -28,8 +28,6 @@
 
 #define IDT_FLYOUT_DEBOUNCE 101
 
-void TrimProcessWorkingSetAsync();
-
 static bool IsHeaderNameTrimmed(const std::wstring& name, double fontSize, double maxWidth)
 {
     if (name.empty()) return false;
@@ -329,9 +327,6 @@ namespace winrt::ClickBrightness::implementation
             BOOL darkMode = isDark ? TRUE : FALSE;
             DwmSetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &darkMode, sizeof(darkMode));
 
-            COLORREF captionColor = isDark ? RGB(32, 32, 32) : RGB(243, 243, 243);
-            DwmSetWindowAttribute(m_hwnd, DWMWA_CAPTION_COLOR, &captionColor, sizeof(captionColor));
-
             DWM_WINDOW_CORNER_PREFERENCE cornerPref = DWMWCP_ROUND;
             DwmSetWindowAttribute(m_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &cornerPref, sizeof(cornerPref));
 
@@ -473,10 +468,6 @@ namespace winrt::ClickBrightness::implementation
                 {
                     SetupBackdrop();
                 }
-                if (m_backdropConfig)
-                {
-                    m_backdropConfig.IsInputActive(true);
-                }
                 RootGrid().Background(winrt::Microsoft::UI::Xaml::Media::SolidColorBrush(winrt::Microsoft::UI::Colors::Transparent()));
             }
             else
@@ -499,11 +490,6 @@ namespace winrt::ClickBrightness::implementation
             {
                 BOOL darkMode = isDark ? TRUE : FALSE;
                 DwmSetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &darkMode, sizeof(darkMode));
-
-                int backdropType = DWMSBT_NONE;
-                DwmSetWindowAttribute(m_hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdropType, sizeof(backdropType));
-
-                SetWindowPos(m_hwnd, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE);
             }
 
             RootGrid().UpdateLayout();

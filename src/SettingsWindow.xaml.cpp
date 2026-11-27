@@ -390,15 +390,6 @@ namespace winrt::ClickBrightness::implementation
                     StopCapture(false);
 
                     bool isDark = ThemeHelper::IsAppInDarkMode(g_Settings.appTheme);
-                    if (m_hwnd)
-                    {
-                        BOOL darkMode = isDark ? TRUE : FALSE;
-                        DwmSetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &darkMode, sizeof(darkMode));
-
-                        COLORREF captionColor = isDark ? RGB(32, 32, 32) : RGB(243, 243, 243);
-                        DwmSetWindowAttribute(m_hwnd, DWMWA_CAPTION_COLOR, &captionColor, sizeof(captionColor));
-                    }
-
                     winrt::Windows::UI::Color solidBg = isDark
                         ? winrt::Microsoft::UI::ColorHelper::FromArgb(255, 32, 32, 32)
                         : winrt::Microsoft::UI::ColorHelper::FromArgb(255, 243, 243, 243);
@@ -414,7 +405,6 @@ namespace winrt::ClickBrightness::implementation
             FlushPendingSave();
             StopCapture(false);
             s_settingsWindow = nullptr;
-            TrimProcessWorkingSetAsync();
         });
 
         ExtendsContentIntoTitleBar(true);
@@ -579,8 +569,6 @@ namespace winrt::ClickBrightness::implementation
 
             COLORREF captionColor = isDark ? RGB(32, 32, 32) : RGB(243, 243, 243);
             DwmSetWindowAttribute(m_hwnd, DWMWA_CAPTION_COLOR, &captionColor, sizeof(captionColor));
-
-            SetWindowPos(m_hwnd, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE);
         }
 
         UpdateTitleBarButtons(isDark);
@@ -4171,13 +4159,4 @@ void OnSettingsDisplayChanged()
             impl->OnDisplayChanged();
         }
     }
-}
-
-void TrimProcessWorkingSetAsync()
-{
-    std::thread([]()
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-        SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
-    }).detach();
 }

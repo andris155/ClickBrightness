@@ -108,4 +108,3 @@ void CloseSettingsWindow();
 bool IsSettingsWindowOpen();
 void OnSettingsThemeChanged();
 void OnSettingsDisplayChanged();
-void TrimProcessWorkingSetAsync();

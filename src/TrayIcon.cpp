@@ -919,15 +919,6 @@ static void InitTrayMenu()
             SetWindowLongPtrW(s_hTrayMenuWnd, GWL_EXSTYLE, exStyle);
             SetLayeredWindowAttributes(s_hTrayMenuWnd, 0, 0, LWA_ALPHA);
 
-            COLORREF borderColor = DWMWA_COLOR_NONE;
-            DwmSetWindowAttribute(s_hTrayMenuWnd, DWMWA_BORDER_COLOR, &borderColor, sizeof(borderColor));
-
-            DWM_WINDOW_CORNER_PREFERENCE cornerPref = DWMWCP_DONOTROUND;
-            DwmSetWindowAttribute(s_hTrayMenuWnd, DWMWA_WINDOW_CORNER_PREFERENCE, &cornerPref, sizeof(cornerPref));
-
-            int ncPolicy = DWMNCRP_DISABLED;
-            DwmSetWindowAttribute(s_hTrayMenuWnd, DWMWA_NCRENDERING_POLICY, &ncPolicy, sizeof(ncPolicy));
-
             BOOL forceDisableTransitions = TRUE;
             DwmSetWindowAttribute(s_hTrayMenuWnd, DWMWA_TRANSITIONS_FORCEDISABLED, &forceDisableTransitions, sizeof(forceDisableTransitions));
 
@@ -1213,12 +1204,6 @@ void TrayIcon::ShowContextMenu(UINT uId) {
         }
 
         SetWindowPos(s_hTrayMenuWnd, HWND_TOPMOST, anchorX, anchorY, 1, 1, SWP_SHOWWINDOW | SWP_NOACTIVATE);
-        ShowWindow(s_hTrayMenuWnd, SW_SHOWNOACTIVATE);
-
-        // Ensure anchor window remains 100% invisible without rendering a pixel/dot
-        HRGN hRgn = CreateRectRgn(0, 0, 0, 0);
-        SetWindowRgn(s_hTrayMenuWnd, hRgn, TRUE);
-        SetLayeredWindowAttributes(s_hTrayMenuWnd, 0, 0, LWA_ALPHA);
 
         SetForegroundWindow(s_hTrayMenuWnd);
 
