@@ -26,6 +26,7 @@ struct PhysicalMonitorInfo {
     std::wstring friendlyName;
     std::wstring deviceName;
     std::wstring id;
+    std::wstring legacyId;
     std::wstring wmiInstanceName;
     DWORD minBrightness;
     DWORD maxBrightness;

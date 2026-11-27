@@ -16,9 +16,31 @@ MonitorManager g_MonitorManager;
 
 struct DisplayConfigSummary {
     std::map<std::wstring, std::vector<std::wstring>> friendlyNames;
+    std::map<std::wstring, std::vector<std::wstring>> modelIds;
     std::wstring internalFriendlyName;
     std::wstring internalDeviceName;
 };
+
+static std::wstring ExtractMonitorModelId(const DISPLAYCONFIG_TARGET_DEVICE_NAME& targetName) {
+    // monitorDevicePath format: \\?\DISPLAY#AUS24CC#5&7650b30&1&UID4354#{guid}
+    std::wstring path = targetName.monitorDevicePath;
+    size_t firstHash = path.find(L'#');
+    if (firstHash != std::wstring::npos) {
+        size_t secondHash = path.find(L'#', firstHash + 1);
+        if (secondHash != std::wstring::npos && secondHash > firstHash + 1) {
+            std::wstring model = path.substr(firstHash + 1, secondHash - firstHash - 1);
+            if (!model.empty()) {
+                return model;
+            }
+        }
+    }
+    if (targetName.edidManufactureId != 0 || targetName.edidProductCodeId != 0) {
+        wchar_t buf[32];
+        swprintf_s(buf, L"EDID_%04X_%04X", targetName.edidManufactureId, targetName.edidProductCodeId);
+        return buf;
+    }
+    return L"";
+}
 
 static bool IsInternalOutputTechnology(DISPLAYCONFIG_VIDEO_OUTPUT_TECHNOLOGY tech) {
     return tech == DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INTERNAL ||
@@ -60,6 +82,7 @@ static DisplayConfigSummary QueryDisplayConfigInfo() {
                 if (!friendly.empty()) {
                     summary.friendlyNames[sourceName.viewGdiDeviceName].push_back(friendly);
                 }
+                summary.modelIds[sourceName.viewGdiDeviceName].push_back(ExtractMonitorModelId(targetName));
                 if (IsInternalOutputTechnology(paths[i].targetInfo.outputTechnology) && summary.internalDeviceName.empty()) {
                     summary.internalDeviceName = sourceName.viewGdiDeviceName;
                     summary.internalFriendlyName = !friendly.empty() ? friendly : L"Internal Display";
@@ -288,6 +311,8 @@ struct EnumContext {
     std::vector<PHYSICAL_MONITOR>* rawMonitors;
     std::vector<PhysicalMonitorInfo>* monitors;
     std::map<std::wstring, std::vector<std::wstring>> friendlyNames;
+    std::map<std::wstring, std::vector<std::wstring>> modelIds;
+    std::map<std::wstring, int> modelCounts;
 };
 
 static bool IsExternalMonitorPoweredOffVcp(HANDLE hPhysical) {
@@ -344,7 +369,20 @@ static BOOL CALLBACK MonitorEnumCallback(HMONITOR hMonitor, HDC hdcMonitor, LPRE
                     if (slashPos != std::wstring::npos) {
                         cleanDev = cleanDev.substr(slashPos + 1);
                     }
-                    info.id = cleanDev + L"#" + std::to_wstring(i);
+                    std::wstring legacyId = cleanDev + L"#" + std::to_wstring(i);
+                    info.legacyId = legacyId;
+
+                    std::wstring modelId;
+                    auto mit = ctx->modelIds.find(devName);
+                    if (mit != ctx->modelIds.end() && !mit->second.empty()) {
+                        modelId = (i < mit->second.size()) ? mit->second[i] : mit->second[0];
+                    }
+                    if (!modelId.empty()) {
+                        int modelIdx = ctx->modelCounts[modelId]++;
+                        info.id = modelId + L"#" + std::to_wstring(modelIdx);
+                    } else {
+                        info.id = legacyId;
+                    }
                     info.minBrightness = minB;
                     info.maxBrightness = maxB;
                     info.currentBrightness = curB;
@@ -481,6 +519,7 @@ void MonitorManager::EnumMonitorsInternal() {
         ctx.rawMonitors = &m_rawMonitors;
         ctx.monitors = &m_monitors;
         ctx.friendlyNames = dispCfg.friendlyNames;
+        ctx.modelIds = dispCfg.modelIds;
 
         EnumDisplayMonitors(NULL, NULL, MonitorEnumCallback, reinterpret_cast<LPARAM>(&ctx));
         EnumInternalMonitorsWmi(m_monitors, dispCfg);
@@ -488,6 +527,26 @@ void MonitorManager::EnumMonitorsInternal() {
 
     if (!m_monitors.empty()) {
         m_driverAvailable = true;
+
+        // Migrate legacy DISPLAY#i configs to hardware-stable model IDs on first encounter
+        bool migratedAny = false;
+        for (const auto& mon : m_monitors) {
+            if (!mon.legacyId.empty() && _wcsicmp(mon.legacyId.c_str(), mon.id.c_str()) != 0 &&
+                !g_Settings.FindMonitorConfig(mon.id)) {
+                if (const auto* oldCfg = g_Settings.FindMonitorConfig(mon.legacyId)) {
+                    MonitorControlConfig copied = *oldCfg;
+                    g_Settings.monitorConfigs[mon.id] = copied;
+                    g_Settings.monitorConfigs.erase(mon.legacyId);
+                    if (!g_Settings.mainMonitorId.empty() && _wcsicmp(g_Settings.mainMonitorId.c_str(), mon.legacyId.c_str()) == 0) {
+                        g_Settings.mainMonitorId = mon.id;
+                    }
+                    migratedAny = true;
+                }
+            }
+        }
+        if (migratedAny) {
+            g_Settings.Save();
+        }
 
         // Ensure every detected monitor has a MonitorControlConfig entry
         bool mainConnected = false;
