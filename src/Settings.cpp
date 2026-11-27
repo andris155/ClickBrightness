@@ -65,8 +65,44 @@ const std::wstring& AppSettings::GetIniFilePath() {
     return g_Settings.IsSimulatedMode() ? s_simIniPath : s_normalIniPath;
 }
 
+void AppSettings::ResetToDefaults() {
+    int savedCachedBrightness = cachedBrightness;
+    bool savedStartWithWindows = startWithWindows;
+    int savedSimCount = simulateMonitorsCount;
+    int savedCliSimOverride = cliSimulateMonitorsOverride;
+    std::wstring savedMainMonitorId = mainMonitorId;
+    auto savedConfigs = monitorConfigs;
+
+    *this = AppSettings();
+
+    cachedBrightness = savedCachedBrightness;
+    startWithWindows = savedStartWithWindows;
+    simulateMonitorsCount = savedSimCount;
+    cliSimulateMonitorsOverride = savedCliSimOverride;
+    mainMonitorId = savedMainMonitorId;
+    monitorConfigs = std::move(savedConfigs);
+
+    for (auto& [monId, cfg] : monitorConfigs) {
+        MonitorControlConfig fresh;
+        fresh.customName = cfg.customName;
+        fresh.cachedBrightness = cfg.cachedBrightness;
+        CopyCustomizationToMonitor(fresh);
+        if (!mainMonitorId.empty() && _wcsicmp(monId.c_str(), mainMonitorId.c_str()) != 0) {
+            ClearHotkeys(fresh);
+            fresh.trayPercentageMode = 3;
+        }
+        cfg = std::move(fresh);
+    }
+}
+
 void AppSettings::Load() {
     std::wstring ini = GetIniFilePath();
+    if (GetFileAttributesW(ini.c_str()) == INVALID_FILE_ATTRIBUTES) {
+        ResetToDefaults();
+        startWithWindows = IsStartWithWindowsEnabled();
+        Save();
+        return;
+    }
 
     hotkeyAdjustEnabled = (GetPrivateProfileIntW(L"Hotkeys", L"AdjustEnabled", 0, ini.c_str()) != 0);
     hotkeyAdjustShowOsd = (GetPrivateProfileIntW(L"Hotkeys", L"AdjustShowOsd", 1, ini.c_str()) != 0);

@@ -245,6 +245,7 @@ struct AppSettings {
     }
 
     void Load();
+    void ResetToDefaults();
     void Save() const;
     void SaveBrightnessOnly() const;
     static const std::wstring& GetIniFilePath();
