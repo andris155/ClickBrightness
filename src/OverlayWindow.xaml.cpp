@@ -589,7 +589,8 @@ namespace winrt::BrightnessApp::implementation
         m_pendingBrightness = target;
         m_hasPendingChange = true;
 
-        if (showOsd)
+        bool dndSuppressed = (g_Settings.osdSuppressOnDnd && ThemeHelper::IsDoNotDisturbActive());
+        if (showOsd && !dndSuppressed)
         {
             UpdateMultiContent(targetMonitorId, target);
             PositionWindow();
@@ -658,7 +659,8 @@ namespace winrt::BrightnessApp::implementation
             ? g_Settings.GetEffectiveMonitorConfig(g_Settings.mainMonitorId)
             : g_Settings.GetEffectiveMonitorConfig(targetMonitorId);
 
-        if (effCfg.trayWheelShowOsd)
+        bool dndSuppressed = (g_Settings.osdSuppressOnDnd && ThemeHelper::IsDoNotDisturbActive());
+        if (effCfg.trayWheelShowOsd && !dndSuppressed)
         {
             UpdateMultiContent(targetMonitorId, target);
             PositionWindow();
@@ -724,7 +726,8 @@ namespace winrt::BrightnessApp::implementation
         m_pendingBrightness = target;
         m_hasPendingChange = changed;
 
-        if (showOsd)
+        bool dndSuppressed = (g_Settings.osdSuppressOnDnd && ThemeHelper::IsDoNotDisturbActive());
+        if (showOsd && !dndSuppressed)
         {
             UpdateMultiContent(targetMonitorId, target);
             PositionWindow();

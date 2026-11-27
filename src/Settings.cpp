@@ -194,6 +194,7 @@ void AppSettings::Load() {
     overlayTimeoutMs = GetPrivateProfileIntW(L"Overlay", L"TimeoutMs", 2000, ini.c_str());
     if (overlayTimeoutMs < 500) overlayTimeoutMs = 500;
     if (overlayTimeoutMs > 10000) overlayTimeoutMs = 10000;
+    osdSuppressOnDnd = (GetPrivateProfileIntW(L"Overlay", L"SuppressOnDnd", 0, ini.c_str()) != 0);
 
     overlayUseWindowsAccent = GetPrivateProfileIntW(L"Overlay", L"UseWindowsAccent", 1, ini.c_str()) != 0;
 
@@ -474,6 +475,7 @@ void AppSettings::Save() const {
     addSec(L"Overlay");
     addLine(L"Theme", std::to_wstring(overlayTheme));
     addLine(L"TimeoutMs", std::to_wstring(overlayTimeoutMs));
+    addLine(L"SuppressOnDnd", osdSuppressOnDnd ? L"1" : L"0");
     addLine(L"UseWindowsAccent", overlayUseWindowsAccent ? L"1" : L"0");
     addLine(L"AccentColor", FormatColor(overlayAccentColor));
     addLine(L"UseDualColors", overlayUseDualColors ? L"1" : L"0");

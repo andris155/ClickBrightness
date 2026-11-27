@@ -208,6 +208,7 @@ struct AppSettings {
     // OSD & Tray Menu Theme (0 = Follow Windows (system), 1 = Dark, 2 = Light)
     int overlayTheme = 0;
     int overlayTimeoutMs = 2000;             // Default: 2000 ms (2 seconds)
+    bool osdSuppressOnDnd = false;           // Default: OFF (Suppress OSD when Do Not Disturb is active)
     bool overlayUseWindowsAccent = true;     // Default: Use Windows accent color
     COLORREF overlayAccentColor = RGB(0, 120, 212); // Default: #0078D4
     bool overlayUseDualColors = false;
