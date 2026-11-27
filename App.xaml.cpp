@@ -55,8 +55,10 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
         if (uMsg == g_uTaskbarRestartMsg && g_uTaskbarRestartMsg != 0)
         {
             int b = g_MonitorManager.GetCachedBrightness();
+            g_TrayIcon.Destroy();
             g_TrayIcon.Create(hwnd, WM_APP_TRAYMSG, 1);
             g_TrayIcon.UpdateBrightness(b);
+            g_TrayIcon.SyncExtraTrayIcons(true);
             return 0;
         }
 
@@ -258,6 +260,7 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
             if (now - s_lastHoverPowerCheck >= 1500)
             {
                 s_lastHoverPowerCheck = now;
+                g_TrayIcon.UpdateWheelHook();
                 g_MonitorManager.RefreshExternalPowerStatesAsync();
             }
             break;

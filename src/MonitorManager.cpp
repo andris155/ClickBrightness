@@ -1130,9 +1130,19 @@ void MonitorManager::WorkerLoop() {
                 } else {
                     ok = (SetMonitorBrightness(tgt.hPhysical, tgt.targetVal) != FALSE);
                     if (!ok) {
-                        // Retry once after a brief micro-sleep in case of transient I2C bus contention
-                        Sleep(25);
-                        ok = (SetMonitorBrightness(tgt.hPhysical, tgt.targetVal) != FALSE);
+                        // Progressive retry for transient I2C contention or monitor wakeup/input-switch busy state
+                        const int retryDelaysMs[] = { 25, 120 };
+                        for (int delayMs : retryDelaysMs) {
+                            Sleep(delayMs);
+                            {
+                                std::lock_guard<std::mutex> lock(m_workerMutex);
+                                if (m_stopWorker || m_pendingTargetBrightness != kNoPendingBrightness || m_pendingReinit) {
+                                    break;
+                                }
+                            }
+                            ok = (SetMonitorBrightness(tgt.hPhysical, tgt.targetVal) != FALSE);
+                            if (ok) break;
+                        }
                     }
                 }
 

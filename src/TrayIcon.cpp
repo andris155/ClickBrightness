@@ -37,7 +37,19 @@ static LRESULT CALLBACK TrayWheelHookProc(int nCode, WPARAM wParam, LPARAM lPara
         PMSLLHOOKSTRUCT p = reinterpret_cast<PMSLLHOOKSTRUCT>(lParam);
         if (p)
         {
-            HWND hOwner = g_TrayIcon.GetOwnerWnd();
+            // Fast pre-filter: only query Shell_NotifyIconGetRect when cursor is over taskbar or tray overflow
+            HWND hPtWnd = WindowFromPoint(p->pt);
+            HWND hRoot = hPtWnd ? GetAncestor(hPtWnd, GA_ROOT) : NULL;
+            wchar_t cls[64] = { 0 };
+            bool overTray = false;
+            if (hRoot && GetClassNameW(hRoot, cls, ARRAYSIZE(cls)) > 0)
+            {
+                overTray = (_wcsicmp(cls, L"Shell_TrayWnd") == 0 ||
+                            _wcsicmp(cls, L"Shell_SecondaryTrayWnd") == 0 ||
+                            _wcsicmp(cls, L"NotifyIconOverflowWindow") == 0 ||
+                            _wcsicmp(cls, L"TopLevelWindowForOverflowXamlIsland") == 0);
+            }
+            HWND hOwner = overTray ? g_TrayIcon.GetOwnerWnd() : NULL;
             if (hOwner)
             {
                 auto checkSlot = [&](UINT slotId, const std::wstring& targetMonId) -> bool {
