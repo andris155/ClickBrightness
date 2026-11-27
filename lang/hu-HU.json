@@ -60,6 +60,7 @@
   "Btn_ResetDefaults": "Alaphelyzetbe állítás",
   "Confirm_ResetDefaults": "Minden beállítás visszaáll az alapértékekre. Biztosan folytatod?",
   "Btn_ConfirmResetDefaults": "Igen, visszaállítás",
+  "Btn_Apply": "Alkalmaz",
   "Tip_ResetDefaults": "Minden beállítás visszaállítása az alapértékekre",
 
   "Status_Ready_Title": "Hardveres DDC/CI kész",

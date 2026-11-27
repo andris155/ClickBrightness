@@ -1608,7 +1608,6 @@ namespace winrt::BrightnessApp::implementation
             if (m_isUpdatingUI) return;
             g_Settings.hotkeyDelayEnabled = on;
             DelayWaitTimeCard().Visibility(on ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
-            HoldSpeedCard().Visibility(on ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
             ApplyAndSave();
         });
 
@@ -2229,19 +2228,25 @@ namespace winrt::BrightnessApp::implementation
             ApplyAndSave();
         });
 
+        auto updateScheduleApplyState = [this]()
+        {
+            int dayVal = (std::clamp)(static_cast<int>(std::round(ScheduleDayBrightnessSlider().Value())), 0, 100);
+            int nightVal = (std::clamp)(static_cast<int>(std::round(ScheduleNightBrightnessSlider().Value())), 0, 100);
+            ApplyScheduleBrightnessButton().IsEnabled(
+                dayVal != g_Settings.scheduleDayBrightness || nightVal != g_Settings.scheduleNightBrightness);
+        };
+
         // Schedule Daytime Brightness Slider & NumberBox
-        ScheduleDayBrightnessSlider().ValueChanged([this](auto&&, auto&&)
+        ScheduleDayBrightnessSlider().ValueChanged([this, updateScheduleApplyState](auto&&, auto&&)
         {
             if (m_isUpdatingUI) return;
             int val = (std::clamp)(static_cast<int>(std::round(ScheduleDayBrightnessSlider().Value())), 0, 100);
             m_isUpdatingUI = true;
             ScheduleDayBrightnessNumberBox().Value(val);
             m_isUpdatingUI = false;
-            g_Settings.scheduleDayBrightness = val;
-            ApplyAndSave();
-            ScheduleManager::Refresh();
+            updateScheduleApplyState();
         });
-        ScheduleDayBrightnessNumberBox().ValueChanged([this](auto&&, auto&&)
+        ScheduleDayBrightnessNumberBox().ValueChanged([this, updateScheduleApplyState](auto&&, auto&&)
         {
             if (m_isUpdatingUI) return;
             double raw = ScheduleDayBrightnessNumberBox().Value();
@@ -2250,24 +2255,20 @@ namespace winrt::BrightnessApp::implementation
             m_isUpdatingUI = true;
             ScheduleDayBrightnessSlider().Value(val);
             m_isUpdatingUI = false;
-            g_Settings.scheduleDayBrightness = val;
-            ApplyAndSave();
-            ScheduleManager::Refresh();
+            updateScheduleApplyState();
         });
 
         // Schedule Nighttime Brightness Slider & NumberBox
-        ScheduleNightBrightnessSlider().ValueChanged([this](auto&&, auto&&)
+        ScheduleNightBrightnessSlider().ValueChanged([this, updateScheduleApplyState](auto&&, auto&&)
         {
             if (m_isUpdatingUI) return;
             int val = (std::clamp)(static_cast<int>(std::round(ScheduleNightBrightnessSlider().Value())), 0, 100);
             m_isUpdatingUI = true;
             ScheduleNightBrightnessNumberBox().Value(val);
             m_isUpdatingUI = false;
-            g_Settings.scheduleNightBrightness = val;
-            ApplyAndSave();
-            ScheduleManager::Refresh();
+            updateScheduleApplyState();
         });
-        ScheduleNightBrightnessNumberBox().ValueChanged([this](auto&&, auto&&)
+        ScheduleNightBrightnessNumberBox().ValueChanged([this, updateScheduleApplyState](auto&&, auto&&)
         {
             if (m_isUpdatingUI) return;
             double raw = ScheduleNightBrightnessNumberBox().Value();
@@ -2276,7 +2277,16 @@ namespace winrt::BrightnessApp::implementation
             m_isUpdatingUI = true;
             ScheduleNightBrightnessSlider().Value(val);
             m_isUpdatingUI = false;
-            g_Settings.scheduleNightBrightness = val;
+            updateScheduleApplyState();
+        });
+
+        ApplyScheduleBrightnessButton().Click([this](auto&&, auto&&)
+        {
+            int dayVal = (std::clamp)(static_cast<int>(std::round(ScheduleDayBrightnessSlider().Value())), 0, 100);
+            int nightVal = (std::clamp)(static_cast<int>(std::round(ScheduleNightBrightnessSlider().Value())), 0, 100);
+            g_Settings.scheduleDayBrightness = dayVal;
+            g_Settings.scheduleNightBrightness = nightVal;
+            ApplyScheduleBrightnessButton().IsEnabled(false);
             ApplyAndSave();
             ScheduleManager::Refresh();
         });
@@ -3198,6 +3208,7 @@ namespace winrt::BrightnessApp::implementation
         ResetDefaultsButtonText().Text(g_Loc.Get(L"Btn_ResetDefaults", L"Reset Defaults"));
         ResetDefaultsConfirmText().Text(g_Loc.Get(L"Confirm_ResetDefaults", L"All settings will be reset. Do you want to continue?"));
         ConfirmResetDefaultsButton().Content(box_value(g_Loc.Get(L"Btn_ConfirmResetDefaults", L"Yes, reset settings")));
+        ApplyScheduleBrightnessButton().Content(box_value(g_Loc.Get(L"Btn_Apply", L"Apply")));
         ToolTipService::SetToolTip(ResetDefaultsButton(), box_value(g_Loc.Get(L"Tip_ResetDefaults", L"Reset all settings to default values")));
 
         AppearanceSectionTitle().Text(g_Loc.Get(L"Sec_Appearance", L"Appearance"));
@@ -3816,7 +3827,6 @@ namespace winrt::BrightnessApp::implementation
         DelayEnabledToggle().IsOn(g_Settings.hotkeyDelayEnabled);
         DelayEnabledStatusText().Text(g_Settings.hotkeyDelayEnabled ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
         DelayWaitTimeCard().Visibility(g_Settings.hotkeyDelayEnabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
-        HoldSpeedCard().Visibility(g_Settings.hotkeyDelayEnabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         DelaySlider().Value(g_Settings.hotkeyDelayMs);
         DelayNumberBox().Value(g_Settings.hotkeyDelayMs);
 
@@ -3957,6 +3967,7 @@ namespace winrt::BrightnessApp::implementation
         ScheduleDayBrightnessNumberBox().Value(g_Settings.scheduleDayBrightness);
         ScheduleNightBrightnessSlider().Value(g_Settings.scheduleNightBrightness);
         ScheduleNightBrightnessNumberBox().Value(g_Settings.scheduleNightBrightness);
+        ApplyScheduleBrightnessButton().IsEnabled(false);
         ScheduleDayTimePicker().Time(std::chrono::hours(g_Settings.scheduleDayHour) + std::chrono::minutes(g_Settings.scheduleDayMinute));
         ScheduleNightTimePicker().Time(std::chrono::hours(g_Settings.scheduleNightHour) + std::chrono::minutes(g_Settings.scheduleNightMinute));
         ScheduleSunSourceComboBox().SelectedIndex(g_Settings.scheduleSunSource == 1 ? 1 : 0);

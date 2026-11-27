@@ -60,6 +60,7 @@
   "Btn_ResetDefaults": "Reset Defaults",
   "Confirm_ResetDefaults": "All settings will be reset. Do you want to continue?",
   "Btn_ConfirmResetDefaults": "Yes, reset settings",
+  "Btn_Apply": "Apply",
   "Tip_ResetDefaults": "Reset all settings to default values",
 
   "Status_Ready_Title": "Hardware DDC/CI Ready",

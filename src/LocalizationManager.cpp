@@ -317,6 +317,7 @@ void LocalizationManager::LoadBuiltInDefaults() {
         { L"Btn_ResetDefaults", L"Reset Defaults" },
         { L"Confirm_ResetDefaults", L"All settings will be reset. Do you want to continue?" },
         { L"Btn_ConfirmResetDefaults", L"Yes, reset settings" },
+        { L"Btn_Apply", L"Apply" },
         { L"Confirm_MainMonitor", L"Changing the main display will update Sync mode and tray icons. Do you want to continue?" },
         { L"Btn_ConfirmMainMonitor", L"Yes, change main display" },
         { L"Tip_ResetDefaults", L"Reset all settings to default values" },

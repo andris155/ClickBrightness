@@ -1810,7 +1810,14 @@
 
                                 <!-- Brightness Levels -->
                                 <StackPanel x:Name="ScheduleBrightnessSection" Visibility="Collapsed" Spacing="0">
-                                    <TextBlock x:Name="ScheduleBrightnessSectionTitle" Text="Brightness Levels" FontSize="14" FontWeight="SemiBold" Margin="0,14,0,6"/>
+                                    <Grid Margin="0,14,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="ScheduleBrightnessSectionTitle" Text="Brightness Levels" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <Button x:Name="ApplyScheduleBrightnessButton" Grid.Column="1" Content="Apply" Style="{ThemeResource AccentButtonStyle}" IsEnabled="False" VerticalAlignment="Center"/>
+                                    </Grid>
 
                                     <!-- Daytime Brightness -->
                                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
