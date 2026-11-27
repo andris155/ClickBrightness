@@ -79,6 +79,11 @@ public:
     void OnDisplayPowerOn();
     bool IsDisplayPoweredOn() const { return m_displayPoweredOn.load(); }
 
+    void SetSessionLocked(bool locked);
+    bool IsSessionLocked() const { return m_sessionLocked.load(); }
+    void UpdateRemoteSessionState();
+    bool IsRemoteSession() const { return m_isRemoteSession.load(); }
+
 private:
     void EnumMonitorsInternal();
     void WorkerLoop();
@@ -94,6 +99,8 @@ private:
     int m_syncBaseBrightness{ 45 };
     std::atomic<bool> m_driverAvailable;
     std::atomic<bool> m_displayPoweredOn;
+    std::atomic<bool> m_sessionLocked{ false };
+    std::atomic<bool> m_isRemoteSession{ false };
     std::atomic<int> m_consecutiveFailures;
     ULONGLONG m_lastEnumTick;
 

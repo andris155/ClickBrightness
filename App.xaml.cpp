@@ -31,8 +31,11 @@
 #include <strsafe.h>
 #include <roerrorapi.h>
 #include <dbt.h>
+#include <wtsapi32.h>
 #include <thread>
 #include <atomic>
+
+#pragma comment(lib, "wtsapi32.lib")
 
 static const wchar_t* MAIN_WND_CLASS = L"ClickBrightness_MessageWndClass";
 static HWND g_hMainWnd = NULL;
@@ -66,57 +69,121 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
         {
             std::wstring cmdStr = (const wchar_t*)pcds->lpData;
             CliCommand cmd = ParseCommandLine(cmdStr);
+
+            auto getCliTargets = [&]() -> std::vector<std::wstring>
+            {
+                std::vector<std::wstring> targets;
+                if (cmd.allMonitors)
+                {
+                    targets.push_back(L""); // Main/Sync group
+                    for (const auto& mon : g_MonitorManager.GetMonitors())
+                    {
+                        if (!g_Settings.mainMonitorId.empty() && _wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0)
+                            continue;
+                        const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
+                        if (cfg && cfg->enabled && cfg->controlMode == 1)
+                        {
+                            targets.push_back(mon.id);
+                        }
+                    }
+                }
+                else if (!cmd.monitorSelector.empty())
+                {
+                    std::wstring resolvedId;
+                    if (ResolveCliMonitorTarget(g_MonitorManager, cmd.monitorSelector, resolvedId))
+                    {
+                        targets.push_back(resolvedId);
+                    }
+                }
+                else
+                {
+                    targets.push_back(L"");
+                }
+                return targets;
+            };
+
             switch (cmd.action)
             {
             case CliAction::GetBrightness:
             {
-                int b = g_MonitorManager.GetCachedBrightness();
+                std::wstring resolvedId;
+                int b = (!cmd.monitorSelector.empty() && ResolveCliMonitorTarget(g_MonitorManager, cmd.monitorSelector, resolvedId))
+                    ? g_MonitorManager.GetTargetControlBrightness(resolvedId)
+                    : g_MonitorManager.GetCachedBrightness();
                 return (LRESULT)(b + 1); // +1 offset so 0% brightness returns non-zero
             }
             case CliAction::SetBrightness:
             {
                 if (cmd.value >= 0 && cmd.value <= 100)
                 {
-                    g_OverlayWindow.TriggerBrightnessSet(cmd.value, cmd.showOsd);
+                    for (const auto& tgt : getCliTargets())
+                    {
+                        g_OverlayWindow.TriggerBrightnessSetForTarget(tgt, cmd.value, cmd.showOsd);
+                    }
                 }
                 return 1;
             }
             case CliAction::StepUp:
             {
-                int delta = (cmd.value > 0) ? cmd.value : g_Settings.hotkeyStep;
-                g_OverlayWindow.TriggerBrightnessDelta(+delta, cmd.showOsd);
+                for (const auto& tgt : getCliTargets())
+                {
+                    const auto& effCfg = g_Settings.GetEffectiveMonitorConfig(tgt.empty() ? g_Settings.mainMonitorId : tgt);
+                    int delta = (cmd.value > 0) ? cmd.value : effCfg.hotkeyStep;
+                    g_OverlayWindow.TriggerBrightnessDeltaForTarget(tgt, +delta, cmd.showOsd);
+                }
                 return 1;
             }
             case CliAction::StepDown:
             {
-                int delta = (cmd.value > 0) ? cmd.value : g_Settings.hotkeyStep;
-                g_OverlayWindow.TriggerBrightnessDelta(-delta, cmd.showOsd);
+                for (const auto& tgt : getCliTargets())
+                {
+                    const auto& effCfg = g_Settings.GetEffectiveMonitorConfig(tgt.empty() ? g_Settings.mainMonitorId : tgt);
+                    int delta = (cmd.value > 0) ? cmd.value : effCfg.hotkeyStep;
+                    g_OverlayWindow.TriggerBrightnessDeltaForTarget(tgt, -delta, cmd.showOsd);
+                }
                 return 1;
             }
             case CliAction::Preset1:
             {
-                g_OverlayWindow.TriggerBrightnessSet(g_Settings.hotkeyPreset1Brightness, cmd.showOsd);
+                for (const auto& tgt : getCliTargets())
+                {
+                    const auto& effCfg = g_Settings.GetEffectiveMonitorConfig(tgt.empty() ? g_Settings.mainMonitorId : tgt);
+                    g_OverlayWindow.TriggerBrightnessSetForTarget(tgt, effCfg.hotkeyPreset1Brightness, cmd.showOsd);
+                }
                 return 1;
             }
             case CliAction::Preset2:
             {
-                g_OverlayWindow.TriggerBrightnessSet(g_Settings.hotkeyPreset2Brightness, cmd.showOsd);
+                for (const auto& tgt : getCliTargets())
+                {
+                    const auto& effCfg = g_Settings.GetEffectiveMonitorConfig(tgt.empty() ? g_Settings.mainMonitorId : tgt);
+                    g_OverlayWindow.TriggerBrightnessSetForTarget(tgt, effCfg.hotkeyPreset2Brightness, cmd.showOsd);
+                }
                 return 1;
             }
             case CliAction::Toggle:
             {
-                int curB = g_MonitorManager.GetCachedBrightness();
-                int p1 = g_Settings.hotkeyPresetToggle1Brightness;
-                int p2 = g_Settings.hotkeyPresetToggle2Brightness;
-                int target = (curB == p1) ? p2 : ((curB == p2) ? p1 : (abs(curB - p1) < abs(curB - p2) ? p2 : p1));
-                g_OverlayWindow.TriggerBrightnessSet(target, cmd.showOsd);
+                for (const auto& tgt : getCliTargets())
+                {
+                    const auto& effCfg = g_Settings.GetEffectiveMonitorConfig(tgt.empty() ? g_Settings.mainMonitorId : tgt);
+                    int curB = g_MonitorManager.GetTargetControlBrightness(tgt);
+                    int p1 = effCfg.hotkeyPresetToggle1Brightness;
+                    int p2 = effCfg.hotkeyPresetToggle2Brightness;
+                    int target = (curB == p1) ? p2 : ((curB == p2) ? p1 : (abs(curB - p1) < abs(curB - p2) ? p2 : p1));
+                    g_OverlayWindow.TriggerBrightnessSetForTarget(tgt, target, cmd.showOsd);
+                }
                 return 1;
             }
             case CliAction::ShowFlyout:
             {
                 POINT pt;
                 GetCursorPos(&pt);
-                g_FlyoutWindow.Show(&pt);
+                std::wstring resolvedId;
+                if (!cmd.monitorSelector.empty())
+                {
+                    ResolveCliMonitorTarget(g_MonitorManager, cmd.monitorSelector, resolvedId);
+                }
+                g_FlyoutWindow.Show(&pt, resolvedId);
                 return 1;
             }
             case CliAction::ShowSettings:
@@ -438,6 +505,37 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
         return 0;
     }
 
+    case WM_WTSSESSION_CHANGE:
+    {
+        switch (wParam)
+        {
+        case WTS_SESSION_LOCK:
+            g_MonitorManager.SetSessionLocked(true);
+            break;
+        case WTS_SESSION_UNLOCK:
+            g_MonitorManager.SetSessionLocked(false);
+            g_MonitorManager.UpdateRemoteSessionState();
+            if (!g_MonitorManager.IsRemoteSession())
+            {
+                g_MonitorManager.RefreshExternalPowerStatesAsync();
+                ScheduleManager::Refresh();
+            }
+            break;
+        case WTS_CONSOLE_CONNECT:
+        case WTS_REMOTE_CONNECT:
+        case WTS_CONSOLE_DISCONNECT:
+        case WTS_REMOTE_DISCONNECT:
+            g_MonitorManager.UpdateRemoteSessionState();
+            if (!g_MonitorManager.IsRemoteSession())
+            {
+                g_MonitorManager.OnDisplayChanged();
+                SetTimer(hwnd, IDT_GPU_RESET_COOLDOWN, 1000, NULL);
+            }
+            break;
+        }
+        return 0;
+    }
+
     case WM_TIMER:
     {
         if (wParam == IDT_GPU_RESET_COOLDOWN)
@@ -533,6 +631,7 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
         g_HotkeyManager.UnregisterAll(hwnd);
         g_TrayIcon.Destroy();
         g_FlyoutWindow.Destroy();
+        WTSUnRegisterSessionNotification(hwnd);
         ScheduleManager::Uninit();
         g_OverlayWindow.Destroy();
         g_MonitorManager.Cleanup();
@@ -659,6 +758,7 @@ namespace winrt::BrightnessApp::implementation
             {
                 ChangeWindowMessageFilterEx(g_hMainWnd, WM_COPYDATA, MSGFLT_ALLOW, NULL);
                 s_hPowerNotify = RegisterPowerSettingNotification(g_hMainWnd, &GUID_MONITOR_POWER_ON, DEVICE_NOTIFY_WINDOW_HANDLE);
+                WTSRegisterSessionNotification(g_hMainWnd, NOTIFY_FOR_THIS_SESSION);
             }
 
             // Initialize DDC/CI monitor manager

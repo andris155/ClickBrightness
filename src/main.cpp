@@ -58,6 +58,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
         if (cmd.action == CliAction::ListMonitors)
         {
+            g_Settings.Load();
             MonitorManager monMgr;
             monMgr.Initialize();
             PrintToConsole(GetMonitorsText(monMgr));
@@ -125,9 +126,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     if (cmd.action == CliAction::GetBrightness)
     {
+        g_Settings.Load();
         MonitorManager monMgr;
         monMgr.Initialize();
-        int b = monMgr.GetCurrentBrightness();
+        std::wstring targetId;
+        int b = (!cmd.monitorSelector.empty() && ResolveCliMonitorTarget(monMgr, cmd.monitorSelector, targetId))
+            ? monMgr.GetTargetControlBrightness(targetId)
+            : monMgr.GetCurrentBrightness();
         PrintToConsole(L"Current Brightness: " + std::to_wstring(b) + L"%\r\n");
         monMgr.Cleanup();
         if (hMutex) { ReleaseMutex(hMutex); CloseHandle(hMutex); }
@@ -136,6 +141,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     if (cmd.action == CliAction::ListMonitors)
     {
+        g_Settings.Load();
         MonitorManager monMgr;
         monMgr.Initialize();
         PrintToConsole(GetMonitorsText(monMgr));

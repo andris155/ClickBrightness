@@ -115,7 +115,8 @@ static void ScheduleExactNextSecondIfImminent(const MonitorControlConfig& cfg, c
 }
 
 void Tick() {
-    if (!g_MonitorManager.IsDriverAvailable() || !g_MonitorManager.IsDisplayPoweredOn()) {
+    if (!g_MonitorManager.IsDriverAvailable() || !g_MonitorManager.IsDisplayPoweredOn() ||
+        g_MonitorManager.IsSessionLocked() || g_MonitorManager.IsRemoteSession()) {
         return;
     }
 

@@ -6,6 +6,7 @@
 #include <vector>
 #include <cwctype>
 #include "MonitorManager.h"
+#include "Settings.h"
 
 enum class CliAction {
     None,
@@ -27,6 +28,8 @@ struct CliCommand {
     CliAction action = CliAction::None;
     int value = -1;       // For SetBrightness (0-100) or StepUp/StepDown custom delta
     bool showOsd = true;  // Default true; set to false if --no-osd is specified
+    std::wstring monitorSelector; // Empty = Main/Sync group; otherwise index (1..N), ID, or name
+    bool allMonitors = false;     // Apply adjustment to Main/Sync + all enabled Separate monitors
 };
 
 inline void PrintToConsole(const std::wstring& text)
@@ -90,15 +93,93 @@ inline std::wstring GetHelpText()
            L"  --exit, -e                  Cleanly terminate running background instance\r\n"
            L"  --help, -h, /?              Show this help information\r\n\r\n"
            L"Options:\r\n"
+           L"  --monitor <target>          Target a specific display by index (1..N), ID, name, or 'sync'\r\n"
+           L"  --all, -a                   Apply adjustment to Main/Sync and all Separate displays\r\n"
            L"  --osd                       Display on-screen banner during adjustment (default)\r\n"
            L"  --no-osd                    Suppress on-screen banner (silent adjustment)\r\n\r\n"
            L"Examples:\r\n"
            L"  ClickBrightness.exe --set 65\r\n"
-           L"  ClickBrightness.exe --set 40 --no-osd\r\n"
-           L"  ClickBrightness.exe --up 10\r\n"
-           L"  ClickBrightness.exe --toggle\r\n"
-           L"  ClickBrightness.exe --get\r\n"
-           L"  ClickBrightness.exe --flyout\r\n\r\n";
+           L"  ClickBrightness.exe --monitor 2 --set 40 --no-osd\r\n"
+           L"  ClickBrightness.exe --monitor \"ASUS\" --up 10\r\n"
+           L"  ClickBrightness.exe --all --set 50\r\n"
+           L"  ClickBrightness.exe --get --monitor 2\r\n"
+           L"  ClickBrightness.exe --monitors\r\n"
+           L"  ClickBrightness.exe --flyout --monitor 2\r\n\r\n";
+}
+
+inline bool ResolveCliMonitorTarget(MonitorManager& monMgr, const std::wstring& selector, std::wstring& outTargetId)
+{
+    if (selector.empty() || _wcsicmp(selector.c_str(), L"main") == 0 || _wcsicmp(selector.c_str(), L"sync") == 0)
+    {
+        outTargetId.clear();
+        return true;
+    }
+
+    auto monitors = monMgr.GetMonitors();
+    if (monitors.empty()) return false;
+
+    // 1. Check 1-based index
+    bool allDigits = true;
+    for (wchar_t ch : selector)
+    {
+        if (!iswdigit(ch)) { allDigits = false; break; }
+    }
+    if (allDigits)
+    {
+        int idx = _wtoi(selector.c_str());
+        if (idx >= 1 && idx <= static_cast<int>(monitors.size()))
+        {
+            const auto& mon = monitors[idx - 1];
+            const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
+            bool isMain = (!g_Settings.mainMonitorId.empty() && _wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
+            if (isMain || !cfg || cfg->controlMode == 0)
+            {
+                outTargetId.clear();
+            }
+            else
+            {
+                outTargetId = mon.id;
+            }
+            return true;
+        }
+    }
+
+    // 2. Exact monitor ID match
+    for (const auto& mon : monitors)
+    {
+        if (_wcsicmp(mon.id.c_str(), selector.c_str()) == 0)
+        {
+            const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
+            bool isMain = (!g_Settings.mainMonitorId.empty() && _wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
+            outTargetId = (isMain || !cfg || cfg->controlMode == 0) ? L"" : mon.id;
+            return true;
+        }
+    }
+
+    // 3. Substring match on custom name, friendlyName, or description
+    std::wstring selLower = selector;
+    std::transform(selLower.begin(), selLower.end(), selLower.begin(), ::towlower);
+    for (const auto& mon : monitors)
+    {
+        const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
+        std::wstring custom = cfg ? cfg->customName : L"";
+        std::wstring friendly = mon.friendlyName;
+        std::wstring desc = mon.description;
+        std::transform(custom.begin(), custom.end(), custom.begin(), ::towlower);
+        std::transform(friendly.begin(), friendly.end(), friendly.begin(), ::towlower);
+        std::transform(desc.begin(), desc.end(), desc.begin(), ::towlower);
+
+        if ((!custom.empty() && custom.find(selLower) != std::wstring::npos) ||
+            (!friendly.empty() && friendly.find(selLower) != std::wstring::npos) ||
+            (!desc.empty() && desc.find(selLower) != std::wstring::npos))
+        {
+            bool isMain = (!g_Settings.mainMonitorId.empty() && _wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
+            outTargetId = (isMain || !cfg || cfg->controlMode == 0) ? L"" : mon.id;
+            return true;
+        }
+    }
+
+    return false;
 }
 
 inline std::wstring GetMonitorsText(MonitorManager& monMgr)
@@ -109,30 +190,22 @@ inline std::wstring GetMonitorsText(MonitorManager& monMgr)
         return L"\r\nNo DDC/CI compatible monitors detected (or driver still initializing).\r\n\r\n";
     }
 
-    std::wstring out = L"\r\nDetected DDC/CI Physical Monitors:\r\n";
+    std::wstring out = L"\r\nDetected Physical Monitors:\r\n";
     int idx = 1;
     for (const auto& mon : monitors)
     {
-        out += L"  [" + std::to_wstring(idx++) + L"] ";
-        if (!mon.friendlyName.empty())
-        {
-            out += mon.friendlyName;
-        }
-        else if (!mon.description.empty())
-        {
-            out += mon.description;
-        }
-        else
-        {
-            out += mon.deviceName;
-        }
+        const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
+        std::wstring dispName = (cfg && !cfg->customName.empty()) ? cfg->customName
+            : (!mon.friendlyName.empty() ? mon.friendlyName : (!mon.description.empty() ? mon.description : mon.deviceName));
+        bool isMain = (!g_Settings.mainMonitorId.empty() && _wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0);
+        std::wstring modeStr = isMain ? L"Main/Sync" : ((cfg && cfg->controlMode == 1) ? L"Separate" : L"Sync");
 
-        if (mon.isPrimary)
-        {
-            out += L" (Primary)";
-        }
-
-        out += L" - Brightness: " + std::to_wstring(mon.currentBrightness) + L"%";
+        out += L"  [" + std::to_wstring(idx++) + L"] " + dispName;
+        if (mon.isPrimary) out += L" (Primary)";
+        if (mon.isPoweredOff) out += L" (Off)";
+        out += L" | ID: " + mon.id;
+        out += L" | Mode: " + modeStr;
+        out += L" | Brightness: " + std::to_wstring(mon.currentBrightness) + L"%";
         out += L" (Range: " + std::to_wstring(mon.minBrightness) + L"-" + std::to_wstring(mon.maxBrightness) + L"%)\r\n";
     }
     out += L"\r\n";
@@ -148,7 +221,8 @@ inline CliCommand ParseCommandLine(const std::wstring& cmdLine)
     LPWSTR* argv = CommandLineToArgvW(cmdLine.c_str(), &argc);
     if (!argv || argc <= 0) return cmd;
 
-    // Check for --no-osd / --osd anywhere in arguments
+    // Check for --no-osd / --osd / --all / --monitor anywhere in arguments
+    int skipArgIdx = -1;
     for (int i = 0; i < argc; ++i)
     {
         std::wstring arg = argv[i];
@@ -160,11 +234,39 @@ inline CliCommand ParseCommandLine(const std::wstring& cmdLine)
         {
             cmd.showOsd = true;
         }
+        else if (_wcsicmp(arg.c_str(), L"--all") == 0 || _wcsicmp(arg.c_str(), L"-a") == 0)
+        {
+            cmd.allMonitors = true;
+        }
+        else if (_wcsicmp(arg.c_str(), L"--monitor") == 0 || _wcsicmp(arg.c_str(), L"-mon") == 0)
+        {
+            if (i + 1 < argc)
+            {
+                cmd.monitorSelector = argv[i + 1];
+                skipArgIdx = i + 1;
+                ++i;
+            }
+        }
+        else if (arg.rfind(L"--monitor=", 0) == 0)
+        {
+            cmd.monitorSelector = arg.substr(10);
+        }
+        else if (arg.rfind(L"-mon=", 0) == 0)
+        {
+            cmd.monitorSelector = arg.substr(5);
+        }
     }
 
     for (int i = 0; i < argc; ++i)
     {
+        if (i == skipArgIdx) continue;
         std::wstring arg = argv[i];
+        if (_wcsicmp(arg.c_str(), L"--monitor") == 0 || _wcsicmp(arg.c_str(), L"-mon") == 0 ||
+            arg.rfind(L"--monitor=", 0) == 0 || arg.rfind(L"-mon=", 0) == 0 ||
+            _wcsicmp(arg.c_str(), L"--all") == 0 || _wcsicmp(arg.c_str(), L"-a") == 0)
+        {
+            continue;
+        }
 
         // Help
         if (_wcsicmp(arg.c_str(), L"--help") == 0 || _wcsicmp(arg.c_str(), L"-h") == 0 ||

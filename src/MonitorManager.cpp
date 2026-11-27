@@ -542,6 +542,7 @@ void MonitorManager::EnumMonitorsInternal() {
 }
 
 bool MonitorManager::Initialize() {
+    UpdateRemoteSessionState();
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_cachedBrightness = g_Settings.cachedBrightness;
@@ -1040,7 +1041,7 @@ void MonitorManager::WorkerLoop() {
         }
 
         if (targetBrightness != kNoPendingBrightness) {
-            if (!m_displayPoweredOn.load()) {
+            if (!m_displayPoweredOn.load() || m_isRemoteSession.load()) {
                 continue;
             }
             struct MonTarget {
@@ -1226,11 +1227,22 @@ bool MonitorManager::IsMonitorPoweredOff(const std::wstring& monitorId) const {
 }
 
 void MonitorManager::RefreshExternalPowerStatesAsync() {
+    if (m_sessionLocked.load() || m_isRemoteSession.load()) {
+        return;
+    }
     {
         std::lock_guard<std::mutex> lock(m_workerMutex);
         m_pendingPowerCheck = true;
     }
     m_workerCv.notify_one();
+}
+
+void MonitorManager::SetSessionLocked(bool locked) {
+    m_sessionLocked = locked;
+}
+
+void MonitorManager::UpdateRemoteSessionState() {
+    m_isRemoteSession = (GetSystemMetrics(SM_REMOTESESSION) != 0);
 }
 
 void MonitorManager::OnDisplayChanged() {
