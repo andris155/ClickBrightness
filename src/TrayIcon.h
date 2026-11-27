@@ -63,6 +63,7 @@ private:
     std::map<std::wstring, HICON> m_customIconCache;
     std::vector<ExtraTraySlot> m_extraSlots;
     int m_lastBrightness;
+    std::wstring m_cachedMainMonitorId;
     bool m_created;
     bool m_lastTrayWasLight;
 

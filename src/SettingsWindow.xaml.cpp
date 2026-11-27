@@ -1097,6 +1097,11 @@ namespace winrt::BrightnessApp::implementation
                 PopulateMonitorsSelectionList();
                 LoadMonitorConfigToUI();
                 ApplyAndSave();
+                g_TrayIcon.InvalidateIconCache();
+                int newMainB = g_MonitorManager.GetMonitorBrightnessById(g_Settings.mainMonitorId);
+                g_TrayIcon.UpdateBrightness(newMainB);
+                g_TrayIcon.SyncExtraTrayIcons(true);
+                g_FlyoutWindow.RefreshOnDisplayChange();
             }
         });
 

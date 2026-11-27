@@ -615,6 +615,15 @@ bool TrayIcon::UpdateBrightnessForTarget(const std::wstring& targetMonitorId, in
                         _wcsicmp(targetMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0;
 
     if (isMainOrSync) {
+        if (_wcsicmp(m_cachedMainMonitorId.c_str(), g_Settings.mainMonitorId.c_str()) != 0) {
+            for (int i = 0; i <= 100; ++i) {
+                if (m_iconCache[i]) {
+                    DestroyIcon(m_iconCache[i]);
+                    m_iconCache[i] = NULL;
+                }
+            }
+            m_cachedMainMonitorId = g_Settings.mainMonitorId;
+        }
         brightness = g_MonitorManager.GetEffectiveSyncedBrightness(g_Settings.mainMonitorId, rawBrightness);
         m_lastBrightness = brightness;
         const auto& cfg = g_Settings.GetEffectiveMonitorConfig(g_Settings.mainMonitorId);
