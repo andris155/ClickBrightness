@@ -243,7 +243,7 @@
   "About_Subtitle": "Könnyűsúlyú, modern Windows 11 DDC/CI monitor fényerőszabályzó segédprogram",
   "About_AppInfo": "ClickBrightness",
   "About_Version": "Verzió 2.0.0 (x64 Release)",
-  "About_AppType": "Natív WinUI 3 / Windows App SDK 2.6 asztali alkalmazás",
+  "About_AppType": "Natív WinUI 3 asztali alkalmazás",
   "About_Copyright": "Copyright (C) 2026 andris155",
   "About_DescTitle": "Leírás",
   "About_Description": "Modern, könnyűsúlyú Windows 11 segédprogram a monitor hardveres fényerejének vezérléséhez DDC/CI protokollon keresztül (VCP kód 0x10). Képernyőkijelzést (OSD), élő tálcamutatót egérgörgős léptetéssel, valamint letisztult felugró csúszkát tartalmaz.",

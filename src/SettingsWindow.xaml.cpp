@@ -3482,7 +3482,7 @@ namespace winrt::BrightnessApp::implementation
         AboutHeaderSubtitle().Text(g_Loc.Get(L"About_Subtitle", L"Lightweight, modern Windows 11 DDC/CI monitor brightness utility"));
         AboutAppNameText().Text(g_Loc.Get(L"About_AppInfo", L"ClickBrightness"));
         AboutVersionText().Text(g_Loc.Get(L"About_Version", L"Version 2.0.0 (x64 Release)"));
-        AboutAppTypeText().Text(g_Loc.Get(L"About_AppType", L"Native WinUI 3 / Windows App SDK 2.6 Desktop Application"));
+        AboutAppTypeText().Text(g_Loc.Get(L"About_AppType", L"Native WinUI 3 Desktop Application"));
         AboutCopyrightText().Text(g_Loc.Get(L"About_Copyright", L"Copyright (C) 2026 andris155"));
         AboutDescTitleText().Text(g_Loc.Get(L"About_DescTitle", L"Description"));
         AboutDescContentText().Text(g_Loc.Get(L"About_Description", L"A modern, lightweight Windows 11 utility for controlling hardware monitor brightness via DDC/CI (VCP code 0x10). Supports on-screen display (OSD), system tray live indicator with mouse wheel stepping, and a smooth flyout slider."));

@@ -243,7 +243,7 @@
   "About_Subtitle": "Lightweight, modern Windows 11 DDC/CI monitor brightness utility",
   "About_AppInfo": "ClickBrightness",
   "About_Version": "Version 2.0.0 (x64 Release)",
-  "About_AppType": "Native WinUI 3 / Windows App SDK 2.6 Desktop Application",
+  "About_AppType": "Native WinUI 3 Desktop Application",
   "About_Copyright": "Copyright (C) 2026 andris155",
   "About_DescTitle": "Description",
   "About_Description": "A modern, lightweight Windows 11 utility for controlling hardware monitor brightness via DDC/CI (VCP code 0x10). Supports on-screen display (OSD), system tray live indicator with mouse wheel stepping, and a smooth flyout slider.",
