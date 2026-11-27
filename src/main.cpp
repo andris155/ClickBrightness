@@ -44,7 +44,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     }
 
     // Single instance mutex check & message forwarding
-    HANDLE hMutex = CreateMutexW(NULL, TRUE, L"ClickBrightness_v1.0.9_SingleInstance_Mutex");
+    HANDLE hMutex = CreateMutexW(NULL, TRUE, L"ClickBrightness_v2.0.0_SingleInstance_Mutex");
     if (GetLastError() == ERROR_ALREADY_EXISTS)
     {
         CliCommand cmd = ParseCommandLine(fullCmd);

@@ -1902,6 +1902,24 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
+                                            <FontIcon Glyph="&#xE706;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                                <TextBlock x:Name="ScheduleSunTimesTitleText" Text="Today's Solar Times" FontSize="14" FontWeight="Normal"/>
+                                                <TextBlock x:Name="ScheduleSunTimesText" Text="Sunrise: 07:00  |  Sunset: 20:00" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                            <Button x:Name="ScheduleRefreshSunButton" Grid.Column="2" Content="Refresh" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
                                             <FontIcon Glyph="&#xE707;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                                                 <TextBlock x:Name="ScheduleSunSourceTitleText" Text="Location Source" FontSize="14" FontWeight="Normal"/>
@@ -1933,7 +1951,7 @@
                                         </Grid>
                                     </Border>
 
-                                    <Border x:Name="ScheduleCoordsCard" Visibility="Collapsed"
+                                    <Border x:Name="ScheduleLatCard" Visibility="Collapsed"
                                             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                             BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
@@ -1943,15 +1961,31 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <FontIcon Glyph="&#xE909;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <FontIcon Glyph="&#xE709;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                                                <TextBlock x:Name="ScheduleCoordsTitleText" Text="Coordinates (Lat / Lon)" FontSize="14" FontWeight="Normal"/>
-                                                <TextBlock x:Name="ScheduleCoordsDescText" Text="Latitude (-90 to 90) and Longitude (-180 to 180)" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                                <TextBlock x:Name="ScheduleLatTitleText" Text="Latitude" FontSize="14" FontWeight="Normal"/>
+                                                <TextBlock x:Name="ScheduleLatDescText" Text="Geographic coordinate north or south of the equator (-90.0° to 90.0°)" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                                             </StackPanel>
-                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                                <NumberBox x:Name="ScheduleLatNumberBox" Width="105" Minimum="-90" Maximum="90" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
-                                                <NumberBox x:Name="ScheduleLonNumberBox" Width="105" Minimum="-180" Maximum="180" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
+                                            <NumberBox x:Name="ScheduleLatNumberBox" Grid.Column="2" Width="120" Minimum="-90" Maximum="90" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <Border x:Name="ScheduleLonCard" Visibility="Collapsed"
+                                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Glyph="&#xE709;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                                <TextBlock x:Name="ScheduleLonTitleText" Text="Longitude" FontSize="14" FontWeight="Normal"/>
+                                                <TextBlock x:Name="ScheduleLonDescText" Text="Geographic coordinate east or west of the prime meridian (-180.0° to 180.0°)" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                                             </StackPanel>
+                                            <NumberBox x:Name="ScheduleLonNumberBox" Grid.Column="2" Width="120" Minimum="-180" Maximum="180" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
                                         </Grid>
                                     </Border>
 
@@ -1964,15 +1998,30 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <FontIcon Glyph="&#xE916;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <FontIcon Glyph="&#xE706;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                                                <TextBlock x:Name="ScheduleSunOffsetsTitleText" Text="Sunrise / Sunset Offset (min)" FontSize="14" FontWeight="Normal"/>
-                                                <TextBlock x:Name="ScheduleSunTimesText" Text="Today: 07:00 | 20:00" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                                <TextBlock x:Name="ScheduleSunriseOffsetTitleText" Text="Sunrise Offset (minutes)" FontSize="14" FontWeight="Normal"/>
+                                                <TextBlock x:Name="ScheduleSunriseOffsetDescText" Text="Shift Daytime Brightness switch earlier (negative) or later (positive) relative to sunrise" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                                             </StackPanel>
-                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                                <NumberBox x:Name="ScheduleSunriseOffsetNumberBox" Width="105" Minimum="-180" Maximum="180" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
-                                                <NumberBox x:Name="ScheduleSunsetOffsetNumberBox" Width="105" Minimum="-180" Maximum="180" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
+                                            <NumberBox x:Name="ScheduleSunriseOffsetNumberBox" Grid.Column="2" Width="90" Minimum="-180" Maximum="180" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Glyph="&#xE708;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                                <TextBlock x:Name="ScheduleSunsetOffsetTitleText" Text="Sunset Offset (minutes)" FontSize="14" FontWeight="Normal"/>
+                                                <TextBlock x:Name="ScheduleSunsetOffsetDescText" Text="Shift Nighttime Brightness switch earlier (negative) or later (positive) relative to sunset" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                                             </StackPanel>
+                                            <NumberBox x:Name="ScheduleSunsetOffsetNumberBox" Grid.Column="2" Width="90" Minimum="-180" Maximum="180" SpinButtonPlacementMode="Hidden" VerticalAlignment="Center"/>
                                         </Grid>
                                     </Border>
                                 </StackPanel>
@@ -2413,7 +2462,7 @@
                                     <Image x:Name="AboutAppIconImage" Width="48" Height="48" VerticalAlignment="Center" Margin="0,0,16,0"/>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                         <TextBlock x:Name="AboutAppNameText" Text="ClickBrightness" FontSize="15" FontWeight="SemiBold"/>
-                                        <TextBlock x:Name="AboutVersionText" Text="Version 1.0.9 (x64 Release)" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                        <TextBlock x:Name="AboutVersionText" Text="Version 2.0.0 (x64 Release)" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                         <TextBlock x:Name="AboutAppTypeText" Text="Native WinUI 3 / Windows App SDK 2.6 Desktop Application" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,2,0,0"/>
                                         <TextBlock x:Name="AboutCopyrightText" Text="Copyright (C) 2026 andris155" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,2,0,0"/>
                                     </StackPanel>

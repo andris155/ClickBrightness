@@ -230,7 +230,7 @@
   "Flyout_Brightness": "Brightness %d%%",
 
   "Tray_Options": "Options...",
-  "Tray_About": "ClickBrightness v1.0.9",
+  "Tray_About": "ClickBrightness v2.0.0",
   "Tray_Exit": "Exit",
   "Tray_Tooltip": "Brightness: %d%%",
 
@@ -242,7 +242,7 @@
   "About_Title": "About ClickBrightness",
   "About_Subtitle": "Lightweight, modern Windows 11 DDC/CI monitor brightness utility",
   "About_AppInfo": "ClickBrightness",
-  "About_Version": "Version 1.0.9 (x64 Release)",
+  "About_Version": "Version 2.0.0 (x64 Release)",
   "About_AppType": "Native WinUI 3 / Windows App SDK 2.6 Desktop Application",
   "About_Copyright": "Copyright (C) 2026 andris155",
   "About_DescTitle": "Description",

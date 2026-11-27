@@ -2270,6 +2270,16 @@ namespace winrt::BrightnessApp::implementation
             DetectScheduleLocationAsync();
         });
 
+        ScheduleRefreshSunButton().Click([this](auto&&, auto&&)
+        {
+            if (g_Settings.scheduleSunSource == 0)
+            {
+                DetectScheduleLocationAsync();
+            }
+            UpdateScheduleSunPreview();
+            ScheduleManager::Refresh();
+        });
+
         ScheduleLatNumberBox().ValueChanged([this](auto&&, auto&&)
         {
             if (m_isUpdatingUI) return;
@@ -3412,7 +3422,7 @@ namespace winrt::BrightnessApp::implementation
         AboutHeaderTitle().Text(g_Loc.Get(L"About_Title", L"About ClickBrightness"));
         AboutHeaderSubtitle().Text(g_Loc.Get(L"About_Subtitle", L"Lightweight, modern Windows 11 DDC/CI monitor brightness utility"));
         AboutAppNameText().Text(g_Loc.Get(L"About_AppInfo", L"ClickBrightness"));
-        AboutVersionText().Text(g_Loc.Get(L"About_Version", L"Version 1.0.9 (x64 Release)"));
+        AboutVersionText().Text(g_Loc.Get(L"About_Version", L"Version 2.0.0 (x64 Release)"));
         AboutAppTypeText().Text(g_Loc.Get(L"About_AppType", L"Native WinUI 3 / Windows App SDK 2.6 Desktop Application"));
         AboutCopyrightText().Text(g_Loc.Get(L"About_Copyright", L"Copyright (C) 2026 andris155"));
         AboutDescTitleText().Text(g_Loc.Get(L"About_DescTitle", L"Description"));
@@ -3989,7 +3999,8 @@ namespace winrt::BrightnessApp::implementation
         CustomScheduleSection().Visibility(isCustom ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         SunScheduleSection().Visibility(isSun ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         ScheduleLocationStatusCard().Visibility(isLocService ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
-        ScheduleCoordsCard().Visibility(!isLocService ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        ScheduleLatCard().Visibility(!isLocService ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        ScheduleLonCard().Visibility(!isLocService ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
     }
 
     void SettingsWindow::UpdateScheduleSunPreview()
@@ -4005,10 +4016,18 @@ namespace winrt::BrightnessApp::implementation
             g_Settings.scheduleSunsetOffset);
         if (info.valid)
         {
-            wchar_t sunBuf[128];
-            swprintf_s(sunBuf, L"Today: %02d:%02d | %02d:%02d (Effective: %02d:%02d | %02d:%02d)",
-                info.riseHour, info.riseMin, info.setHour, info.setMin,
-                info.effectiveRiseHour, info.effectiveRiseMin, info.effectiveSetHour, info.effectiveSetMin);
+            wchar_t sunBuf[160];
+            if (g_Settings.scheduleSunriseOffset != 0 || g_Settings.scheduleSunsetOffset != 0)
+            {
+                swprintf_s(sunBuf, L"Sunrise: %02d:%02d  |  Sunset: %02d:%02d  (Effective: %02d:%02d  |  %02d:%02d)",
+                    info.riseHour, info.riseMin, info.setHour, info.setMin,
+                    info.effectiveRiseHour, info.effectiveRiseMin, info.effectiveSetHour, info.effectiveSetMin);
+            }
+            else
+            {
+                swprintf_s(sunBuf, L"Sunrise: %02d:%02d  |  Sunset: %02d:%02d",
+                    info.riseHour, info.riseMin, info.setHour, info.setMin);
+            }
             ScheduleSunTimesText().Text(sunBuf);
         }
         else

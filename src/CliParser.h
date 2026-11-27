@@ -74,7 +74,7 @@ inline void PrintToConsole(const std::wstring& text)
 
 inline std::wstring GetHelpText()
 {
-    return L"\r\nClickBrightness v1.0.9 - Hardware DDC/CI Monitor Brightness Control\r\n\r\n"
+    return L"\r\nClickBrightness v2.0.0 - Hardware DDC/CI Monitor Brightness Control\r\n\r\n"
            L"Usage:\r\n"
            L"  ClickBrightness.exe [command] [options]\r\n\r\n"
            L"Commands:\r\n"
