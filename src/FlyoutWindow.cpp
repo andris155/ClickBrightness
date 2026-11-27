@@ -47,12 +47,38 @@ FlyoutWindow::~FlyoutWindow()
     Destroy();
 }
 
+static std::wstring FindFirstSeparateMonitorId()
+{
+    for (const auto& mon : g_MonitorManager.GetMonitors())
+    {
+        if (!g_Settings.mainMonitorId.empty() && _wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0)
+        {
+            continue;
+        }
+        const auto* cfg = g_Settings.FindMonitorConfig(mon.id);
+        if (cfg && cfg->enabled && cfg->controlMode == 1)
+        {
+            return mon.id;
+        }
+    }
+    return L"";
+}
+
 bool FlyoutWindow::Create()
 {
     auto* p = GetOrCreateImpl(s_mainFlyoutWindow);
     if (p)
     {
         p->Prewarm();
+        std::wstring sepId = FindFirstSeparateMonitorId();
+        if (!sepId.empty())
+        {
+            if (auto* pSep = GetOrCreateImpl(s_separateFlyoutWindow))
+            {
+                pSep->SetTargetMonitor(sepId);
+                pSep->Prewarm();
+            }
+        }
         return true;
     }
     return false;
@@ -176,6 +202,30 @@ void FlyoutWindow::RefreshOnDisplayChange()
             else
             {
                 p->HideWindow();
+            }
+        }
+        else
+        {
+            std::wstring sepId = FindFirstSeparateMonitorId();
+            if (!sepId.empty() && p->GetTargetMonitor().empty())
+            {
+                p->SetTargetMonitor(sepId);
+            }
+            if (!p->GetTargetMonitor().empty())
+            {
+                p->RefreshLayoutInPlace();
+            }
+        }
+    }
+    else
+    {
+        std::wstring sepId = FindFirstSeparateMonitorId();
+        if (!sepId.empty())
+        {
+            if (auto* pSep = GetOrCreateImpl(s_separateFlyoutWindow))
+            {
+                pSep->SetTargetMonitor(sepId);
+                pSep->Prewarm();
             }
         }
     }

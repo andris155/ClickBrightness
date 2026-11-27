@@ -33,12 +33,24 @@ void TrimProcessWorkingSetAsync();
 static bool IsHeaderNameTrimmed(const std::wstring& name, double fontSize, double maxWidth)
 {
     if (name.empty()) return false;
+    static std::wstring s_lastName;
+    static double s_lastFontSize = 0.0;
+    static double s_lastMaxWidth = 0.0;
+    static bool s_lastResult = false;
+    if (name == s_lastName && fontSize == s_lastFontSize && maxWidth == s_lastMaxWidth)
+    {
+        return s_lastResult;
+    }
     winrt::Microsoft::UI::Xaml::Controls::TextBlock measureTb;
     measureTb.FontFamily(winrt::Microsoft::UI::Xaml::Media::FontFamily(L"Segoe UI Variable Text, Segoe UI"));
     measureTb.FontSize(fontSize);
     measureTb.Text(name);
     measureTb.Measure({ 10000.0f, 100.0f });
-    return measureTb.DesiredSize().Width > static_cast<float>(maxWidth);
+    s_lastName = name;
+    s_lastFontSize = fontSize;
+    s_lastMaxWidth = maxWidth;
+    s_lastResult = measureTb.DesiredSize().Width > static_cast<float>(maxWidth);
+    return s_lastResult;
 }
 
 namespace winrt::ClickBrightness::implementation
@@ -257,6 +269,8 @@ namespace winrt::ClickBrightness::implementation
             SetWindowPos(m_hwnd, NULL, -32000, -32000, width, height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
             this->Activate();
             RootGrid().UpdateLayout();
+            BOOL cloak = TRUE;
+            DwmSetWindowAttribute(m_hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
             if (hPrevForeground && hPrevForeground != m_hwnd)
             {
                 SetForegroundWindow(hPrevForeground);
@@ -321,7 +335,7 @@ namespace winrt::ClickBrightness::implementation
             DWM_WINDOW_CORNER_PREFERENCE cornerPref = DWMWCP_ROUND;
             DwmSetWindowAttribute(m_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &cornerPref, sizeof(cornerPref));
 
-            int backdropType = g_Settings.transparencyEnabled ? DWMSBT_TRANSIENTWINDOW : DWMSBT_NONE;
+            int backdropType = DWMSBT_NONE;
             DwmSetWindowAttribute(m_hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdropType, sizeof(backdropType));
 
             BOOL forceDisableTransitions = TRUE;
@@ -459,6 +473,10 @@ namespace winrt::ClickBrightness::implementation
                 {
                     SetupBackdrop();
                 }
+                if (m_backdropConfig)
+                {
+                    m_backdropConfig.IsInputActive(true);
+                }
                 RootGrid().Background(winrt::Microsoft::UI::Xaml::Media::SolidColorBrush(winrt::Microsoft::UI::Colors::Transparent()));
             }
             else
@@ -482,8 +500,10 @@ namespace winrt::ClickBrightness::implementation
                 BOOL darkMode = isDark ? TRUE : FALSE;
                 DwmSetWindowAttribute(m_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &darkMode, sizeof(darkMode));
 
-                int backdropType = g_Settings.transparencyEnabled ? DWMSBT_TRANSIENTWINDOW : DWMSBT_NONE;
+                int backdropType = DWMSBT_NONE;
                 DwmSetWindowAttribute(m_hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdropType, sizeof(backdropType));
+
+                SetWindowPos(m_hwnd, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE);
             }
 
             RootGrid().UpdateLayout();
@@ -577,7 +597,7 @@ namespace winrt::ClickBrightness::implementation
     bool FlyoutWindow::RebuildSyncMonitorsPanel()
     {
         bool isSyncGroup = m_targetMonitorId.empty() || _wcsicmp(m_targetMonitorId.c_str(), L"__SYNC__") == 0;
-        std::wstring sig = isSyncGroup ? L"SYNC|" : (L"SEP|" + m_targetMonitorId);
+        std::wstring sig = isSyncGroup ? L"SYNC|" : L"SEP";
         if (isSyncGroup)
         {
             sig += g_Settings.mainMonitorId + L"|";
@@ -828,6 +848,8 @@ namespace winrt::ClickBrightness::implementation
     void FlyoutWindow::ResetGraphics()
     {
         DetachBackdrop();
+        m_lastTheme = -1;
+        m_lastTransparency = -1;
         SetupBackdrop();
         UpdateTheme();
         InitializeButtons();
@@ -1153,10 +1175,7 @@ namespace winrt::ClickBrightness::implementation
     {
         if (!m_isVisible)
         {
-            if (m_targetMonitorId.empty() || _wcsicmp(m_targetMonitorId.c_str(), L"__SYNC__") == 0)
-            {
-                Prewarm();
-            }
+            Prewarm();
             return;
         }
 
@@ -1274,7 +1293,10 @@ namespace winrt::ClickBrightness::implementation
         }
 
         SetBrightnessVisual(m_syncBaseBrightness);
-        RootGrid().UpdateLayout();
+        if (rebuilt || sizeChanged)
+        {
+            RootGrid().UpdateLayout();
+        }
 
         // Check if opened from Windows hidden icons overflow window
         HWND hOverflow = FindWindowW(L"TopLevelWindowForOverflowXamlIsland", NULL);
@@ -1454,7 +1476,9 @@ namespace winrt::ClickBrightness::implementation
         {
             if (!rebuilt && !sizeChanged)
             {
-                SetWindowPos(m_hwnd, HWND_TOP, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+                SetWindowPos(m_hwnd, HWND_TOP, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOCOPYBITS);
+                BOOL cloak = FALSE;
+                DwmSetWindowAttribute(m_hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
                 SetForegroundWindow(m_hwnd);
                 SetFocus(m_hwnd);
                 try
@@ -1482,7 +1506,9 @@ namespace winrt::ClickBrightness::implementation
                         CancelPendingShow();
                         if (!m_isVisible || !m_hwnd) return;
                         m_showTick = GetTickCount64();
-                        SetWindowPos(m_hwnd, HWND_TOP, targetX, targetY, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+                        SetWindowPos(m_hwnd, HWND_TOP, targetX, targetY, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOCOPYBITS);
+                        BOOL cloak = FALSE;
+                        DwmSetWindowAttribute(m_hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
                         SetForegroundWindow(m_hwnd);
                         SetFocus(m_hwnd);
                         try
@@ -1533,9 +1559,10 @@ namespace winrt::ClickBrightness::implementation
             }
             if (m_hwnd)
             {
+                BOOL cloak = TRUE;
+                DwmSetWindowAttribute(m_hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
                 SetWindowPos(m_hwnd, NULL, -32000, -32000, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
             }
-            TrimProcessWorkingSetAsync();
         }
     }
 
