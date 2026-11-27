@@ -4,15 +4,15 @@
 
 OverlayWindow g_OverlayWindow;
 
-static winrt::BrightnessApp::OverlayWindow s_overlayWindow{ nullptr };
+static winrt::ClickBrightness::OverlayWindow s_overlayWindow{ nullptr };
 
-static winrt::BrightnessApp::implementation::OverlayWindow* GetImpl()
+static winrt::ClickBrightness::implementation::OverlayWindow* GetImpl()
 {
     if (!s_overlayWindow)
     {
         try
         {
-            s_overlayWindow = winrt::make<winrt::BrightnessApp::implementation::OverlayWindow>();
+            s_overlayWindow = winrt::make<winrt::ClickBrightness::implementation::OverlayWindow>();
         }
         catch (...)
         {
@@ -20,7 +20,7 @@ static winrt::BrightnessApp::implementation::OverlayWindow* GetImpl()
     }
     if (s_overlayWindow)
     {
-        return winrt::get_self<winrt::BrightnessApp::implementation::OverlayWindow>(s_overlayWindow);
+        return winrt::get_self<winrt::ClickBrightness::implementation::OverlayWindow>(s_overlayWindow);
     }
     return nullptr;
 }
@@ -81,7 +81,7 @@ void OverlayWindow::ApplyPendingBrightness()
 {
     if (s_overlayWindow)
     {
-        auto p = winrt::get_self<winrt::BrightnessApp::implementation::OverlayWindow>(s_overlayWindow);
+        auto p = winrt::get_self<winrt::ClickBrightness::implementation::OverlayWindow>(s_overlayWindow);
         if (p) p->ApplyPendingBrightness();
     }
 }
@@ -90,7 +90,7 @@ void OverlayWindow::OnThemeChanged()
 {
     if (s_overlayWindow)
     {
-        auto p = winrt::get_self<winrt::BrightnessApp::implementation::OverlayWindow>(s_overlayWindow);
+        auto p = winrt::get_self<winrt::ClickBrightness::implementation::OverlayWindow>(s_overlayWindow);
         if (p) p->UpdateTheme();
     }
 }
@@ -99,7 +99,7 @@ void OverlayWindow::Hide()
 {
     if (s_overlayWindow)
     {
-        auto p = winrt::get_self<winrt::BrightnessApp::implementation::OverlayWindow>(s_overlayWindow);
+        auto p = winrt::get_self<winrt::ClickBrightness::implementation::OverlayWindow>(s_overlayWindow);
         if (p) p->HideWindow();
     }
 }
@@ -108,7 +108,7 @@ void OverlayWindow::Destroy()
 {
     if (s_overlayWindow)
     {
-        auto p = winrt::get_self<winrt::BrightnessApp::implementation::OverlayWindow>(s_overlayWindow);
+        auto p = winrt::get_self<winrt::ClickBrightness::implementation::OverlayWindow>(s_overlayWindow);
         if (p) p->DestroyWindow();
         s_overlayWindow = nullptr;
     }

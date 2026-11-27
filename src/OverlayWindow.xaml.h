@@ -6,7 +6,7 @@
 #include <winrt/Microsoft.UI.Windowing.h>
 #include <winrt/Microsoft.UI.Composition.SystemBackdrops.h>
 
-namespace winrt::BrightnessApp::implementation
+namespace winrt::ClickBrightness::implementation
 {
     struct OverlayWindow : OverlayWindowT<OverlayWindow>
     {
@@ -75,7 +75,7 @@ namespace winrt::BrightnessApp::implementation
     };
 }
 
-namespace winrt::BrightnessApp::factory_implementation
+namespace winrt::ClickBrightness::factory_implementation
 {
     struct OverlayWindow : OverlayWindowT<OverlayWindow, implementation::OverlayWindow>
     {

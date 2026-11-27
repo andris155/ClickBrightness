@@ -165,7 +165,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         // Start WinUI 3 Application
         winrt::Microsoft::UI::Xaml::Application::Start([](auto&&)
         {
-            winrt::make<winrt::BrightnessApp::implementation::App>();
+            winrt::make<winrt::ClickBrightness::implementation::App>();
         });
     }
     catch (...)

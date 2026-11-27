@@ -23,7 +23,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace winrt::BrightnessApp::implementation
+namespace winrt::ClickBrightness::implementation
 {
     OverlayWindow::OverlayWindow()
     {
@@ -777,7 +777,7 @@ namespace winrt::BrightnessApp::implementation
             {
                 g_Settings.cachedBrightness = m_pendingBrightness;
             }
-            g_Settings.SaveBrightnessOnly();
+            g_Settings.Save();
         }
     }
 

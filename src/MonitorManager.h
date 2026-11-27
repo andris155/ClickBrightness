@@ -54,6 +54,7 @@ public:
 
     int GetCurrentBrightness();
     int GetMonitorBrightnessById(const std::wstring& monitorId);
+    int GetCachedMonitorBrightnessById(const std::wstring& monitorId);
     int GetTargetControlBrightness(const std::wstring& targetMonitorId);
     void GetTargetBounds(const std::wstring& targetMonitorId, int& outMin, int& outMax) const;
     int GetEffectiveSyncedBrightness(const std::wstring& monitorId, int baseBrightness) const;

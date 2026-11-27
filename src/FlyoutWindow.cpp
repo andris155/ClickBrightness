@@ -6,16 +6,16 @@
 
 FlyoutWindow g_FlyoutWindow;
 
-static winrt::BrightnessApp::FlyoutWindow s_mainFlyoutWindow{ nullptr };
-static winrt::BrightnessApp::FlyoutWindow s_separateFlyoutWindow{ nullptr };
+static winrt::ClickBrightness::FlyoutWindow s_mainFlyoutWindow{ nullptr };
+static winrt::ClickBrightness::FlyoutWindow s_separateFlyoutWindow{ nullptr };
 
-static winrt::BrightnessApp::implementation::FlyoutWindow* GetOrCreateImpl(winrt::BrightnessApp::FlyoutWindow& slot)
+static winrt::ClickBrightness::implementation::FlyoutWindow* GetOrCreateImpl(winrt::ClickBrightness::FlyoutWindow& slot)
 {
     if (!slot)
     {
         try
         {
-            slot = winrt::make<winrt::BrightnessApp::implementation::FlyoutWindow>();
+            slot = winrt::make<winrt::ClickBrightness::implementation::FlyoutWindow>();
         }
         catch (...)
         {
@@ -23,16 +23,16 @@ static winrt::BrightnessApp::implementation::FlyoutWindow* GetOrCreateImpl(winrt
     }
     if (slot)
     {
-        return winrt::get_self<winrt::BrightnessApp::implementation::FlyoutWindow>(slot);
+        return winrt::get_self<winrt::ClickBrightness::implementation::FlyoutWindow>(slot);
     }
     return nullptr;
 }
 
-static winrt::BrightnessApp::implementation::FlyoutWindow* GetImplIfCreated(winrt::BrightnessApp::FlyoutWindow const& slot)
+static winrt::ClickBrightness::implementation::FlyoutWindow* GetImplIfCreated(winrt::ClickBrightness::FlyoutWindow const& slot)
 {
     if (slot)
     {
-        return winrt::get_self<winrt::BrightnessApp::implementation::FlyoutWindow>(slot);
+        return winrt::get_self<winrt::ClickBrightness::implementation::FlyoutWindow>(slot);
     }
     return nullptr;
 }
@@ -58,7 +58,7 @@ bool FlyoutWindow::Create()
     return false;
 }
 
-void FlyoutWindow::Show(const POINT* pTrayPos, const std::wstring& targetMonitorId)
+void FlyoutWindow::Show(const POINT* pTrayPos, const std::wstring& targetMonitorId, UINT trayIconId)
 {
     bool isSeparate = IsSeparateTarget(targetMonitorId);
     auto* other = GetImplIfCreated(isSeparate ? s_mainFlyoutWindow : s_separateFlyoutWindow);
@@ -70,7 +70,7 @@ void FlyoutWindow::Show(const POINT* pTrayPos, const std::wstring& targetMonitor
     auto* p = GetOrCreateImpl(isSeparate ? s_separateFlyoutWindow : s_mainFlyoutWindow);
     if (p)
     {
-        p->SetTargetMonitor(targetMonitorId);
+        p->SetTargetMonitor(targetMonitorId, trayIconId);
         p->ShowWindow(pTrayPos);
     }
 }

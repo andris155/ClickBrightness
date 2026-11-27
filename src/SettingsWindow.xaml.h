@@ -4,7 +4,7 @@
 #include "SettingsWindow.xaml.g.h"
 #include <winrt/Microsoft.UI.Windowing.h>
 
-namespace winrt::BrightnessApp::implementation
+namespace winrt::ClickBrightness::implementation
 {
     struct SettingsWindow : SettingsWindowT<SettingsWindow>
     {
@@ -95,7 +95,7 @@ namespace winrt::BrightnessApp::implementation
     };
 }
 
-namespace winrt::BrightnessApp::factory_implementation
+namespace winrt::ClickBrightness::factory_implementation
 {
     struct SettingsWindow : SettingsWindowT<SettingsWindow, implementation::SettingsWindow>
     {

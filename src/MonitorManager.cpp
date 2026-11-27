@@ -769,6 +769,38 @@ int MonitorManager::GetMonitorBrightnessById(const std::wstring& monitorId) {
     return m_cachedBrightness;
 }
 
+int MonitorManager::GetCachedMonitorBrightnessById(const std::wstring& monitorId) {
+    if (monitorId.empty() || _wcsicmp(monitorId.c_str(), g_Settings.mainMonitorId.c_str()) == 0) {
+        return m_cachedBrightness;
+    }
+    int pendingSyncVal = kNoPendingBrightness;
+    {
+        std::lock_guard<std::mutex> wlock(m_workerMutex);
+        if (m_pendingTargetBrightness != kNoPendingBrightness) {
+            if (_wcsicmp(m_pendingTargetMonitorId.c_str(), monitorId.c_str()) == 0) {
+                return (std::clamp)(m_pendingTargetBrightness, 0, 100);
+            }
+            if (m_pendingTargetMonitorId.empty()) {
+                const auto* cfg = g_Settings.FindMonitorConfig(monitorId);
+                if (!cfg || cfg->controlMode == 0) {
+                    pendingSyncVal = m_pendingTargetBrightness;
+                }
+            }
+        }
+    }
+    if (pendingSyncVal != kNoPendingBrightness) {
+        return GetEffectiveSyncedBrightness(monitorId, pendingSyncVal);
+    }
+    std::lock_guard<std::mutex> lock(m_mutex);
+    for (const auto& mon : m_monitors) {
+        if (_wcsicmp(mon.id.c_str(), monitorId.c_str()) == 0) {
+            return SafeCalcBrightnessPercent(mon.currentBrightness, mon.minBrightness, mon.maxBrightness);
+        }
+    }
+    const auto* cfg = g_Settings.FindMonitorConfig(monitorId);
+    return cfg ? cfg->cachedBrightness : m_cachedBrightness;
+}
+
 void MonitorManager::GetSyncFirstHitBoundsLocked(int& outFirstHit100, int& outFirstHit0) const {
     outFirstHit100 = 100;
     outFirstHit0 = 0;
@@ -875,7 +907,7 @@ int MonitorManager::GetTargetControlBrightness(const std::wstring& targetMonitor
         std::lock_guard<std::mutex> lock(m_mutex);
         return (std::clamp)(m_syncBaseBrightness, minB, maxB);
     }
-    return GetMonitorBrightnessById(targetMonitorId);
+    return GetCachedMonitorBrightnessById(targetMonitorId);
 }
 
 std::vector<BrightnessChangeEntry> MonitorManager::GetChangedMonitorsForTarget(const std::wstring& targetMonitorId, int targetBrightness) const {

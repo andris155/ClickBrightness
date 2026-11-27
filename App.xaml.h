@@ -2,7 +2,7 @@
 
 #include "App.xaml.g.h"
 
-namespace winrt::BrightnessApp::implementation
+namespace winrt::ClickBrightness::implementation
 {
     struct App : AppT<App>
     {

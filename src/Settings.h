@@ -181,9 +181,6 @@ struct AppSettings {
     // Display Language ("default" = Windows display language, or "en-US", etc.)
     std::wstring language = L"default";
 
-    // Target Monitors to Control ("all", or semicolon-separated monitor IDs)
-    std::wstring selectedMonitors = L"all";
-
     // Multi-Monitor Sync & Separate Configuration
     std::wstring mainMonitorId;
     bool syncExternalWithLaptopFnKeys = false; // Default: OFF
@@ -247,7 +244,6 @@ struct AppSettings {
     void Load();
     void ResetToDefaults();
     void Save() const;
-    void SaveBrightnessOnly() const;
     static const std::wstring& GetIniFilePath();
 
     static bool IsStartWithWindowsEnabled();
@@ -261,7 +257,6 @@ struct AppSettings {
     static std::wstring FormatColor(COLORREF c);
 
     bool IsMonitorSelected(const std::wstring& monitorId) const;
-    void SetMonitorSelected(const std::wstring& monitorId, bool selected, const std::vector<std::wstring>& allIds);
 
     static std::wstring SanitizeMonitorName(const std::wstring& name, size_t maxLen = 20);
     static int ComputeSyncedBrightness(int mainBrightness, const MonitorControlConfig& cfg);

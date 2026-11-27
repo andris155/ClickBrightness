@@ -159,9 +159,9 @@ using namespace winrt::Microsoft::UI::Xaml;
 using namespace winrt::Microsoft::UI::Xaml::Controls;
 
 static HHOOK s_hKeyboardHook = NULL;
-static winrt::BrightnessApp::implementation::SettingsWindow* s_currentCaptureInstance = nullptr;
+static winrt::ClickBrightness::implementation::SettingsWindow* s_currentCaptureInstance = nullptr;
 static UINT s_captureMods = 0;
-static winrt::BrightnessApp::SettingsWindow s_settingsWindow{ nullptr };
+static winrt::ClickBrightness::SettingsWindow s_settingsWindow{ nullptr };
 
 static winrt::Microsoft::UI::Xaml::Media::Imaging::WriteableBitmap HIconToWriteableBitmap(HICON hIcon, int width, int height)
 {
@@ -234,7 +234,7 @@ static winrt::Microsoft::UI::Xaml::Media::Imaging::WriteableBitmap HIconToWritea
     return wb;
 }
 
-namespace winrt::BrightnessApp::implementation
+namespace winrt::ClickBrightness::implementation
 {
     SettingsWindow::SettingsWindow()
     {
@@ -1234,6 +1234,8 @@ namespace winrt::BrightnessApp::implementation
             }
             LoadMonitorConfigToUI();
             ApplyAndSave();
+            g_TrayIcon.SyncExtraTrayIcons(true);
+            g_FlyoutWindow.RefreshOnDisplayChange();
         });
 
         // Per-Monitor Offset Slider & NumberBox
@@ -4084,7 +4086,7 @@ void InitSettingsWindow(bool show)
     {
         try
         {
-            s_settingsWindow = winrt::make<winrt::BrightnessApp::implementation::SettingsWindow>();
+            s_settingsWindow = winrt::make<winrt::ClickBrightness::implementation::SettingsWindow>();
         }
         catch (...)
         {
@@ -4100,7 +4102,7 @@ void ShowSettingsWindow()
 {
     if (s_settingsWindow)
     {
-        auto impl = winrt::get_self<winrt::BrightnessApp::implementation::SettingsWindow>(s_settingsWindow);
+        auto impl = winrt::get_self<winrt::ClickBrightness::implementation::SettingsWindow>(s_settingsWindow);
         if (impl && impl->IsClosing())
         {
             s_settingsWindow = nullptr;
@@ -4109,10 +4111,10 @@ void ShowSettingsWindow()
 
     if (!s_settingsWindow)
     {
-        s_settingsWindow = winrt::make<winrt::BrightnessApp::implementation::SettingsWindow>();
+        s_settingsWindow = winrt::make<winrt::ClickBrightness::implementation::SettingsWindow>();
     }
 
-    auto impl = winrt::get_self<winrt::BrightnessApp::implementation::SettingsWindow>(s_settingsWindow);
+    auto impl = winrt::get_self<winrt::ClickBrightness::implementation::SettingsWindow>(s_settingsWindow);
     if (impl)
     {
         impl->ShowWindow();
@@ -4126,7 +4128,7 @@ void CloseSettingsWindow()
     {
         try
         {
-            auto impl = winrt::get_self<winrt::BrightnessApp::implementation::SettingsWindow>(s_settingsWindow);
+            auto impl = winrt::get_self<winrt::ClickBrightness::implementation::SettingsWindow>(s_settingsWindow);
             if (impl)
             {
                 impl->SetExiting(true);
@@ -4143,7 +4145,7 @@ void CloseSettingsWindow()
 bool IsSettingsWindowOpen()
 {
     if (!s_settingsWindow) return false;
-    auto impl = winrt::get_self<winrt::BrightnessApp::implementation::SettingsWindow>(s_settingsWindow);
+    auto impl = winrt::get_self<winrt::ClickBrightness::implementation::SettingsWindow>(s_settingsWindow);
     return (impl && !impl->IsClosing());
 }
 
@@ -4151,7 +4153,7 @@ void OnSettingsThemeChanged()
 {
     if (s_settingsWindow)
     {
-        auto impl = winrt::get_self<winrt::BrightnessApp::implementation::SettingsWindow>(s_settingsWindow);
+        auto impl = winrt::get_self<winrt::ClickBrightness::implementation::SettingsWindow>(s_settingsWindow);
         if (impl)
         {
             impl->ApplyTheme();
@@ -4163,7 +4165,7 @@ void OnSettingsDisplayChanged()
 {
     if (s_settingsWindow)
     {
-        auto impl = winrt::get_self<winrt::BrightnessApp::implementation::SettingsWindow>(s_settingsWindow);
+        auto impl = winrt::get_self<winrt::ClickBrightness::implementation::SettingsWindow>(s_settingsWindow);
         if (impl)
         {
             impl->OnDisplayChanged();

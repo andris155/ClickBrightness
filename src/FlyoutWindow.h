@@ -9,7 +9,7 @@ public:
     ~FlyoutWindow();
 
     bool Create();
-    void Show(const POINT* pTrayPos = nullptr, const std::wstring& targetMonitorId = L"");
+    void Show(const POINT* pTrayPos = nullptr, const std::wstring& targetMonitorId = L"", UINT trayIconId = 0);
     void Hide();
     void Destroy();
     bool IsVisible() const;

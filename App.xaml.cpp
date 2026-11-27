@@ -300,7 +300,7 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
                 g_OverlayWindow.ApplyPendingBrightness();
                 POINT pt;
                 GetCursorPos(&pt);
-                g_FlyoutWindow.Show(&pt, targetMonId);
+                g_FlyoutWindow.Show(&pt, targetMonId, trayId);
             }
             break;
         }
@@ -711,7 +711,7 @@ void ExitApp()
     catch (...) {}
 }
 
-namespace winrt::BrightnessApp::implementation
+namespace winrt::ClickBrightness::implementation
 {
     App::App()
     {

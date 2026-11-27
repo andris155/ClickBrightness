@@ -469,21 +469,6 @@ HICON TrayIcon::CreateBrightnessIconForConfig(int brightness, const MonitorContr
     int w = (cfg.trayFontWeight >= 100 && cfg.trayFontWeight <= 900) ? cfg.trayFontWeight : 375;
     DWRITE_FONT_WEIGHT fontWeight = static_cast<DWRITE_FONT_WEIGHT>(w);
 
-    // Fallback: if a legacy font name still has a weight suffix, strip it and apply weight
-    auto stripWeightSuffix = [&fontName](const wchar_t* suffix) {
-        size_t pos = fontName.rfind(suffix);
-        if (pos != std::wstring::npos && pos + wcslen(suffix) == fontName.length()) {
-            fontName.erase(pos);
-            return true;
-        }
-        return false;
-    };
-    if (stripWeightSuffix(L" Semilight") || stripWeightSuffix(L" SemiLight")) fontWeight = DWRITE_FONT_WEIGHT_SEMI_LIGHT;
-    else if (stripWeightSuffix(L" Light")) fontWeight = DWRITE_FONT_WEIGHT_LIGHT;
-    else if (stripWeightSuffix(L" Semibold") || stripWeightSuffix(L" SemiBold")) fontWeight = DWRITE_FONT_WEIGHT_SEMI_BOLD;
-    else if (stripWeightSuffix(L" Medium")) fontWeight = DWRITE_FONT_WEIGHT_MEDIUM;
-    else if (stripWeightSuffix(L" Bold")) fontWeight = DWRITE_FONT_WEIGHT_BOLD;
-
     // Font size calibrated for authentic Windows 11 taskbar typography:
     float scale = (cfg.trayFontSize >= 40 && cfg.trayFontSize <= 150)
         ? (cfg.trayFontSize / 100.0f) : 0.88f;

@@ -1,8 +1,8 @@
 <Window
-    x:Class="BrightnessApp.SettingsWindow"
+    x:Class="ClickBrightness.SettingsWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:BrightnessApp"
+    xmlns:local="using:ClickBrightness"
     Title="ClickBrightness settings">
 
     <Grid x:Name="RootGrid" Background="Transparent">

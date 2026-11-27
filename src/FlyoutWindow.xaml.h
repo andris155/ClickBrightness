@@ -6,14 +6,14 @@
 #include <winrt/Microsoft.UI.Composition.SystemBackdrops.h>
 #include <functional>
 
-namespace winrt::BrightnessApp::implementation
+namespace winrt::ClickBrightness::implementation
 {
     struct FlyoutWindow : FlyoutWindowT<FlyoutWindow>
     {
         FlyoutWindow();
         ~FlyoutWindow();
 
-        void SetTargetMonitor(const std::wstring& targetMonitorId) { m_targetMonitorId = targetMonitorId; }
+        void SetTargetMonitor(const std::wstring& targetMonitorId, UINT trayIconId = 0) { m_targetMonitorId = targetMonitorId; m_targetTrayId = trayIconId; }
         const std::wstring& GetTargetMonitor() const { return m_targetMonitorId; }
         void Prewarm();
         void RefreshLayoutInPlace();
@@ -57,6 +57,7 @@ namespace winrt::BrightnessApp::implementation
         int m_syncBaseBrightness{ 45 };
         int m_pendingBrightness{ 45 };
         std::wstring m_targetMonitorId;
+        UINT m_targetTrayId{ 0 };
         std::wstring m_lastSyncSignature;
         bool m_hasPendingBrightness{ false };
         bool m_hasSeparatePendingSave{ false };
@@ -89,7 +90,7 @@ namespace winrt::BrightnessApp::implementation
     };
 }
 
-namespace winrt::BrightnessApp::factory_implementation
+namespace winrt::ClickBrightness::factory_implementation
 {
     struct FlyoutWindow : FlyoutWindowT<FlyoutWindow, implementation::FlyoutWindow>
     {

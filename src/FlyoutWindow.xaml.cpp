@@ -41,7 +41,7 @@ static bool IsHeaderNameTrimmed(const std::wstring& name, double fontSize, doubl
     return measureTb.DesiredSize().Width > static_cast<float>(maxWidth);
 }
 
-namespace winrt::BrightnessApp::implementation
+namespace winrt::ClickBrightness::implementation
 {
     FlyoutWindow::FlyoutWindow()
     {
@@ -630,7 +630,7 @@ namespace winrt::BrightnessApp::implementation
                 std::wstring monName = !cfg->customName.empty() ? cfg->customName : AppSettings::SanitizeMonitorName(mon.friendlyName, 20);
                 if (monName.empty()) monName = mon.id;
                 int effB = isSeparate
-                    ? (std::clamp)(g_MonitorManager.GetMonitorBrightnessById(mon.id), 0, 100)
+                    ? (std::clamp)(g_MonitorManager.GetCachedMonitorBrightnessById(mon.id), 0, 100)
                     : g_MonitorManager.GetEffectiveSyncedBrightness(mon.id, m_syncBaseBrightness);
 
                 winrt::Microsoft::UI::Xaml::Controls::TextBlock hdr;
@@ -737,7 +737,7 @@ namespace winrt::BrightnessApp::implementation
                         if (saveNow)
                         {
                             m_hasSeparatePendingSave = false;
-                            g_Settings.SaveBrightnessOnly();
+                            g_Settings.Save();
                         }
                         else
                         {
@@ -934,7 +934,7 @@ namespace winrt::BrightnessApp::implementation
             {
                 const auto* sCfg = g_Settings.FindMonitorConfig(entry.monitorId);
                 int effB = entry.isSeparate
-                    ? (std::clamp)(g_MonitorManager.GetMonitorBrightnessById(entry.monitorId), 0, 100)
+                    ? (std::clamp)(g_MonitorManager.GetCachedMonitorBrightnessById(entry.monitorId), 0, 100)
                     : g_MonitorManager.GetEffectiveSyncedBrightness(entry.monitorId, m_syncBaseBrightness);
                 bool isEntryOff = g_MonitorManager.IsMonitorPoweredOff(entry.monitorId);
                 if (isEntryOff)
@@ -984,7 +984,7 @@ namespace winrt::BrightnessApp::implementation
         {
             g_Settings.cachedBrightness = val;
         }
-        g_Settings.SaveBrightnessOnly();
+        g_Settings.Save();
     }
 
     void FlyoutWindow::ScheduleDebounce(int val, int delayMs)
@@ -1057,7 +1057,7 @@ namespace winrt::BrightnessApp::implementation
             {
                 g_Settings.cachedBrightness = m_pendingBrightness;
             }
-            g_Settings.SaveBrightnessOnly();
+            g_Settings.Save();
         }
     }
 
@@ -1308,8 +1308,8 @@ namespace winrt::BrightnessApp::implementation
         RECT rcIcon = { 0 };
         NOTIFYICONIDENTIFIER nii = { sizeof(NOTIFYICONIDENTIFIER) };
         nii.hWnd = g_TrayIcon.GetOwnerWnd();
-        nii.uID = g_TrayIcon.GetId();
-        if (!m_targetMonitorId.empty())
+        nii.uID = (m_targetTrayId != 0) ? m_targetTrayId : g_TrayIcon.GetId();
+        if (m_targetTrayId == 0 && !m_targetMonitorId.empty())
         {
             for (const auto& slot : g_TrayIcon.GetExtraSlots())
             {
@@ -1529,7 +1529,7 @@ namespace winrt::BrightnessApp::implementation
             if (m_hasSeparatePendingSave)
             {
                 m_hasSeparatePendingSave = false;
-                g_Settings.SaveBrightnessOnly();
+                g_Settings.Save();
             }
             if (m_hwnd)
             {
@@ -1546,7 +1546,7 @@ namespace winrt::BrightnessApp::implementation
         if (m_hasSeparatePendingSave)
         {
             m_hasSeparatePendingSave = false;
-            g_Settings.SaveBrightnessOnly();
+            g_Settings.Save();
         }
         m_isVisible = false;
         HWND h = m_hwnd;

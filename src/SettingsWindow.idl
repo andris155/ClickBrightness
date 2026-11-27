@@ -1,4 +1,4 @@
-namespace BrightnessApp
+namespace ClickBrightness
 {
     [default_interface]
     runtimeclass SettingsWindow : Microsoft.UI.Xaml.Window
