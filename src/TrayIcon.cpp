@@ -289,7 +289,29 @@ static std::wstring GetMainMonitorDisplayName() {
 }
 
 static std::wstring FormatTrayTip(const std::wstring& name, int brightness, const std::wstring& monitorId) {
-    if (!monitorId.empty() && g_MonitorManager.IsMonitorPoweredOff(monitorId)) {
+    bool singleMonitor = (g_MonitorManager.GetMonitors().size() <= 1);
+    bool isOff = (!monitorId.empty() && g_MonitorManager.IsMonitorPoweredOff(monitorId));
+    if (singleMonitor) {
+        std::wstring fmt = g_Loc.Get(L"Tray_Tooltip", L"Brightness: %d%%");
+        if (isOff && g_Settings.disableTurnedOffControl) {
+            std::wstring offTag = L"(" + g_Loc.Get(L"Common_Off", L"Off") + L")";
+            size_t pctPos = fmt.find(L"%d%%");
+            if (pctPos != std::wstring::npos) {
+                fmt.replace(pctPos, 4, offTag);
+                return fmt;
+            }
+            return L"Brightness: " + offTag;
+        }
+        wchar_t buf[128] = { 0 };
+        swprintf_s(buf, fmt.c_str(), brightness);
+        std::wstring res = buf;
+        if (isOff) {
+            res += L" (" + g_Loc.Get(L"Common_Off", L"Off") + L")";
+        }
+        return res;
+    }
+
+    if (isOff) {
         if (g_Settings.disableTurnedOffControl) {
             return name + L": (" + g_Loc.Get(L"Common_Off", L"Off") + L")";
         }
