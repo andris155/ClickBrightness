@@ -1082,27 +1082,58 @@ namespace winrt::BrightnessApp::implementation
             int idx = MainMonitorComboBox().SelectedIndex();
             if (idx >= 0 && idx < static_cast<int>(m_cachedMonitorIds.size()))
             {
-                g_Settings.mainMonitorId = m_cachedMonitorIds[idx];
-                if (g_Settings.FindMonitorConfig(g_Settings.mainMonitorId))
+                const std::wstring& selectedId = m_cachedMonitorIds[idx];
+                if (_wcsicmp(selectedId.c_str(), g_Settings.mainMonitorId.c_str()) == 0)
                 {
-                    auto& mainCfg = g_Settings.GetOrCreateMonitorConfig(g_Settings.mainMonitorId);
-                    mainCfg.enabled = true;
-                    mainCfg.controlMode = 0;
-                    if (mainCfg.trayPercentageMode == 3)
+                    return;
+                }
+
+                // Revert selection until user confirms in the flyout
+                m_pendingMainMonitorId = selectedId;
+                int currentIdx = 0;
+                for (int i = 0; i < static_cast<int>(m_cachedMonitorIds.size()); ++i)
+                {
+                    if (_wcsicmp(m_cachedMonitorIds[i].c_str(), g_Settings.mainMonitorId.c_str()) == 0)
                     {
-                        mainCfg.trayPercentageMode = 0; // Follow Windows
+                        currentIdx = i;
+                        break;
                     }
                 }
-                g_MonitorManager.UpdateFnSyncListener();
-                PopulateMonitorsSelectionList();
-                LoadMonitorConfigToUI();
-                ApplyAndSave();
-                g_TrayIcon.InvalidateIconCache();
-                int newMainB = g_MonitorManager.GetMonitorBrightnessById(g_Settings.mainMonitorId);
-                g_TrayIcon.UpdateBrightness(newMainB);
-                g_TrayIcon.SyncExtraTrayIcons(true);
-                g_FlyoutWindow.RefreshOnDisplayChange();
+                m_isUpdatingUI = true;
+                MainMonitorComboBox().SelectedIndex(currentIdx);
+                m_isUpdatingUI = false;
+
+                MainMonitorConfirmFlyout().ShowAt(MainMonitorComboBox());
             }
+        });
+
+        ConfirmMainMonitorButton().Click([this](auto&&, auto&&)
+        {
+            MainMonitorConfirmFlyout().Hide();
+            if (m_pendingMainMonitorId.empty()) return;
+
+            g_Settings.mainMonitorId = m_pendingMainMonitorId;
+            m_pendingMainMonitorId.clear();
+
+            if (g_Settings.FindMonitorConfig(g_Settings.mainMonitorId))
+            {
+                auto& mainCfg = g_Settings.GetOrCreateMonitorConfig(g_Settings.mainMonitorId);
+                mainCfg.enabled = true;
+                mainCfg.controlMode = 0;
+                if (mainCfg.trayPercentageMode == 3)
+                {
+                    mainCfg.trayPercentageMode = 0; // Follow Windows
+                }
+            }
+            g_MonitorManager.UpdateFnSyncListener();
+            PopulateMonitorsSelectionList();
+            LoadMonitorConfigToUI();
+            ApplyAndSave();
+            g_TrayIcon.InvalidateIconCache();
+            int newMainB = g_MonitorManager.GetMonitorBrightnessById(g_Settings.mainMonitorId);
+            g_TrayIcon.UpdateBrightness(newMainB);
+            g_TrayIcon.SyncExtraTrayIcons(true);
+            g_FlyoutWindow.RefreshOnDisplayChange();
         });
 
         // Sync External Monitors with Laptop Fn Keys
@@ -1996,8 +2027,6 @@ namespace winrt::BrightnessApp::implementation
             TrayWheelStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
             TrayWheelStepCard().Visibility(on ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
             TrayWheelShowOsdCard().Visibility(on ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
-            TrayWheelDelayCard().Visibility(on ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
-            TrayWheelWaitTimeCard().Visibility((on && g_Settings.trayWheelDelayEnabled) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
             g_TrayIcon.UpdateWheelHook();
             ApplyAndSave();
         });
@@ -2032,7 +2061,7 @@ namespace winrt::BrightnessApp::implementation
             bool on = TrayWheelDelayToggle().IsOn();
             g_Settings.trayWheelDelayEnabled = on;
             TrayWheelDelayStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
-            TrayWheelWaitTimeCard().Visibility((g_Settings.trayWheelEnabled && on) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+            TrayWheelWaitTimeCard().Visibility(on ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
             ApplyAndSave();
         });
 
@@ -2153,8 +2182,6 @@ namespace winrt::BrightnessApp::implementation
             if (m_isUpdatingUI) return;
             g_Settings.flyoutScrollEnabled = on;
             FlyoutScrollStepCard().Visibility(on ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
-            FlyoutScrollDelayCard().Visibility(on ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
-            FlyoutScrollWaitTimeCard().Visibility((on && g_Settings.flyoutScrollDelayEnabled) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
             ApplyAndSave();
         });
 
@@ -3228,6 +3255,8 @@ namespace winrt::BrightnessApp::implementation
         SubmenuFlyoutDescText().Text(g_Loc.Get(L"Desc_SubmenuFlyout", L"Flyout scrolling and slider accent color"));
         MainMonitorTitleText().Text(g_Loc.Get(L"Opt_MainMonitor", L"Main Display"));
         MainMonitorDescText().Text(g_Loc.Get(L"Desc_MainMonitor", L"Primary reference display used for brightness offsets and Sync mode"));
+        MainMonitorConfirmText().Text(g_Loc.Get(L"Confirm_MainMonitor", L"Changing the main display will update Sync mode and tray icons. Do you want to continue?"));
+        ConfirmMainMonitorButton().Content(box_value(g_Loc.Get(L"Btn_ConfirmMainMonitor", L"Yes, change main display")));
         SyncLaptopFnKeysTitleText().Text(g_Loc.Get(L"Opt_SyncLaptopFnKeys", L"Sync External Monitors with Laptop Fn Keys"));
         SyncLaptopFnKeysDescText().Text(g_Loc.Get(L"Desc_SyncLaptopFnKeys", L"Automatically sync external Sync-mode monitors when adjusting internal display brightness via laptop Fn keys"));
         ShowSeparateInMultiFlyoutTitleText().Text(g_Loc.Get(L"Opt_ShowSeparateInMultiFlyout", L"Show Separate Monitors in Multi-Monitor Flyout"));
@@ -3897,14 +3926,14 @@ namespace winrt::BrightnessApp::implementation
         TrayWheelStepCard().Visibility(g_Settings.trayWheelEnabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         TrayWheelStepComboBox().SelectedIndex(stepToIndex(g_Settings.trayWheelStep));
         TrayWheelShowOsdCard().Visibility(g_Settings.trayWheelEnabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
-        TrayWheelDelayCard().Visibility(g_Settings.trayWheelEnabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        TrayWheelDelayCard().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
 
         TrayWheelShowOsdToggle().IsOn(g_Settings.trayWheelShowOsd);
         TrayWheelShowOsdStatusText().Text(g_Settings.trayWheelShowOsd ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
 
         TrayWheelDelayToggle().IsOn(g_Settings.trayWheelDelayEnabled);
         TrayWheelDelayStatusText().Text(g_Settings.trayWheelDelayEnabled ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
-        TrayWheelWaitTimeCard().Visibility((g_Settings.trayWheelEnabled && g_Settings.trayWheelDelayEnabled) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        TrayWheelWaitTimeCard().Visibility(g_Settings.trayWheelDelayEnabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         TrayWheelDelaySlider().Value(g_Settings.trayWheelDelayMs);
         TrayWheelDelayNumberBox().Value(g_Settings.trayWheelDelayMs);
 
@@ -3980,7 +4009,7 @@ namespace winrt::BrightnessApp::implementation
         FlyoutScrollEnabledToggle().IsOn(g_Settings.flyoutScrollEnabled);
         FlyoutScrollEnabledStatusText().Text(g_Settings.flyoutScrollEnabled ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
         FlyoutScrollStepCard().Visibility(g_Settings.flyoutScrollEnabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
-        FlyoutScrollDelayCard().Visibility(g_Settings.flyoutScrollEnabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        FlyoutScrollDelayCard().Visibility(winrt::Microsoft::UI::Xaml::Visibility::Visible);
 
         FlyoutScrollStepComboBox().SelectedIndex(stepToIndex(g_Settings.flyoutScrollStep));
 
@@ -3989,7 +4018,7 @@ namespace winrt::BrightnessApp::implementation
 
         FlyoutScrollDelayToggle().IsOn(g_Settings.flyoutScrollDelayEnabled);
         FlyoutScrollDelayStatusText().Text(g_Settings.flyoutScrollDelayEnabled ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
-        FlyoutScrollWaitTimeCard().Visibility((g_Settings.flyoutScrollEnabled && g_Settings.flyoutScrollDelayEnabled) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        FlyoutScrollWaitTimeCard().Visibility(g_Settings.flyoutScrollDelayEnabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         FlyoutScrollDelaySlider().Value(g_Settings.flyoutScrollDelayMs);
         FlyoutScrollDelayNumberBox().Value(g_Settings.flyoutScrollDelayMs);
 

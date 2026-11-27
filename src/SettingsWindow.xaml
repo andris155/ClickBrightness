@@ -314,7 +314,16 @@
                                         <TextBlock x:Name="MainMonitorTitleText" Text="Main Display" FontSize="14" FontWeight="Normal"/>
                                         <TextBlock x:Name="MainMonitorDescText" Text="Primary reference display used for brightness offsets and Sync mode" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
                                     </StackPanel>
-                                    <ComboBox x:Name="MainMonitorComboBox" Grid.Column="2" Width="220" VerticalAlignment="Center"/>
+                                    <ComboBox x:Name="MainMonitorComboBox" Grid.Column="2" Width="220" VerticalAlignment="Center">
+                                        <FlyoutBase.AttachedFlyout>
+                                            <Flyout x:Name="MainMonitorConfirmFlyout" Placement="BottomEdgeAlignedRight">
+                                                <StackPanel Spacing="12" MaxWidth="300">
+                                                    <TextBlock x:Name="MainMonitorConfirmText" Text="Changing the main display will update Sync mode and tray icons. Do you want to continue?" Style="{ThemeResource BaseTextBlockStyle}" TextWrapping="Wrap"/>
+                                                    <Button x:Name="ConfirmMainMonitorButton" Content="Yes, change main display"/>
+                                                </StackPanel>
+                                            </Flyout>
+                                        </FlyoutBase.AttachedFlyout>
+                                    </ComboBox>
                                 </Grid>
                             </Border>
 

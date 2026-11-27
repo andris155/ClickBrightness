@@ -30,6 +30,17 @@
 
 void TrimProcessWorkingSetAsync();
 
+static bool IsHeaderNameTrimmed(const std::wstring& name, double fontSize, double maxWidth)
+{
+    if (name.empty()) return false;
+    winrt::Microsoft::UI::Xaml::Controls::TextBlock measureTb;
+    measureTb.FontFamily(winrt::Microsoft::UI::Xaml::Media::FontFamily(L"Segoe UI Variable Text, Segoe UI"));
+    measureTb.FontSize(fontSize);
+    measureTb.Text(name);
+    measureTb.Measure({ 10000.0f, 100.0f });
+    return measureTb.DesiredSize().Width > static_cast<float>(maxWidth);
+}
+
 namespace winrt::BrightnessApp::implementation
 {
     FlyoutWindow::FlyoutWindow()
@@ -629,6 +640,8 @@ namespace winrt::BrightnessApp::implementation
                 hdr.TextTrimming(winrt::Microsoft::UI::Xaml::TextTrimming::CharacterEllipsis);
                 hdr.Width(64);
                 hdr.HorizontalAlignment(winrt::Microsoft::UI::Xaml::HorizontalAlignment::Left);
+                winrt::Microsoft::UI::Xaml::Controls::ToolTipService::SetToolTip(
+                    hdr, IsHeaderNameTrimmed(monName, 12.0, 64.0) ? winrt::box_value(monName) : nullptr);
                 if (isSeparate)
                 {
                     hdr.Margin({ 25, 0, 0, 0 });
@@ -843,6 +856,11 @@ namespace winrt::BrightnessApp::implementation
         const auto* cfg = g_Settings.FindMonitorConfig(targetId);
         if (enabledCount > 1 && cfg && !cfg->customName.empty())
         {
+            TitleText().FontSize(12);
+            TitleText().Width(96);
+            TitleText().Margin(winrt::Microsoft::UI::Xaml::Thickness{ 0, 0, 0, 10 });
+            winrt::Microsoft::UI::Xaml::Controls::ToolTipService::SetToolTip(
+                TitleText(), IsHeaderNameTrimmed(cfg->customName, 12.0, 96.0) ? winrt::box_value(cfg->customName) : nullptr);
             std::wstring titleText = (isTargetOff && g_Settings.disableTurnedOffControl)
                 ? (cfg->customName + L"\n(" + g_Loc.Get(L"Common_Off", L"Off") + L")")
                 : (cfg->customName + L"\n" + std::to_wstring(m_brightness) + L"%");
@@ -862,6 +880,10 @@ namespace winrt::BrightnessApp::implementation
         }
         else
         {
+            TitleText().FontSize(13.5);
+            TitleText().Width(std::numeric_limits<double>::quiet_NaN());
+            TitleText().Margin(winrt::Microsoft::UI::Xaml::Thickness{ 0, 0, 0, 14 });
+            winrt::Microsoft::UI::Xaml::Controls::ToolTipService::SetToolTip(TitleText(), nullptr);
             std::wstring fmt = g_Loc.Get(L"Flyout_Brightness", L"Brightness %d%%");
             wchar_t bbuf[64];
             swprintf_s(bbuf, fmt.c_str(), m_brightness);
@@ -896,6 +918,8 @@ namespace winrt::BrightnessApp::implementation
         if (!m_syncEntries.empty())
         {
             std::wstring mainName = (cfg && !cfg->customName.empty()) ? cfg->customName : g_Loc.Get(L"MainDisplay", L"Main").c_str();
+            winrt::Microsoft::UI::Xaml::Controls::ToolTipService::SetToolTip(
+                MainColumnHeader(), IsHeaderNameTrimmed(mainName, 12.0, 64.0) ? winrt::box_value(mainName) : nullptr);
             if (g_MonitorManager.IsMonitorPoweredOff(g_Settings.mainMonitorId))
             {
                 MainColumnHeader().Text(mainName + L"\n" + std::to_wstring(m_brightness) + L"% (" + g_Loc.Get(L"Common_Off", L"Off") + L")");
@@ -1103,8 +1127,17 @@ namespace winrt::BrightnessApp::implementation
         {
             extraWidth += entry.isSeparate ? 95 : 70;
         }
+        int enabledCount = 0;
+        for (const auto& m : g_MonitorManager.GetMonitors())
+        {
+            if (g_Settings.IsMonitorSelected(m.id)) enabledCount++;
+        }
+        std::wstring targetIdForHeight = m_targetMonitorId.empty() ? g_Settings.mainMonitorId : m_targetMonitorId;
+        const auto* cfgForHeight = g_Settings.FindMonitorConfig(targetIdForHeight);
+        bool isTwoRowTitle = (enabledCount > 1 && cfgForHeight && !cfgForHeight->customName.empty());
+
         int width = DpiHelper::Scale(!m_syncEntries.empty() ? (137 + extraWidth) : 121, dpi);
-        int height = DpiHelper::Scale(!m_syncEntries.empty() ? 574 : 576, dpi);
+        int height = DpiHelper::Scale(!m_syncEntries.empty() ? 574 : (isTwoRowTitle ? 576 : 566), dpi);
         m_lastW = width;
         m_lastH = height;
 
@@ -1148,8 +1181,17 @@ namespace winrt::BrightnessApp::implementation
         {
             extraWidth += entry.isSeparate ? 95 : 70;
         }
+        int enabledCount = 0;
+        for (const auto& m : g_MonitorManager.GetMonitors())
+        {
+            if (g_Settings.IsMonitorSelected(m.id)) enabledCount++;
+        }
+        std::wstring targetIdForHeight = m_targetMonitorId.empty() ? g_Settings.mainMonitorId : m_targetMonitorId;
+        const auto* cfgForHeight = g_Settings.FindMonitorConfig(targetIdForHeight);
+        bool isTwoRowTitle = (enabledCount > 1 && cfgForHeight && !cfgForHeight->customName.empty());
+
         int width = DpiHelper::Scale(!m_syncEntries.empty() ? (137 + extraWidth) : 121, dpi);
-        int height = DpiHelper::Scale(!m_syncEntries.empty() ? 574 : 576, dpi);
+        int height = DpiHelper::Scale(!m_syncEntries.empty() ? 574 : (isTwoRowTitle ? 576 : 566), dpi);
         bool sizeChanged = (m_lastW != width || m_lastH != height);
         m_lastW = width;
         m_lastH = height;
@@ -1209,8 +1251,17 @@ namespace winrt::BrightnessApp::implementation
         {
             extraWidth += entry.isSeparate ? 95 : 70;
         }
+        int enabledCount = 0;
+        for (const auto& m : g_MonitorManager.GetMonitors())
+        {
+            if (g_Settings.IsMonitorSelected(m.id)) enabledCount++;
+        }
+        std::wstring targetIdForHeight = m_targetMonitorId.empty() ? g_Settings.mainMonitorId : m_targetMonitorId;
+        const auto* cfgForHeight = g_Settings.FindMonitorConfig(targetIdForHeight);
+        bool isTwoRowTitle = (enabledCount > 1 && cfgForHeight && !cfgForHeight->customName.empty());
+
         int width = DpiHelper::Scale(!m_syncEntries.empty() ? (137 + extraWidth) : 121, dpi);
-        int height = DpiHelper::Scale(!m_syncEntries.empty() ? 574 : 576, dpi);
+        int height = DpiHelper::Scale(!m_syncEntries.empty() ? 574 : (isTwoRowTitle ? 576 : 566), dpi);
 
         bool sizeChanged = (m_lastW != width || m_lastH != height);
         m_lastW = width;

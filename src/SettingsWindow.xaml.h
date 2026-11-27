@@ -80,6 +80,7 @@ namespace winrt::BrightnessApp::implementation
         bool m_aboutTabLoaded{ false };
         std::vector<std::wstring> m_cachedMonitorIds;
         std::wstring m_selectedConfigMonitorId;
+        std::wstring m_pendingMainMonitorId;
         std::wstring m_currentMonitorsSubpage;
         std::wstring m_currentTimingsSubpage;
 

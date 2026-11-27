@@ -24,13 +24,12 @@
                            Grid.Row="0"
                            Text="Brightness 50%"
                            FontFamily="Segoe UI Variable Text, Segoe UI"
-                           FontSize="12"
+                           FontSize="13.5"
                            FontWeight="Normal"
                            TextAlignment="Center"
                            TextTrimming="CharacterEllipsis"
-                           Width="96"
                            Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                           Margin="0,0,0,10"
+                           Margin="0,0,0,14"
                            HorizontalAlignment="Center"/>
 
                 <!-- Content Grid: 3 columns (Buttons, Main Slider, Extra Sync Sliders), 2 rows (Headers, Controls) -->

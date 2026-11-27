@@ -317,6 +317,8 @@ void LocalizationManager::LoadBuiltInDefaults() {
         { L"Btn_ResetDefaults", L"Reset Defaults" },
         { L"Confirm_ResetDefaults", L"All settings will be reset. Do you want to continue?" },
         { L"Btn_ConfirmResetDefaults", L"Yes, reset settings" },
+        { L"Confirm_MainMonitor", L"Changing the main display will update Sync mode and tray icons. Do you want to continue?" },
+        { L"Btn_ConfirmMainMonitor", L"Yes, change main display" },
         { L"Tip_ResetDefaults", L"Reset all settings to default values" },
         { L"Status_Ready_Title", L"Hardware DDC/CI Ready" },
         { L"Status_Ready_Msg", L"DDC/CI communication active. Hardware monitor brightness will update directly." },
