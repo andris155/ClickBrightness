@@ -1808,6 +1808,29 @@
                                     </Grid>
                                 </Border>
 
+                                <!-- Only Show OSD When Brightness Changed -->
+                                <Border x:Name="ScheduleOsdOnlyOnChangeCard" Visibility="Collapsed"
+                                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="1" CornerRadius="4" Padding="16,12,16,12" Margin="0,0,0,4">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon Glyph="&#xE7F4;" FontSize="16" Width="20" Height="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock x:Name="ScheduleOsdOnlyOnChangeTitleText" Text="Only Show OSD When Brightness Changed" FontSize="14" FontWeight="Normal"/>
+                                            <TextBlock x:Name="ScheduleOsdOnlyOnChangeDescText" Text="Skip the OSD banner if the monitor is already at the scheduled brightness" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="ScheduleOsdOnlyOnChangeStatusText" Text="On" FontSize="14" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                                            <ToggleSwitch x:Name="ScheduleOsdOnlyOnChangeToggle" MinWidth="0" OnContent="" OffContent="" Margin="0" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
                                 <!-- Brightness Levels -->
                                 <StackPanel x:Name="ScheduleBrightnessSection" Visibility="Collapsed" Spacing="0">
                                     <Grid Margin="0,14,0,6">

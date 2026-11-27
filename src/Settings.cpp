@@ -382,6 +382,7 @@ void AppSettings::Load() {
         cfg.scheduleSunriseOffset = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"ScheduleSunriseOffset", 0, ini.c_str()), -180, 180);
         cfg.scheduleSunsetOffset = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"ScheduleSunsetOffset", 0, ini.c_str()), -180, 180);
         cfg.scheduleShowOsd = (GetPrivateProfileIntW(sec.c_str(), L"ScheduleShowOsd", 1, ini.c_str()) != 0);
+        cfg.scheduleOsdOnlyOnChange = (GetPrivateProfileIntW(sec.c_str(), L"ScheduleOsdOnlyOnChange", 1, ini.c_str()) != 0);
 
         cfg.cachedBrightness = (std::clamp)((int)GetPrivateProfileIntW(sec.c_str(), L"CachedBrightness", cachedBrightness, ini.c_str()), 0, 100);
         monitorConfigs[monId] = cfg;
@@ -606,6 +607,7 @@ void AppSettings::Save() const {
         addLine(L"ScheduleSunriseOffset", std::to_wstring(cfg.scheduleSunriseOffset));
         addLine(L"ScheduleSunsetOffset", std::to_wstring(cfg.scheduleSunsetOffset));
         addLine(L"ScheduleShowOsd", cfg.scheduleShowOsd ? L"1" : L"0");
+        addLine(L"ScheduleOsdOnlyOnChange", cfg.scheduleOsdOnlyOnChange ? L"1" : L"0");
         addLine(L"CachedBrightness", std::to_wstring(cfg.cachedBrightness));
     }
 
@@ -1038,6 +1040,7 @@ MonitorControlConfig AppSettings::GetEffectiveMonitorConfig(const std::wstring& 
         result.scheduleSunriseOffset = own.scheduleSunriseOffset;
         result.scheduleSunsetOffset = own.scheduleSunsetOffset;
         result.scheduleShowOsd = own.scheduleShowOsd;
+        result.scheduleOsdOnlyOnChange = own.scheduleOsdOnlyOnChange;
         result.cachedBrightness = own.cachedBrightness;
     }
     if (isMain && result.trayPercentageMode == 3) {
@@ -1113,6 +1116,7 @@ void AppSettings::CopyCustomizationToMonitor(MonitorControlConfig& dst) const {
     dst.scheduleSunriseOffset = scheduleSunriseOffset;
     dst.scheduleSunsetOffset = scheduleSunsetOffset;
     dst.scheduleShowOsd = scheduleShowOsd;
+    dst.scheduleOsdOnlyOnChange = scheduleOsdOnlyOnChange;
     dst.cachedBrightness = cachedBrightness;
 }
 
@@ -1183,6 +1187,7 @@ void AppSettings::ApplyMonitorCustomizationToLegacy(const MonitorControlConfig& 
     scheduleSunriseOffset = src.scheduleSunriseOffset;
     scheduleSunsetOffset = src.scheduleSunsetOffset;
     scheduleShowOsd = src.scheduleShowOsd;
+    scheduleOsdOnlyOnChange = src.scheduleOsdOnlyOnChange;
     cachedBrightness = src.cachedBrightness;
 }
 

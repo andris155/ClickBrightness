@@ -853,6 +853,7 @@ namespace winrt::BrightnessApp::implementation
                 { g_Loc.Get(L"Opt_ScheduleMode", L"Automatic Schedule").c_str(), catMon, L"schedule automatic day night custom time sunrise sunset", L"Monitors_Schedule", ScheduleModeComboBox() },
                 { g_Loc.Get(L"Opt_ScheduleDayBrightness", L"Daytime Brightness (%)").c_str(), catMon, L"schedule day brightness level", L"Monitors_Schedule", ScheduleDayBrightnessSlider() },
                 { g_Loc.Get(L"Opt_ScheduleNightBrightness", L"Nighttime Brightness (%)").c_str(), catMon, L"schedule night brightness level", L"Monitors_Schedule", ScheduleNightBrightnessSlider() },
+                { g_Loc.Get(L"Opt_ScheduleOsdOnlyOnChange", L"Only Show OSD When Brightness Changed").c_str(), catMon, L"schedule osd only changed brightness banner", L"Monitors_Schedule", ScheduleOsdOnlyOnChangeToggle() },
 
                 // Timings & Global
                 { g_Loc.Get(L"Opt_DelayEnabled", L"Delayed Brightness Change").c_str(), catTim, L"delay debounce shortcut", L"Timings_Shortcuts", DelayEnabledToggle() },
@@ -2225,6 +2226,17 @@ namespace winrt::BrightnessApp::implementation
             ScheduleShowOsdStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
             if (m_isUpdatingUI) return;
             g_Settings.scheduleShowOsd = on;
+            UpdateScheduleVisibility();
+            ApplyAndSave();
+        });
+
+        // Schedule Only Show OSD When Brightness Changed Toggle
+        ScheduleOsdOnlyOnChangeToggle().Toggled([this](auto&&, auto&&)
+        {
+            bool on = ScheduleOsdOnlyOnChangeToggle().IsOn();
+            ScheduleOsdOnlyOnChangeStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+            if (m_isUpdatingUI) return;
+            g_Settings.scheduleOsdOnlyOnChange = on;
             ApplyAndSave();
         });
 
@@ -2639,6 +2651,7 @@ namespace winrt::BrightnessApp::implementation
             g_Settings.scheduleSunriseOffset = 0;
             g_Settings.scheduleSunsetOffset = 0;
             g_Settings.scheduleShowOsd = true;
+            g_Settings.scheduleOsdOnlyOnChange = true;
             for (auto& [monId, cfg] : g_Settings.monitorConfigs)
             {
                 cfg.enabled = true;
@@ -3209,6 +3222,9 @@ namespace winrt::BrightnessApp::implementation
         ResetDefaultsConfirmText().Text(g_Loc.Get(L"Confirm_ResetDefaults", L"All settings will be reset. Do you want to continue?"));
         ConfirmResetDefaultsButton().Content(box_value(g_Loc.Get(L"Btn_ConfirmResetDefaults", L"Yes, reset settings")));
         ApplyScheduleBrightnessButton().Content(box_value(g_Loc.Get(L"Btn_Apply", L"Apply")));
+        ScheduleOsdOnlyOnChangeTitleText().Text(g_Loc.Get(L"Opt_ScheduleOsdOnlyOnChange", L"Only Show OSD When Brightness Changed"));
+        ScheduleOsdOnlyOnChangeDescText().Text(g_Loc.Get(L"Desc_ScheduleOsdOnlyOnChange", L"Skip the OSD banner if the monitor is already at the scheduled brightness"));
+        ScheduleOsdOnlyOnChangeStatusText().Text(ScheduleOsdOnlyOnChangeToggle().IsOn() ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
         ToolTipService::SetToolTip(ResetDefaultsButton(), box_value(g_Loc.Get(L"Tip_ResetDefaults", L"Reset all settings to default values")));
 
         AppearanceSectionTitle().Text(g_Loc.Get(L"Sec_Appearance", L"Appearance"));
@@ -3963,6 +3979,8 @@ namespace winrt::BrightnessApp::implementation
         ScheduleModeComboBox().SelectedIndex((std::clamp)(g_Settings.scheduleMode, 0, 2));
         ScheduleShowOsdToggle().IsOn(g_Settings.scheduleShowOsd);
         ScheduleShowOsdStatusText().Text(g_Settings.scheduleShowOsd ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+        ScheduleOsdOnlyOnChangeToggle().IsOn(g_Settings.scheduleOsdOnlyOnChange);
+        ScheduleOsdOnlyOnChangeStatusText().Text(g_Settings.scheduleOsdOnlyOnChange ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
         ScheduleDayBrightnessSlider().Value(g_Settings.scheduleDayBrightness);
         ScheduleDayBrightnessNumberBox().Value(g_Settings.scheduleDayBrightness);
         ScheduleNightBrightnessSlider().Value(g_Settings.scheduleNightBrightness);
@@ -4067,6 +4085,7 @@ namespace winrt::BrightnessApp::implementation
         bool isLocService = (g_Settings.scheduleSunSource == 0);
 
         ScheduleShowOsdCard().Visibility(enabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
+        ScheduleOsdOnlyOnChangeCard().Visibility((enabled && g_Settings.scheduleShowOsd) ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         ScheduleBrightnessSection().Visibility(enabled ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         CustomScheduleSection().Visibility(isCustom ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);
         SunScheduleSection().Visibility(isSun ? winrt::Microsoft::UI::Xaml::Visibility::Visible : winrt::Microsoft::UI::Xaml::Visibility::Collapsed);

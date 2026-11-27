@@ -61,6 +61,8 @@
   "Confirm_ResetDefaults": "Minden beállítás visszaáll az alapértékekre. Biztosan folytatod?",
   "Btn_ConfirmResetDefaults": "Igen, visszaállítás",
   "Btn_Apply": "Alkalmaz",
+  "Opt_ScheduleOsdOnlyOnChange": "OSD megjelenítése csak fényerőváltozáskor",
+  "Desc_ScheduleOsdOnlyOnChange": "OSD sáv kihagyása, ha a monitor már az ütemezett fényerőn van",
   "Tip_ResetDefaults": "Minden beállítás visszaállítása az alapértékekre",
 
   "Status_Ready_Title": "Hardveres DDC/CI kész",

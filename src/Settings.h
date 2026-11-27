@@ -94,6 +94,7 @@ struct MonitorControlConfig {
     int scheduleSunriseOffset = 0;      // -180 to +180 min
     int scheduleSunsetOffset = 0;       // -180 to +180 min
     bool scheduleShowOsd = true;
+    bool scheduleOsdOnlyOnChange = true;
 
     int cachedBrightness = 45;
 };
@@ -204,6 +205,7 @@ struct AppSettings {
     int scheduleSunriseOffset = 0;
     int scheduleSunsetOffset = 0;
     bool scheduleShowOsd = true;
+    bool scheduleOsdOnlyOnChange = true;
 
     // OSD & Tray Menu Theme (0 = Follow Windows (system), 1 = Dark, 2 = Light)
     int overlayTheme = 0;

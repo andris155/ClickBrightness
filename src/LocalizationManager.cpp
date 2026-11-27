@@ -318,6 +318,8 @@ void LocalizationManager::LoadBuiltInDefaults() {
         { L"Confirm_ResetDefaults", L"All settings will be reset. Do you want to continue?" },
         { L"Btn_ConfirmResetDefaults", L"Yes, reset settings" },
         { L"Btn_Apply", L"Apply" },
+        { L"Opt_ScheduleOsdOnlyOnChange", L"Only Show OSD When Brightness Changed" },
+        { L"Desc_ScheduleOsdOnlyOnChange", L"Skip the OSD banner if the monitor is already at the scheduled brightness" },
         { L"Confirm_MainMonitor", L"Changing the main display will update Sync mode and tray icons. Do you want to continue?" },
         { L"Btn_ConfirmMainMonitor", L"Yes, change main display" },
         { L"Tip_ResetDefaults", L"Reset all settings to default values" },

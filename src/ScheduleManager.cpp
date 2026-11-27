@@ -134,7 +134,9 @@ void Tick() {
             auto it = s_lastEvaluatedStates.find(L"__SYNC__");
             if (it == s_lastEvaluatedStates.end() || it->second != desired) {
                 int targetB = (std::clamp)(desired == 1 ? mainCfg.scheduleDayBrightness : mainCfg.scheduleNightBrightness, 0, 100);
-                if (mainCfg.scheduleShowOsd) {
+                int currentB = g_MonitorManager.GetTargetControlBrightness(L"");
+                bool showOsd = mainCfg.scheduleShowOsd && (!mainCfg.scheduleOsdOnlyOnChange || currentB != targetB);
+                if (showOsd) {
                     g_OverlayWindow.TriggerBrightnessSetForTarget(L"", targetB, true);
                 } else {
                     g_MonitorManager.SetMonitorBrightnessTarget(L"", targetB, true);
@@ -165,7 +167,9 @@ void Tick() {
         auto it = s_lastEvaluatedStates.find(mon.id);
         if (it == s_lastEvaluatedStates.end() || it->second != desired) {
             int targetB = (std::clamp)(desired == 1 ? cfg->scheduleDayBrightness : cfg->scheduleNightBrightness, 0, 100);
-            if (cfg->scheduleShowOsd) {
+            int currentB = g_MonitorManager.GetTargetControlBrightness(mon.id);
+            bool showOsd = cfg->scheduleShowOsd && (!cfg->scheduleOsdOnlyOnChange || currentB != targetB);
+            if (showOsd) {
                 g_OverlayWindow.TriggerBrightnessSetForTarget(mon.id, targetB, true);
             } else {
                 g_MonitorManager.SetMonitorBrightnessTarget(mon.id, targetB, true);
