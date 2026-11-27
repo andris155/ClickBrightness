@@ -838,22 +838,7 @@ bool AppSettings::IsMonitorSelected(const std::wstring& monitorId) const {
     if (it != monitorConfigs.end()) {
         return it->second.enabled;
     }
-    if (selectedMonitors.empty() || _wcsicmp(selectedMonitors.c_str(), L"all") == 0) {
-        return true;
-    }
-    size_t start = 0;
-    while (start < selectedMonitors.length()) {
-        size_t end = selectedMonitors.find(L';', start);
-        if (end == std::wstring::npos) end = selectedMonitors.length();
-        std::wstring token = selectedMonitors.substr(start, end - start);
-        while (!token.empty() && iswspace(token.front())) token.erase(token.begin());
-        while (!token.empty() && iswspace(token.back())) token.pop_back();
-        if (_wcsicmp(token.c_str(), monitorId.c_str()) == 0) {
-            return true;
-        }
-        start = end + 1;
-    }
-    return false;
+    return true;
 }
 
 void AppSettings::SetMonitorSelected(const std::wstring& monitorId, bool selected, const std::vector<std::wstring>& allIds) {
@@ -943,7 +928,7 @@ MonitorControlConfig& AppSettings::GetOrCreateMonitorConfig(const std::wstring& 
         ClearHotkeys(cfg);
         cfg.trayPercentageMode = 3; // Non-main Sync monitors default to Hide tray icon
     }
-    cfg.enabled = IsMonitorSelected(monitorId);
+    cfg.enabled = true;
     cfg.customName = SanitizeMonitorName(defaultName);
     cfg.controlMode = 0;
     cfg.offset = 0;

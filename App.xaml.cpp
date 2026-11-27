@@ -559,6 +559,8 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
 
             int b = g_MonitorManager.GetCachedBrightness();
             g_TrayIcon.UpdateBrightness(b);
+            g_TrayIcon.SyncExtraTrayIcons(true);
+            g_FlyoutWindow.RefreshOnDisplayChange();
             ScheduleManager::Refresh();
 
             // If driver is still settling or physical monitors aren't ready yet, start retry loop
