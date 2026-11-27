@@ -237,6 +237,11 @@ struct AppSettings {
     int simulateMonitorsCount = 0;
     int cliSimulateMonitorsOverride = -1;
 
+    bool IsSimulatedMode() const {
+        int count = (cliSimulateMonitorsOverride >= 0) ? cliSimulateMonitorsOverride : simulateMonitorsCount;
+        return count > 0;
+    }
+
     void Load();
     void Save() const;
     void SaveBrightnessOnly() const;

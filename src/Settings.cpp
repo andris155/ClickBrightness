@@ -9,53 +9,60 @@
 AppSettings g_Settings;
 
 const std::wstring& AppSettings::GetIniFilePath() {
-    static std::wstring s_iniPath;
-    if (s_iniPath.empty()) {
-        // If running in portable mode (settings.ini or portable.txt exists next to exe), keep settings app-local
+    static std::wstring s_normalIniPath;
+    static std::wstring s_simIniPath;
+    if (s_normalIniPath.empty()) {
+        // If running in portable mode (settings.ini, simulated_settings.ini, or portable.txt exists next to exe), keep settings app-local
         wchar_t exePath[MAX_PATH] = { 0 };
         DWORD len = GetModuleFileNameW(NULL, exePath, MAX_PATH);
         if (len > 0 && len < MAX_PATH) {
             std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
             std::filesystem::path localIni = exeDir / L"settings.ini";
+            std::filesystem::path localSimIni = exeDir / L"simulated_settings.ini";
             std::filesystem::path portableMarker = exeDir / L"portable.txt";
-            if (std::filesystem::exists(localIni) || std::filesystem::exists(portableMarker)) {
-                s_iniPath = localIni.wstring();
-                return s_iniPath;
+            if (std::filesystem::exists(localIni) || std::filesystem::exists(localSimIni) || std::filesystem::exists(portableMarker)) {
+                s_normalIniPath = localIni.wstring();
+                s_simIniPath = localSimIni.wstring();
             }
         }
 
-        PWSTR localAppData = nullptr;
-        if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_CREATE, NULL, &localAppData))) {
-            std::filesystem::path dir = std::filesystem::path(localAppData) / L"ClickBrightness";
-            std::filesystem::path oldDir = std::filesystem::path(localAppData) / L"BrightnessApp";
-            std::error_code ec;
-            std::filesystem::create_directories(dir, ec);
-            std::filesystem::path iniFile = dir / L"settings.ini";
-            std::filesystem::path oldIniFile = oldDir / L"settings.ini";
-            if (!std::filesystem::exists(iniFile, ec) && std::filesystem::exists(oldIniFile, ec)) {
-                std::filesystem::copy_file(oldIniFile, iniFile, std::filesystem::copy_options::overwrite_existing, ec);
+        if (s_normalIniPath.empty()) {
+            PWSTR localAppData = nullptr;
+            if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_CREATE, NULL, &localAppData))) {
+                std::filesystem::path dir = std::filesystem::path(localAppData) / L"ClickBrightness";
+                std::filesystem::path oldDir = std::filesystem::path(localAppData) / L"BrightnessApp";
+                std::error_code ec;
+                std::filesystem::create_directories(dir, ec);
+                std::filesystem::path iniFile = dir / L"settings.ini";
+                std::filesystem::path oldIniFile = oldDir / L"settings.ini";
+                if (!std::filesystem::exists(iniFile, ec) && std::filesystem::exists(oldIniFile, ec)) {
+                    std::filesystem::copy_file(oldIniFile, iniFile, std::filesystem::copy_options::overwrite_existing, ec);
+                }
+                s_normalIniPath = iniFile.wstring();
+                s_simIniPath = (dir / L"simulated_settings.ini").wstring();
+                CoTaskMemFree(localAppData);
             }
-            s_iniPath = iniFile.wstring();
-            CoTaskMemFree(localAppData);
         }
-        if (s_iniPath.empty()) {
-            wchar_t exePath[MAX_PATH];
-            DWORD len = GetModuleFileNameW(NULL, exePath, MAX_PATH);
-            if (len > 0 && len < MAX_PATH) {
-                exePath[len] = L'\0';
-                wchar_t* lastSlash = wcsrchr(exePath, L'\\');
+
+        if (s_normalIniPath.empty()) {
+            wchar_t exePath2[MAX_PATH];
+            DWORD len2 = GetModuleFileNameW(NULL, exePath2, MAX_PATH);
+            if (len2 > 0 && len2 < MAX_PATH) {
+                exePath2[len2] = L'\0';
+                wchar_t* lastSlash = wcsrchr(exePath2, L'\\');
                 if (lastSlash) {
                     *(lastSlash + 1) = L'\0';
-                    s_iniPath = exePath;
-                    s_iniPath += L"settings.ini";
+                    s_normalIniPath = std::wstring(exePath2) + L"settings.ini";
+                    s_simIniPath = std::wstring(exePath2) + L"simulated_settings.ini";
                 }
             }
-            if (s_iniPath.empty()) {
-                s_iniPath = L"settings.ini";
+            if (s_normalIniPath.empty()) {
+                s_normalIniPath = L"settings.ini";
+                s_simIniPath = L"simulated_settings.ini";
             }
         }
     }
-    return s_iniPath;
+    return g_Settings.IsSimulatedMode() ? s_simIniPath : s_normalIniPath;
 }
 
 void AppSettings::Load() {
@@ -232,6 +239,14 @@ void AppSettings::Load() {
     if (cachedBrightness > 100) cachedBrightness = 100;
 
     simulateMonitorsCount = (std::clamp)((int)GetPrivateProfileIntW(L"Debug", L"SimulateMonitors", 0, ini.c_str()), 0, 16);
+    static int s_iniForcedSimCount = 0;
+    if (s_iniForcedSimCount > 0) {
+        simulateMonitorsCount = s_iniForcedSimCount;
+    } else if (cliSimulateMonitorsOverride < 0 && simulateMonitorsCount > 0) {
+        s_iniForcedSimCount = simulateMonitorsCount;
+        Load();
+        return;
+    }
 
     // Multi-Monitor Sync & Separate Configs
     wchar_t mainMonBuf[256] = { 0 };
@@ -375,7 +390,7 @@ void AppSettings::Load() {
 
 
     bool regStartWithWin = IsStartWithWindowsEnabled();
-    if (!IsInstalledInProgramFiles()) {
+    if (!IsInstalledInProgramFiles() || g_Settings.IsSimulatedMode()) {
         // Not running from Program Files (e.g. debug or portable build).
         // Block modifications to startup registry; keep existing startup state if already active.
         int iniStartWithWin = GetPrivateProfileIntW(L"General", L"StartWithWindows", -1, ini.c_str());
@@ -673,7 +688,7 @@ bool AppSettings::IsInstalledInProgramFiles() {
 }
 
 bool AppSettings::SetStartWithWindows(bool enable) {
-    if (!IsInstalledInProgramFiles()) {
+    if (!IsInstalledInProgramFiles() || g_Settings.IsSimulatedMode()) {
         // Block changes when not installed in Program Files without touching existing registry entries
         return false;
     }
