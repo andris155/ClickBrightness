@@ -384,15 +384,8 @@ namespace winrt::ClickBrightness::implementation
 
                 m_appWindow.MoveAndResize({ x, y, width, height });
 
-                m_appWindow.Closing([this](auto&&, Microsoft::UI::Windowing::AppWindowClosingEventArgs const& args)
+                m_appWindow.Closing([this](auto&&, Microsoft::UI::Windowing::AppWindowClosingEventArgs const&)
                 {
-                    if (!m_isAppExiting)
-                    {
-                        args.Cancel(true);
-                        FlushPendingSave();
-                        HideWindow();
-                        return;
-                    }
                     m_isClosing = true;
                     StopCapture(false);
 
@@ -2672,16 +2665,9 @@ namespace winrt::ClickBrightness::implementation
         ApplyTheme();
         PopulateMonitorsInfo();
 
-        if (m_hwnd)
+        if (m_hwnd && IsIconic(m_hwnd))
         {
-            if (IsIconic(m_hwnd))
-            {
-                ::ShowWindow(m_hwnd, SW_RESTORE);
-            }
-            else if (!::IsWindowVisible(m_hwnd))
-            {
-                ::ShowWindow(m_hwnd, SW_SHOW);
-            }
+            ::ShowWindow(m_hwnd, SW_RESTORE);
         }
         this->Activate();
         if (m_hwnd)
@@ -4154,7 +4140,7 @@ bool IsSettingsWindowOpen()
 {
     if (!s_settingsWindow) return false;
     auto impl = winrt::get_self<winrt::ClickBrightness::implementation::SettingsWindow>(s_settingsWindow);
-    return (impl && !impl->IsClosing() && impl->IsWindowVisible());
+    return (impl && !impl->IsClosing());
 }
 
 void OnSettingsThemeChanged()
