@@ -49,6 +49,8 @@ static std::thread s_ipcThread;
 static bool s_toggleKeyHeld = false;
 static UINT s_toggleHeldVk = 0;
 
+static bool s_pendingFullGpuReset = false;
+
 static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     try
@@ -447,6 +449,7 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
         // DBT_DEVNODES_CHANGED (0x0007) is broadcast by Windows when GPU driver restarts/reloads
         if (wParam == DBT_DEVNODES_CHANGED || wParam == 0x0007)
         {
+            s_pendingFullGpuReset = true;
             g_MonitorManager.OnDisplayChanged();
             SetTimer(hwnd, IDT_GPU_RESET_COOLDOWN, 1500, NULL);
         }
@@ -532,6 +535,7 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
             g_MonitorManager.UpdateRemoteSessionState();
             if (!g_MonitorManager.IsRemoteSession())
             {
+                s_pendingFullGpuReset = true;
                 g_MonitorManager.OnDisplayChanged();
                 SetTimer(hwnd, IDT_GPU_RESET_COOLDOWN, 1000, NULL);
             }
@@ -545,15 +549,20 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
         if (wParam == IDT_GPU_RESET_COOLDOWN)
         {
             KillTimer(hwnd, IDT_GPU_RESET_COOLDOWN);
+            bool fullGpuReset = s_pendingFullGpuReset;
+            s_pendingFullGpuReset = false;
 
-            // 1. Re-initialize physical monitors on the new GPU driver
+            // 1. Re-initialize physical monitors on the new display/GPU state
             g_MonitorManager.Reinitialize();
             g_HotkeyManager.RegisterAll(hwnd);
 
-            // 2. Recreate Direct2D, Direct3D, XAML swapchains, and tray menus on the new GPU device
+            // 2. Recreate tray graphics (DPI/theme), and only tear down XAML backdrops on actual GPU/session resets
             g_TrayIcon.ResetGraphicsResources();
-            g_FlyoutWindow.ResetGraphicsResources();
-            g_OverlayWindow.ResetGraphicsResources();
+            if (fullGpuReset)
+            {
+                g_FlyoutWindow.ResetGraphicsResources();
+                g_OverlayWindow.ResetGraphicsResources();
+            }
 
             // 3. Gracefully refresh Settings window if open (do not destroy/recreate)
             OnSettingsDisplayChanged();
@@ -562,6 +571,7 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
             g_TrayIcon.UpdateBrightness(b);
             g_TrayIcon.SyncExtraTrayIcons(true);
             g_FlyoutWindow.RefreshOnDisplayChange();
+            g_OverlayWindow.RefreshOnDisplayChange();
             ScheduleManager::Refresh();
 
             // If driver is still settling or physical monitors aren't ready yet, start retry loop

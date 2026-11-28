@@ -20,6 +20,7 @@ public:
     void Hide();
     void Destroy();
     void ResetGraphicsResources();
+    void RefreshOnDisplayChange();
 };
 
 extern OverlayWindow g_OverlayWindow;

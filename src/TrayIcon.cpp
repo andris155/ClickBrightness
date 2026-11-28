@@ -15,6 +15,9 @@
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Microsoft.UI.Windowing.h>
 #include <dwmapi.h>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 
 #pragma comment(lib, "d2d1.lib")
 #pragma comment(lib, "dwrite.lib")
@@ -28,6 +31,20 @@ static HWND s_hTrayMenuWnd = NULL;
 static std::atomic<bool> s_isMenuOpen{ false };
 static std::atomic<ULONGLONG> s_lastMenuCloseTick{ 0 };
 static HHOOK s_hTrayWheelHook = NULL;
+static std::thread s_wheelHookThread;
+static DWORD s_wheelHookThreadId = 0;
+static std::mutex s_wheelHookCtrlMutex;
+static std::condition_variable s_wheelHookReadyCv;
+static bool s_wheelHookReady = false;
+
+struct HookSlotInfo {
+    UINT uId;
+    int step;
+};
+static std::mutex s_hookSlotsMutex;
+static std::vector<HookSlotInfo> s_hookSlots;
+static HWND s_hookOwnerWnd = NULL;
+
 static void InitTrayMenu();
 
 static LRESULT CALLBACK TrayWheelHookProc(int nCode, WPARAM wParam, LPARAM lParam)
@@ -49,46 +66,103 @@ static LRESULT CALLBACK TrayWheelHookProc(int nCode, WPARAM wParam, LPARAM lPara
                             _wcsicmp(cls, L"NotifyIconOverflowWindow") == 0 ||
                             _wcsicmp(cls, L"TopLevelWindowForOverflowXamlIsland") == 0);
             }
-            HWND hOwner = overTray ? g_TrayIcon.GetOwnerWnd() : NULL;
-            if (hOwner)
+            if (overTray)
             {
-                auto checkSlot = [&](UINT slotId, const std::wstring& targetMonId) -> bool {
-                    std::wstring effId = targetMonId.empty() ? g_Settings.mainMonitorId : targetMonId;
-                    const auto& effCfg = g_Settings.GetEffectiveMonitorConfig(effId);
-                    if (!effCfg.trayWheelEnabled) return false;
-
-                    NOTIFYICONIDENTIFIER nid = { sizeof(NOTIFYICONIDENTIFIER) };
-                    nid.hWnd = hOwner;
-                    nid.uID = slotId;
-                    RECT rcIcon = {};
-                    if (SUCCEEDED(Shell_NotifyIconGetRect(&nid, &rcIcon)) && PtInRect(&rcIcon, p->pt))
-                    {
-                        short delta = static_cast<short>(HIWORD(p->mouseData));
-                        if (delta != 0)
-                        {
-                            int step = (delta > 0) ? effCfg.trayWheelStep : -effCfg.trayWheelStep;
-                            PostMessageW(hOwner, WM_APP_TRAY_WHEEL, static_cast<WPARAM>(step), static_cast<LPARAM>(slotId));
-                            return true;
-                        }
-                    }
-                    return false;
-                };
-
-                if (checkSlot(g_TrayIcon.GetId(), L""))
+                HWND hOwner = NULL;
+                std::vector<HookSlotInfo> slots;
                 {
-                    return 1;
+                    std::lock_guard<std::mutex> lock(s_hookSlotsMutex);
+                    hOwner = s_hookOwnerWnd;
+                    slots = s_hookSlots;
                 }
-                for (const auto& slot : g_TrayIcon.GetExtraSlots())
+                if (hOwner && !slots.empty())
                 {
-                    if (slot.created && checkSlot(slot.uId, slot.monitorId))
+                    short delta = static_cast<short>(HIWORD(p->mouseData));
+                    if (delta != 0)
                     {
-                        return 1;
+                        for (const auto& s : slots)
+                        {
+                            NOTIFYICONIDENTIFIER nid = { sizeof(NOTIFYICONIDENTIFIER) };
+                            nid.hWnd = hOwner;
+                            nid.uID = s.uId;
+                            RECT rcIcon = {};
+                            if (SUCCEEDED(Shell_NotifyIconGetRect(&nid, &rcIcon)) && PtInRect(&rcIcon, p->pt))
+                            {
+                                int step = (delta > 0) ? s.step : -s.step;
+                                PostMessageW(hOwner, WM_APP_TRAY_WHEEL, static_cast<WPARAM>(step), static_cast<LPARAM>(s.uId));
+                                return 1;
+                            }
+                        }
                     }
                 }
             }
         }
     }
     return CallNextHookEx(s_hTrayWheelHook, nCode, wParam, lParam);
+}
+
+static void StartWheelHookThread()
+{
+    std::unique_lock<std::mutex> lock(s_wheelHookCtrlMutex);
+    if (s_wheelHookThread.joinable()) return;
+
+    s_wheelHookReady = false;
+    s_wheelHookThreadId = 0;
+    s_wheelHookThread = std::thread([]()
+    {
+        SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+        MSG msg;
+        PeekMessageW(&msg, NULL, WM_USER, WM_USER, PM_NOREMOVE);
+
+        HHOOK hook = SetWindowsHookExW(WH_MOUSE_LL, TrayWheelHookProc, GetModuleHandleW(NULL), 0);
+        {
+            std::lock_guard<std::mutex> lk(s_wheelHookCtrlMutex);
+            s_wheelHookThreadId = GetCurrentThreadId();
+            s_hTrayWheelHook = hook;
+            s_wheelHookReady = true;
+        }
+        s_wheelHookReadyCv.notify_all();
+
+        if (hook)
+        {
+            while (GetMessageW(&msg, NULL, 0, 0) > 0)
+            {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+            UnhookWindowsHookEx(hook);
+            std::lock_guard<std::mutex> lk(s_wheelHookCtrlMutex);
+            if (s_hTrayWheelHook == hook)
+            {
+                s_hTrayWheelHook = NULL;
+            }
+        }
+    });
+
+    s_wheelHookReadyCv.wait(lock, []() { return s_wheelHookReady; });
+}
+
+static void StopWheelHookThread()
+{
+    std::thread toJoin;
+    DWORD tid = 0;
+    {
+        std::lock_guard<std::mutex> lock(s_wheelHookCtrlMutex);
+        if (s_wheelHookThread.joinable())
+        {
+            tid = s_wheelHookThreadId;
+            toJoin = std::move(s_wheelHookThread);
+            s_wheelHookThreadId = 0;
+        }
+    }
+    if (toJoin.joinable())
+    {
+        if (tid != 0)
+        {
+            PostThreadMessageW(tid, WM_QUIT, 0, 0);
+        }
+        toJoin.join();
+    }
 }
 
 TrayIcon::TrayIcon()
@@ -377,9 +451,11 @@ bool TrayIcon::Create(HWND hOwnerWnd, UINT uCallbackMsg, UINT uId) {
 }
 
 void TrayIcon::Destroy() {
-    if (s_hTrayWheelHook) {
-        UnhookWindowsHookEx(s_hTrayWheelHook);
-        s_hTrayWheelHook = NULL;
+    StopWheelHookThread();
+    {
+        std::lock_guard<std::mutex> lock(s_hookSlotsMutex);
+        s_hookOwnerWnd = NULL;
+        s_hookSlots.clear();
     }
     for (auto& slot : m_extraSlots) {
         if (slot.created) {
@@ -411,24 +487,31 @@ void TrayIcon::Destroy() {
 }
 
 void TrayIcon::UpdateWheelHook() {
-    bool anyWheel = g_Settings.GetEffectiveMonitorConfig(g_Settings.mainMonitorId).trayWheelEnabled;
-    if (!anyWheel) {
+    std::vector<HookSlotInfo> newSlots;
+    if (m_created && m_hOwnerWnd) {
+        const auto& mainCfg = g_Settings.GetEffectiveMonitorConfig(g_Settings.mainMonitorId);
+        if (mainCfg.trayWheelEnabled) {
+            newSlots.push_back({ m_uId, mainCfg.trayWheelStep });
+        }
         for (const auto& slot : m_extraSlots) {
-            if (g_Settings.GetEffectiveMonitorConfig(slot.monitorId).trayWheelEnabled) {
-                anyWheel = true;
-                break;
+            if (!slot.created) continue;
+            const auto& cfg = g_Settings.GetEffectiveMonitorConfig(slot.monitorId);
+            if (cfg.trayWheelEnabled) {
+                newSlots.push_back({ slot.uId, cfg.trayWheelStep });
             }
         }
     }
-    if (anyWheel && m_created) {
-        if (!s_hTrayWheelHook) {
-            s_hTrayWheelHook = SetWindowsHookExW(WH_MOUSE_LL, TrayWheelHookProc, GetModuleHandleW(NULL), 0);
-        }
+    bool anyWheel = !newSlots.empty();
+    {
+        std::lock_guard<std::mutex> lock(s_hookSlotsMutex);
+        s_hookOwnerWnd = m_created ? m_hOwnerWnd : NULL;
+        s_hookSlots.swap(newSlots);
+    }
+
+    if (anyWheel) {
+        StartWheelHookThread();
     } else {
-        if (s_hTrayWheelHook) {
-            UnhookWindowsHookEx(s_hTrayWheelHook);
-            s_hTrayWheelHook = NULL;
-        }
+        StopWheelHookThread();
     }
 }
 

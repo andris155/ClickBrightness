@@ -119,3 +119,12 @@ void OverlayWindow::ResetGraphicsResources()
     Destroy();
     Create();
 }
+
+void OverlayWindow::RefreshOnDisplayChange()
+{
+    if (s_overlayWindow)
+    {
+        auto p = winrt::get_self<winrt::ClickBrightness::implementation::OverlayWindow>(s_overlayWindow);
+        if (p) p->RefreshOnDisplayChange();
+    }
+}

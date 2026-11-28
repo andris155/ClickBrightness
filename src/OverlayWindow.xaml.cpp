@@ -290,7 +290,16 @@ namespace winrt::ClickBrightness::implementation
         DetachBackdrop();
         SetupBackdrop();
         UpdateTheme();
-        if (!m_isVisible && m_hwnd)
+        if (!m_isVisible)
+        {
+            RefreshOnDisplayChange();
+        }
+    }
+
+    void OverlayWindow::RefreshOnDisplayChange()
+    {
+        if (!m_hwnd) return;
+        if (!m_isVisible)
         {
             HMONITOR hMon = MonitorFromPoint({ 0, 0 }, MONITOR_DEFAULTTOPRIMARY);
             UINT dpi = DpiHelper::GetDpiForMonitor(hMon);
@@ -298,13 +307,14 @@ namespace winrt::ClickBrightness::implementation
             if (dpi == 0) dpi = 96;
             int width = DpiHelper::Scale(m_osdWidthDip, dpi);
             int height = DpiHelper::Scale(m_osdHeightDip, dpi);
-            if (m_lastW != width || m_lastH != height)
-            {
-                m_lastW = width;
-                m_lastH = height;
-                SetWindowPos(m_hwnd, NULL, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
-            }
+            m_lastW = width;
+            m_lastH = height;
+            SetWindowPos(m_hwnd, NULL, 0, 0, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
             RootGrid().UpdateLayout();
+        }
+        else
+        {
+            PositionWindow();
         }
     }
 
@@ -524,7 +534,10 @@ namespace winrt::ClickBrightness::implementation
             DwmSetWindowAttribute(m_hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
             m_currentY = g_Settings.osdShowAnimation ? (targetY + m_slideOffset) : targetY;
             SetWindowPos(m_hwnd, hInsertAfter, targetX, m_currentY, width, height, SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOCOPYBITS);
-            RootGrid().UpdateLayout();
+            if (sizeChanged)
+            {
+                RootGrid().UpdateLayout();
+            }
             SetTimer(m_hwnd, IDT_OVERLAY_UNCLOAK, 16, NULL);
             m_isVisible = true;
             m_animState = AnimState::Showing;
@@ -971,6 +984,7 @@ namespace winrt::ClickBrightness::implementation
 
         if (uMsg == WM_DPICHANGED && !pThis->m_isVisible)
         {
+            LRESULT res = DefSubclassProc(hWnd, uMsg, wParam, lParam);
             HMONITOR hMon = MonitorFromPoint({ 0, 0 }, MONITOR_DEFAULTTOPRIMARY);
             UINT dpi = DpiHelper::GetDpiForMonitor(hMon);
             if (dpi == 0) dpi = HIWORD(wParam);
@@ -981,7 +995,7 @@ namespace winrt::ClickBrightness::implementation
             pThis->m_lastH = height;
             SetWindowPos(hWnd, NULL, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
             pThis->RootGrid().UpdateLayout();
-            return 0;
+            return res;
         }
 
         if (uMsg == WM_NCDESTROY)

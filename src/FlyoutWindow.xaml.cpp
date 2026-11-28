@@ -1167,7 +1167,7 @@ namespace winrt::ClickBrightness::implementation
 
         if (m_hwnd)
         {
-            SetWindowPos(m_hwnd, NULL, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+            SetWindowPos(m_hwnd, NULL, 0, 0, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
         }
         SetBrightnessVisual(m_syncBaseBrightness);
         RootGrid().UpdateLayout();
@@ -1282,21 +1282,13 @@ namespace winrt::ClickBrightness::implementation
         int width = DpiHelper::Scale(!m_syncEntries.empty() ? (137 + extraWidth) : 121, dpi);
         int height = DpiHelper::Scale(!m_syncEntries.empty() ? 574 : (isTwoRowTitle ? 576 : 566), dpi);
 
+        UINT curWndDpi = m_hwnd ? GetDpiForWindow(m_hwnd) : dpi;
+        bool dpiChanged = (curWndDpi != 0 && curWndDpi != dpi);
         bool sizeChanged = (m_lastW != width || m_lastH != height);
         m_lastW = width;
         m_lastH = height;
 
-        // Resize while cloaked before XAML layout so moving onscreen never shows an old-size frame
-        if (m_hwnd && sizeChanged)
-        {
-            SetWindowPos(m_hwnd, NULL, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
-        }
-
         SetBrightnessVisual(m_syncBaseBrightness);
-        if (rebuilt || sizeChanged)
-        {
-            RootGrid().UpdateLayout();
-        }
 
         // Check if opened from Windows hidden icons overflow window
         HWND hOverflow = FindWindowW(L"TopLevelWindowForOverflowXamlIsland", NULL);
@@ -1479,7 +1471,7 @@ namespace winrt::ClickBrightness::implementation
             {
                 SetWindowLongPtrW(m_hwnd, GWL_EXSTYLE, ex & ~WS_EX_TRANSPARENT);
             }
-            if (!rebuilt && !sizeChanged)
+            if (!rebuilt && !sizeChanged && !dpiChanged)
             {
                 SetWindowPos(m_hwnd, HWND_TOP, x, y, width, height, SWP_NOACTIVATE | SWP_NOCOPYBITS);
                 BOOL cloak = FALSE;
@@ -1498,7 +1490,10 @@ namespace winrt::ClickBrightness::implementation
             }
             else
             {
-                m_pendingShowFrames = 2;
+                // Move and size at target monitor DPI while still cloaked so WinUI updates RasterizationScale before uncloaking
+                SetWindowPos(m_hwnd, HWND_TOP, x, y, width, height, SWP_NOACTIVATE | SWP_NOCOPYBITS);
+                RootGrid().UpdateLayout();
+                m_pendingShowFrames = dpiChanged ? 3 : 2;
                 m_pendingShowX = x;
                 m_pendingShowY = y;
                 m_showRenderToken = winrt::Microsoft::UI::Xaml::Media::CompositionTarget::Rendering(
@@ -1687,6 +1682,13 @@ namespace winrt::ClickBrightness::implementation
                     pThis->HideWindow();
                 }
             }
+        }
+
+        if (uMsg == WM_DPICHANGED && !pThis->m_isVisible)
+        {
+            LRESULT res = DefSubclassProc(hWnd, uMsg, wParam, lParam);
+            pThis->Prewarm();
+            return res;
         }
 
         if (uMsg == WM_NCDESTROY)

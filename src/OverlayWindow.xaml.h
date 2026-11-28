@@ -24,6 +24,7 @@ namespace winrt::ClickBrightness::implementation
         void UpdateMultiContent(const std::wstring& targetMonitorId, int brightness);
         void UpdateTheme();
         void ResetGraphics();
+        void RefreshOnDisplayChange();
         void PositionWindow();
         void HideWindow();
         void DestroyWindow();
