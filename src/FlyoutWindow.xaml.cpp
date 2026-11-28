@@ -251,9 +251,8 @@ namespace winrt::ClickBrightness::implementation
         // Pre-scaled to primary monitor DPI to eliminate first-click resize and re-layout
         if (m_hwnd)
         {
-            POINT ptCursor = { 0, 0 };
-            GetCursorPos(&ptCursor);
-            HMONITOR hMon = MonitorFromPoint(ptCursor, MONITOR_DEFAULTTOPRIMARY);
+            POINT ptOrigin = { 0, 0 };
+            HMONITOR hMon = MonitorFromPoint(ptOrigin, MONITOR_DEFAULTTOPRIMARY);
             UINT dpi = DpiHelper::GetDpiForMonitor(hMon);
             if (dpi == 0) dpi = GetDpiForSystem();
             if (dpi == 0) dpi = 96;
@@ -263,12 +262,14 @@ namespace winrt::ClickBrightness::implementation
             m_lastW = width;
             m_lastH = height;
 
-            HWND hPrevForeground = GetForegroundWindow();
-            SetWindowPos(m_hwnd, NULL, -32000, -32000, width, height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
-            this->Activate();
-            RootGrid().UpdateLayout();
             BOOL cloak = TRUE;
             DwmSetWindowAttribute(m_hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
+            LONG_PTR ex = GetWindowLongPtrW(m_hwnd, GWL_EXSTYLE);
+            SetWindowLongPtrW(m_hwnd, GWL_EXSTYLE, ex | WS_EX_TRANSPARENT);
+            HWND hPrevForeground = GetForegroundWindow();
+            SetWindowPos(m_hwnd, NULL, 0, 0, width, height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            this->Activate();
+            RootGrid().UpdateLayout();
             if (hPrevForeground && hPrevForeground != m_hwnd)
             {
                 SetForegroundWindow(hPrevForeground);
@@ -1139,9 +1140,8 @@ namespace winrt::ClickBrightness::implementation
         RebuildSyncMonitorsPanel();
         UpdateTheme();
 
-        POINT pt = { 0, 0 };
-        GetCursorPos(&pt);
-        HMONITOR hMon = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+        POINT ptOrigin = { 0, 0 };
+        HMONITOR hMon = MonitorFromPoint(ptOrigin, MONITOR_DEFAULTTOPRIMARY);
         UINT dpi = DpiHelper::GetDpiForMonitor(hMon);
         if (dpi == 0 && m_hwnd) dpi = GetDpiForWindow(m_hwnd);
         if (dpi == 0) dpi = 96;
@@ -1167,7 +1167,7 @@ namespace winrt::ClickBrightness::implementation
 
         if (m_hwnd)
         {
-            SetWindowPos(m_hwnd, NULL, -32000, -32000, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+            SetWindowPos(m_hwnd, NULL, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
         }
         SetBrightnessVisual(m_syncBaseBrightness);
         RootGrid().UpdateLayout();
@@ -1286,10 +1286,10 @@ namespace winrt::ClickBrightness::implementation
         m_lastW = width;
         m_lastH = height;
 
-        // Resize while still offscreen before XAML layout so moving onscreen never shows an old-size frame
+        // Resize while cloaked before XAML layout so moving onscreen never shows an old-size frame
         if (m_hwnd && sizeChanged)
         {
-            SetWindowPos(m_hwnd, NULL, -32000, -32000, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+            SetWindowPos(m_hwnd, NULL, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
         }
 
         SetBrightnessVisual(m_syncBaseBrightness);
@@ -1474,9 +1474,14 @@ namespace winrt::ClickBrightness::implementation
 
         if (m_hwnd)
         {
+            LONG_PTR ex = GetWindowLongPtrW(m_hwnd, GWL_EXSTYLE);
+            if (ex & WS_EX_TRANSPARENT)
+            {
+                SetWindowLongPtrW(m_hwnd, GWL_EXSTYLE, ex & ~WS_EX_TRANSPARENT);
+            }
             if (!rebuilt && !sizeChanged)
             {
-                SetWindowPos(m_hwnd, HWND_TOP, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOCOPYBITS);
+                SetWindowPos(m_hwnd, HWND_TOP, x, y, width, height, SWP_NOACTIVATE | SWP_NOCOPYBITS);
                 BOOL cloak = FALSE;
                 DwmSetWindowAttribute(m_hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
                 SetForegroundWindow(m_hwnd);
@@ -1506,7 +1511,7 @@ namespace winrt::ClickBrightness::implementation
                         CancelPendingShow();
                         if (!m_isVisible || !m_hwnd) return;
                         m_showTick = GetTickCount64();
-                        SetWindowPos(m_hwnd, HWND_TOP, targetX, targetY, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOCOPYBITS);
+                        SetWindowPos(m_hwnd, HWND_TOP, targetX, targetY, m_lastW, m_lastH, SWP_NOACTIVATE | SWP_NOCOPYBITS);
                         BOOL cloak = FALSE;
                         DwmSetWindowAttribute(m_hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
                         SetForegroundWindow(m_hwnd);
@@ -1561,7 +1566,11 @@ namespace winrt::ClickBrightness::implementation
             {
                 BOOL cloak = TRUE;
                 DwmSetWindowAttribute(m_hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
-                SetWindowPos(m_hwnd, NULL, -32000, -32000, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+                LONG_PTR ex = GetWindowLongPtrW(m_hwnd, GWL_EXSTYLE);
+                if (!(ex & WS_EX_TRANSPARENT))
+                {
+                    SetWindowLongPtrW(m_hwnd, GWL_EXSTYLE, ex | WS_EX_TRANSPARENT);
+                }
             }
         }
     }
@@ -1603,6 +1612,11 @@ namespace winrt::ClickBrightness::implementation
     {
         auto pThis = reinterpret_cast<FlyoutWindow*>(dwRefData);
         if (!pThis) return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+
+        if (uMsg == WM_NCHITTEST && !pThis->m_isVisible)
+        {
+            return HTTRANSPARENT;
+        }
 
         if (uMsg == WM_TIMER)
         {

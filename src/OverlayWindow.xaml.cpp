@@ -37,9 +37,8 @@ namespace winrt::ClickBrightness::implementation
         // Pre-scaled to primary monitor DPI to prevent first-hit WM_DPICHANGED / swapchain resize
         if (m_hwnd)
         {
-            POINT ptCursor = { 0, 0 };
-            GetCursorPos(&ptCursor);
-            HMONITOR hMon = MonitorFromPoint(ptCursor, MONITOR_DEFAULTTOPRIMARY);
+            POINT ptOrigin = { 0, 0 };
+            HMONITOR hMon = MonitorFromPoint(ptOrigin, MONITOR_DEFAULTTOPRIMARY);
             UINT dpi = DpiHelper::GetDpiForMonitor(hMon);
             if (dpi == 0) dpi = GetDpiForSystem();
             if (dpi == 0) dpi = 96;
@@ -52,7 +51,7 @@ namespace winrt::ClickBrightness::implementation
             BOOL cloak = TRUE;
             DwmSetWindowAttribute(m_hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
             HWND hPrevForeground = GetForegroundWindow();
-            SetWindowPos(m_hwnd, NULL, -32000, -32000, width, height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            SetWindowPos(m_hwnd, NULL, 0, 0, width, height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
             this->Activate();
             RootGrid().UpdateLayout();
             if (hPrevForeground && hPrevForeground != m_hwnd)
@@ -291,6 +290,22 @@ namespace winrt::ClickBrightness::implementation
         DetachBackdrop();
         SetupBackdrop();
         UpdateTheme();
+        if (!m_isVisible && m_hwnd)
+        {
+            HMONITOR hMon = MonitorFromPoint({ 0, 0 }, MONITOR_DEFAULTTOPRIMARY);
+            UINT dpi = DpiHelper::GetDpiForMonitor(hMon);
+            if (dpi == 0) dpi = GetDpiForWindow(m_hwnd);
+            if (dpi == 0) dpi = 96;
+            int width = DpiHelper::Scale(m_osdWidthDip, dpi);
+            int height = DpiHelper::Scale(m_osdHeightDip, dpi);
+            if (m_lastW != width || m_lastH != height)
+            {
+                m_lastW = width;
+                m_lastH = height;
+                SetWindowPos(m_hwnd, NULL, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+            }
+            RootGrid().UpdateLayout();
+        }
     }
 
     void OverlayWindow::UpdateContent(int brightness)
@@ -463,9 +478,8 @@ namespace winrt::ClickBrightness::implementation
     {
         if (!m_hwnd || !m_appWindow) return;
 
-        POINT ptCursor;
-        GetCursorPos(&ptCursor);
-        HMONITOR hMon = MonitorFromPoint(ptCursor, MONITOR_DEFAULTTONEAREST);
+        POINT ptOrigin = { 0, 0 };
+        HMONITOR hMon = MonitorFromPoint(ptOrigin, MONITOR_DEFAULTTOPRIMARY);
         MONITORINFO mi = { sizeof(mi) };
         GetMonitorInfoW(hMon, &mi);
 
@@ -481,26 +495,13 @@ namespace winrt::ClickBrightness::implementation
         int targetX = mi.rcWork.left + (workW - width) / 2;
         int targetY = mi.rcWork.bottom - height - marginBottom;
 
-        // Place right behind the monitor's taskbar in topmost Z-order so it emerges from under it
+        // Place right behind the primary taskbar in topmost Z-order so it emerges from under it
         HWND hInsertAfter = HWND_TOPMOST;
         HWND hTray = FindWindowW(L"Shell_TrayWnd", NULL);
-        if (hTray && MonitorFromWindow(hTray, MONITOR_DEFAULTTONEAREST) == hMon &&
+        if (hTray && MonitorFromWindow(hTray, MONITOR_DEFAULTTOPRIMARY) == hMon &&
             (GetWindowLongPtrW(hTray, GWL_EXSTYLE) & WS_EX_TOPMOST))
         {
             hInsertAfter = hTray;
-        }
-        else
-        {
-            HWND hSecTray = NULL;
-            while ((hSecTray = FindWindowExW(NULL, hSecTray, L"Shell_SecondaryTrayWnd", NULL)) != NULL)
-            {
-                if (MonitorFromWindow(hSecTray, MONITOR_DEFAULTTONEAREST) == hMon &&
-                    (GetWindowLongPtrW(hSecTray, GWL_EXSTYLE) & WS_EX_TOPMOST))
-                {
-                    hInsertAfter = hSecTray;
-                    break;
-                }
-            }
         }
 
         bool sizeChanged = (m_lastW != width || m_lastH != height);
@@ -521,7 +522,7 @@ namespace winrt::ClickBrightness::implementation
             SetupBackdrop();
             BOOL cloak = TRUE;
             DwmSetWindowAttribute(m_hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
-            m_currentY = targetY + m_slideOffset;
+            m_currentY = g_Settings.osdShowAnimation ? (targetY + m_slideOffset) : targetY;
             SetWindowPos(m_hwnd, hInsertAfter, targetX, m_currentY, width, height, SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOCOPYBITS);
             RootGrid().UpdateLayout();
             SetTimer(m_hwnd, IDT_OVERLAY_UNCLOAK, 16, NULL);
@@ -765,6 +766,18 @@ namespace winrt::ClickBrightness::implementation
     void OverlayWindow::StartShowAnimation()
     {
         if (!m_hwnd) return;
+        if (!g_Settings.osdShowAnimation)
+        {
+            StopAnimation();
+            m_animState = AnimState::None;
+            if (m_currentY != m_lastY)
+            {
+                m_currentY = m_lastY;
+                SetWindowPos(m_hwnd, NULL, m_lastX, m_currentY, 0, 0,
+                    SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOSENDCHANGING | SWP_NOCOPYBITS | SWP_DEFERERASE);
+            }
+            return;
+        }
         m_animState = AnimState::Showing;
         m_animStartY = m_currentY;
         m_animEndY = m_lastY;
@@ -780,6 +793,11 @@ namespace winrt::ClickBrightness::implementation
     void OverlayWindow::StartHideAnimation()
     {
         if (!m_hwnd || !m_isVisible) return;
+        if (!g_Settings.osdShowAnimation)
+        {
+            FinishHide();
+            return;
+        }
         if (m_animState == AnimState::Hiding) return;
         m_animState = AnimState::Hiding;
         m_animStartY = m_currentY;
@@ -856,7 +874,6 @@ namespace winrt::ClickBrightness::implementation
         {
             BOOL cloak = TRUE;
             DwmSetWindowAttribute(m_hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
-            SetWindowPos(m_hwnd, NULL, -32000, -32000, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
         }
     }
 
@@ -950,6 +967,21 @@ namespace winrt::ClickBrightness::implementation
                 pThis->ApplyPendingBrightness();
                 return 0;
             }
+        }
+
+        if (uMsg == WM_DPICHANGED && !pThis->m_isVisible)
+        {
+            HMONITOR hMon = MonitorFromPoint({ 0, 0 }, MONITOR_DEFAULTTOPRIMARY);
+            UINT dpi = DpiHelper::GetDpiForMonitor(hMon);
+            if (dpi == 0) dpi = HIWORD(wParam);
+            if (dpi == 0) dpi = 96;
+            int width = DpiHelper::Scale(pThis->m_osdWidthDip, dpi);
+            int height = DpiHelper::Scale(pThis->m_osdHeightDip, dpi);
+            pThis->m_lastW = width;
+            pThis->m_lastH = height;
+            SetWindowPos(hWnd, NULL, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+            pThis->RootGrid().UpdateLayout();
+            return 0;
         }
 
         if (uMsg == WM_NCDESTROY)

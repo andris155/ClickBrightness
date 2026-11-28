@@ -850,6 +850,7 @@ namespace winrt::ClickBrightness::implementation
                 { g_Loc.Get(L"Opt_OverlayTheme", L"OSD Banner Theme").c_str(), catTim, L"osd overlay banner theme dark light", L"Timings_OSD", OverlayThemeComboBox() },
                 { g_Loc.Get(L"Opt_OverlayTimeout", L"Banner Duration (ms)").c_str(), catTim, L"osd overlay timeout duration hide ms", L"Timings_OSD", OverlayTimeoutSlider() },
                 { g_Loc.Get(L"Opt_OsdDnd", L"Suppress in Do Not Disturb").c_str(), catTim, L"osd dnd do not disturb focus assist quiet hours suppress", L"Timings_OSD", OsdDndToggle() },
+                { g_Loc.Get(L"Opt_OsdShowAnim", L"Show OSD Animation").c_str(), catTim, L"osd overlay animation slide show", L"Timings_OSD", OsdShowAnimToggle() },
                 { g_Loc.Get(L"Opt_TrayWheelDelay", L"Scrolling Hardware Delay").c_str(), catTim, L"tray scroll wheel delay debounce", L"Timings_Tray", TrayWheelDelayToggle() },
                 { g_Loc.Get(L"Opt_TrayWheelWaitTime", L"Scrolling Wait Time (ms)").c_str(), catTim, L"tray scroll wheel wait time ms", L"Timings_Tray", TrayWheelDelaySlider() },
                 { g_Loc.Get(L"Opt_FlyoutKeyboardEnabled", L"Keyboard Controls").c_str(), catTim, L"flyout keyboard arrow keys buttons navigation", L"Timings_Flyout", FlyoutKeyboardEnabledToggle() },
@@ -1685,6 +1686,16 @@ namespace winrt::ClickBrightness::implementation
             ApplyAndSave();
         });
 
+        // Show OSD Animation
+        OsdShowAnimToggle().Toggled([this](auto&&, auto&&)
+        {
+            bool on = OsdShowAnimToggle().IsOn();
+            OsdShowAnimStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+            if (m_isUpdatingUI) return;
+            g_Settings.osdShowAnimation = on;
+            ApplyAndSave();
+        });
+
         OverlayTimeoutNumberBox().ValueChanged([this](auto&&, auto&&)
         {
             if (m_isUpdatingUI) return;
@@ -1693,16 +1704,6 @@ namespace winrt::ClickBrightness::implementation
             OverlayTimeoutSlider().Value(val);
             m_isUpdatingUI = false;
             g_Settings.overlayTimeoutMs = val;
-            ApplyAndSave();
-        });
-
-        // Suppress OSD in Do Not Disturb
-        OsdDndToggle().Toggled([this](auto&&, auto&&)
-        {
-            bool on = OsdDndToggle().IsOn();
-            OsdDndStatusText().Text(on ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
-            if (m_isUpdatingUI) return;
-            g_Settings.osdSuppressOnDnd = on;
             ApplyAndSave();
         });
 
@@ -3306,6 +3307,9 @@ namespace winrt::ClickBrightness::implementation
         OsdDndTitleText().Text(g_Loc.Get(L"Opt_OsdDnd", L"Suppress in Do Not Disturb"));
         OsdDndDescText().Text(g_Loc.Get(L"Desc_OsdDnd", L"Do not show on-screen display when Windows Do Not Disturb or Focus Assist is active"));
         OsdDndStatusText().Text(OsdDndToggle().IsOn() ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+        OsdShowAnimTitleText().Text(g_Loc.Get(L"Opt_OsdShowAnim", L"Show OSD Animation"));
+        OsdShowAnimDescText().Text(g_Loc.Get(L"Desc_OsdShowAnim", L"Animate the on-screen display when showing and hiding"));
+        OsdShowAnimStatusText().Text(OsdShowAnimToggle().IsOn() ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
 
         // System Tray
         TrayAppearanceSectionTitle().Text(g_Loc.Get(L"Sec_TrayAppearance", L"System Tray Icon"));
@@ -3754,6 +3758,8 @@ namespace winrt::ClickBrightness::implementation
         OverlayTimeoutNumberBox().Value(g_Settings.overlayTimeoutMs);
         OsdDndToggle().IsOn(g_Settings.osdSuppressOnDnd);
         OsdDndStatusText().Text(g_Settings.osdSuppressOnDnd ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
+        OsdShowAnimToggle().IsOn(g_Settings.osdShowAnimation);
+        OsdShowAnimStatusText().Text(g_Settings.osdShowAnimation ? g_Loc.Get(L"Common_On", L"On") : g_Loc.Get(L"Common_Off", L"Off"));
 
         OverlayUseWindowsAccentToggle().IsOn(g_Settings.overlayUseWindowsAccent);
         OverlayUseWindowsAccentStatusText().Text(g_Settings.overlayUseWindowsAccent ? L"On" : L"Off");

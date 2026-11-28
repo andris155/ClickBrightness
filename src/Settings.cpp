@@ -290,6 +290,7 @@ void AppSettings::Load() {
 
     overlayTimeoutMs = (std::clamp)(iniFile.GetInt(L"Overlay", L"TimeoutMs", 2000), 500, 10000);
     osdSuppressOnDnd = (iniFile.GetInt(L"Overlay", L"SuppressOnDnd", 0) != 0);
+    osdShowAnimation = (iniFile.GetInt(L"Overlay", L"ShowAnimation", 1) != 0);
 
     overlayUseWindowsAccent = (iniFile.GetInt(L"Overlay", L"UseWindowsAccent", 1) != 0);
     overlayAccentColor = ParseColor(iniFile.GetString(L"Overlay", L"AccentColor", L"#0078D4"), RGB(0, 120, 212));
@@ -546,6 +547,7 @@ void AppSettings::Save() const {
     addLine(L"Theme", std::to_wstring(overlayTheme));
     addLine(L"TimeoutMs", std::to_wstring(overlayTimeoutMs));
     addLine(L"SuppressOnDnd", osdSuppressOnDnd ? L"1" : L"0");
+    addLine(L"ShowAnimation", osdShowAnimation ? L"1" : L"0");
     addLine(L"UseWindowsAccent", overlayUseWindowsAccent ? L"1" : L"0");
     addLine(L"AccentColor", FormatColor(overlayAccentColor));
     addLine(L"UseDualColors", overlayUseDualColors ? L"1" : L"0");
