@@ -1280,10 +1280,7 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <Border Width="28" Height="28" Margin="0,0,12,0" VerticalAlignment="Center" CornerRadius="4"
-                                            Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-                                        <Image x:Name="TrayCustomIconPreview" Width="20" Height="20" Stretch="Uniform"/>
-                                    </Border>
+                                    <Image x:Name="TrayCustomIconPreview" Width="32" Height="32" Margin="0,0,16,0" VerticalAlignment="Center" Stretch="Uniform"/>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                                         <TextBlock x:Name="TrayCustomIconTitleText" Text="Custom Icon" FontSize="14" FontWeight="Normal"/>
                                         <TextBlock x:Name="TrayCustomIconDescText" Text="Choose a preset sun icon or browse for a custom .ico file" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
@@ -1327,10 +1324,7 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <Border Width="28" Height="28" Margin="0,0,12,0" VerticalAlignment="Center" CornerRadius="4"
-                                            Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-                                        <Image x:Name="TrayCustomIconDarkPreview" Width="20" Height="20" Stretch="Uniform"/>
-                                    </Border>
+                                    <Image x:Name="TrayCustomIconDarkPreview" Width="32" Height="32" Margin="0,0,16,0" VerticalAlignment="Center" Stretch="Uniform"/>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                                         <TextBlock x:Name="TrayCustomIconDarkTitleText" Text="Dark Mode Icon" FontSize="14" FontWeight="Normal"/>
                                         <TextBlock x:Name="TrayCustomIconDarkDescText" Text="Choose a preset sun icon or browse for a custom .ico file in dark mode" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>

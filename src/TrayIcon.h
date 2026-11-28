@@ -51,6 +51,7 @@ public:
 
     static bool IsTrayColorLight();
     static HICON LoadCustomIconForSpec(const std::wstring& spec, int iconSize);
+    static std::wstring PickCustomIcon(HWND hWndParent, const std::wstring& currentSpec);
 
 private:
     void InitD2D();

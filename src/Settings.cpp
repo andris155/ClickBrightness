@@ -246,10 +246,10 @@ void AppSettings::Load() {
     trayIconColorDark = ParseColor(iniFile.GetString(L"Tray", L"IconColorDark", L"#60CDFF"), RGB(96, 205, 255));
 
     trayIconUseDualCustomIcons = (iniFile.GetInt(L"Tray", L"UseDualCustomIcons", 0) != 0);
-    trayCustomIcon = iniFile.GetString(L"Tray", L"CustomIcon", L"preset:sun");
-    if (trayCustomIcon.empty()) trayCustomIcon = L"preset:sun";
-    trayCustomIconDark = iniFile.GetString(L"Tray", L"CustomIconDark", L"preset:sun-blue");
-    if (trayCustomIconDark.empty()) trayCustomIconDark = L"preset:sun-blue";
+    trayCustomIcon = iniFile.GetString(L"Tray", L"CustomIcon", L"preset:sun-blue");
+    if (trayCustomIcon.empty()) trayCustomIcon = L"preset:sun-blue";
+    trayCustomIconDark = iniFile.GetString(L"Tray", L"CustomIconDark", L"preset:sun-green");
+    if (trayCustomIconDark.empty()) trayCustomIconDark = L"preset:sun-green";
 
     trayFont = iniFile.GetString(L"Tray", L"Font", L"Segoe UI Variable Text");
     if (trayFont.empty()) trayFont = L"Segoe UI Variable Text";

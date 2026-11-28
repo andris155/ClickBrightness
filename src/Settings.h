@@ -55,8 +55,8 @@ struct MonitorControlConfig {
     bool trayIconUseDualColors = false;
     COLORREF trayIconColorDark = RGB(96, 205, 255);
     bool trayIconUseDualCustomIcons = false;
-    std::wstring trayCustomIcon = L"preset:sun";
-    std::wstring trayCustomIconDark = L"preset:sun-blue";
+    std::wstring trayCustomIcon = L"preset:sun-blue";
+    std::wstring trayCustomIconDark = L"preset:sun-green";
     std::wstring trayFont = L"Segoe UI Variable Text";
     int trayFontWeight = 375;
     int trayFontSize = 102;
@@ -151,8 +151,8 @@ struct AppSettings {
     bool trayIconUseDualColors = false;                // Default: OFF (Separate color for dark taskbar)
     COLORREF trayIconColorDark = RGB(96, 205, 255);    // Default: #60CDFF (used on dark taskbar when dual colors ON)
     bool trayIconUseDualCustomIcons = false;           // Default: OFF (Separate custom icon for dark taskbar)
-    std::wstring trayCustomIcon = L"preset:sun";       // Default: sun.ico
-    std::wstring trayCustomIconDark = L"preset:sun-blue"; // Default dark: sun-blue.ico
+    std::wstring trayCustomIcon = L"preset:sun-blue";  // Default: sun-blue.ico
+    std::wstring trayCustomIconDark = L"preset:sun-green"; // Default dark: sun-green.ico
     std::wstring trayFont = L"Segoe UI Variable Text"; // Default font: Segoe UI Variable Text
     int trayFontWeight = 375;                          // Default: 375
     int trayFontSize = 102;                            // Default: 102% (1-2 digits)

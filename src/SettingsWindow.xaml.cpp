@@ -88,22 +88,6 @@ namespace
         }
     }
 
-    static std::wstring BrowseForIcoFile(HWND owner)
-    {
-        wchar_t path[MAX_PATH] = { 0 };
-        OPENFILENAMEW ofn = { sizeof(OPENFILENAMEW) };
-        ofn.hwndOwner = owner;
-        ofn.lpstrFilter = L"Icon Files (*.ico)\0*.ico\0All Files (*.*)\0*.*\0";
-        ofn.lpstrFile = path;
-        ofn.nMaxFile = MAX_PATH;
-        ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
-        if (GetOpenFileNameW(&ofn))
-        {
-            return path;
-        }
-        return L"";
-    }
-
     static void UpdateCustomIconPreview(winrt::Microsoft::UI::Xaml::Controls::Image const& img, const std::wstring& spec)
     {
         if (!img) return;
@@ -111,7 +95,7 @@ namespace
         HICON hIcon = TrayIcon::LoadCustomIconForSpec(spec, sz);
         if (!hIcon)
         {
-            hIcon = TrayIcon::LoadCustomIconForSpec(L"preset:sun", sz);
+            hIcon = TrayIcon::LoadCustomIconForSpec(L"preset:sun-blue", sz);
         }
         if (!hIcon) return;
 
@@ -1800,7 +1784,7 @@ namespace winrt::ClickBrightness::implementation
             }
             else if (idx == presetCount)
             {
-                std::wstring chosen = BrowseForIcoFile(m_hwnd);
+                std::wstring chosen = TrayIcon::PickCustomIcon(m_hwnd, g_Settings.trayCustomIcon);
                 if (!chosen.empty())
                 {
                     g_Settings.trayCustomIcon = chosen;
@@ -1819,7 +1803,7 @@ namespace winrt::ClickBrightness::implementation
 
         TrayCustomIconBrowseButton().Click([this](auto&&, auto&&)
         {
-            std::wstring chosen = BrowseForIcoFile(m_hwnd);
+            std::wstring chosen = TrayIcon::PickCustomIcon(m_hwnd, g_Settings.trayCustomIcon);
             if (!chosen.empty())
             {
                 g_Settings.trayCustomIcon = chosen;
@@ -1858,7 +1842,7 @@ namespace winrt::ClickBrightness::implementation
             }
             else if (idx == presetCount)
             {
-                std::wstring chosen = BrowseForIcoFile(m_hwnd);
+                std::wstring chosen = TrayIcon::PickCustomIcon(m_hwnd, g_Settings.trayCustomIconDark);
                 if (!chosen.empty())
                 {
                     g_Settings.trayCustomIconDark = chosen;
@@ -1877,7 +1861,7 @@ namespace winrt::ClickBrightness::implementation
 
         TrayCustomIconDarkBrowseButton().Click([this](auto&&, auto&&)
         {
-            std::wstring chosen = BrowseForIcoFile(m_hwnd);
+            std::wstring chosen = TrayIcon::PickCustomIcon(m_hwnd, g_Settings.trayCustomIconDark);
             if (!chosen.empty())
             {
                 g_Settings.trayCustomIconDark = chosen;

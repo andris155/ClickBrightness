@@ -286,7 +286,76 @@ HICON TrayIcon::LoadCustomIconForSpec(const std::wstring& spec, int iconSize) {
     if (resId != 0) {
         return (HICON)LoadImageW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(resId), IMAGE_ICON, iconSize, iconSize, LR_DEFAULTCOLOR);
     }
-    return (HICON)LoadImageW(NULL, spec.c_str(), IMAGE_ICON, iconSize, iconSize, LR_LOADFROMFILE | LR_DEFAULTCOLOR);
+
+    std::wstring filePath = spec;
+    int iconIndex = 0;
+    size_t commaPos = spec.rfind(L',');
+    if (commaPos != std::wstring::npos && commaPos + 1 < spec.size()) {
+        bool allDigits = true;
+        size_t start = (spec[commaPos + 1] == L'-') ? commaPos + 2 : commaPos + 1;
+        if (start >= spec.size()) allDigits = false;
+        for (size_t i = start; i < spec.size(); ++i) {
+            if (!iswdigit(spec[i])) { allDigits = false; break; }
+        }
+        if (allDigits) {
+            filePath = spec.substr(0, commaPos);
+            iconIndex = _wtoi(spec.c_str() + commaPos + 1);
+        }
+    }
+
+    wchar_t expanded[MAX_PATH] = { 0 };
+    ExpandEnvironmentStringsW(filePath.c_str(), expanded, MAX_PATH);
+    std::wstring resolvedPath = expanded[0] ? expanded : filePath;
+
+    HICON hIcon = NULL;
+    UINT iconId = 0;
+    if (PrivateExtractIconsW(resolvedPath.c_str(), iconIndex, iconSize, iconSize, &hIcon, &iconId, 1, LR_LOADFROMFILE) > 0 && hIcon) {
+        return hIcon;
+    }
+    return (HICON)LoadImageW(NULL, resolvedPath.c_str(), IMAGE_ICON, iconSize, iconSize, LR_LOADFROMFILE | LR_DEFAULTCOLOR);
+}
+
+std::wstring TrayIcon::PickCustomIcon(HWND hWndParent, const std::wstring& currentSpec) {
+    typedef int(WINAPI* PFN_PickIconDlg)(HWND, LPWSTR, UINT, int*);
+    HMODULE hShell = LoadLibraryW(L"shell32.dll");
+    if (!hShell) return L"";
+
+    PFN_PickIconDlg pfnPickIconDlg = (PFN_PickIconDlg)GetProcAddress(hShell, "PickIconDlg");
+    if (!pfnPickIconDlg) {
+        pfnPickIconDlg = (PFN_PickIconDlg)GetProcAddress(hShell, (LPCSTR)62);
+    }
+    if (!pfnPickIconDlg) {
+        FreeLibrary(hShell);
+        return L"";
+    }
+
+    std::wstring initialFile;
+    int iconIdx0 = 0;
+    if (currentSpec.empty() || currentSpec.rfind(L"preset:", 0) == 0) {
+        wchar_t sysDir[MAX_PATH] = { 0 };
+        GetSystemDirectoryW(sysDir, MAX_PATH);
+        initialFile = std::wstring(sysDir) + L"\\SHELL32.dll";
+    } else {
+        initialFile = currentSpec;
+        size_t commaPos = currentSpec.rfind(L',');
+        if (commaPos != std::wstring::npos && commaPos + 1 < currentSpec.size()) {
+            initialFile = currentSpec.substr(0, commaPos);
+            iconIdx0 = _wtoi(currentSpec.c_str() + commaPos + 1);
+        }
+        wchar_t expanded[MAX_PATH] = { 0 };
+        ExpandEnvironmentStringsW(initialFile.c_str(), expanded, MAX_PATH);
+        if (expanded[0]) initialFile = expanded;
+    }
+
+    wchar_t szBuffer[MAX_PATH] = { 0 };
+    wcsncpy_s(szBuffer, MAX_PATH, initialFile.c_str(), _TRUNCATE);
+    int res = pfnPickIconDlg(hWndParent, szBuffer, MAX_PATH, &iconIdx0);
+    FreeLibrary(hShell);
+
+    if (res == 1 && szBuffer[0]) {
+        return std::wstring(szBuffer) + L"," + std::to_wstring(iconIdx0);
+    }
+    return L"";
 }
 
 HICON TrayIcon::GetOrLoadCustomIcon(const std::wstring& spec, int iconSize) {
