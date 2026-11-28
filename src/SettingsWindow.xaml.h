@@ -27,6 +27,7 @@ namespace winrt::ClickBrightness::implementation
         void SetExiting(bool exiting) { m_isAppExiting = exiting; }
         bool IsClosing() const { return m_isClosing; }
         void SetClosing(bool closing) { m_isClosing = closing; }
+        bool IsWindowVisible() const { return m_hwnd && ::IsWindowVisible(m_hwnd); }
 
     private:
         void InitializeControls();
