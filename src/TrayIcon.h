@@ -17,6 +17,8 @@ struct ExtraTraySlot {
     std::wstring monitorId;
     HICON iconCache[101] = { nullptr };
     int lastBrightness = -1;
+    HICON lastSentIcon = NULL;
+    std::wstring lastSentTip;
     bool created = false;
     bool isSyncSlot = false;
 };
@@ -63,6 +65,8 @@ private:
     std::map<std::wstring, HICON> m_customIconCache;
     std::vector<ExtraTraySlot> m_extraSlots;
     int m_lastBrightness;
+    HICON m_lastSentIcon{ NULL };
+    std::wstring m_lastSentTip;
     std::wstring m_cachedMainMonitorId;
     bool m_created;
     bool m_lastTrayWasLight;

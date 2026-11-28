@@ -70,15 +70,6 @@ bool FlyoutWindow::Create()
     if (p)
     {
         p->Prewarm();
-        std::wstring sepId = FindFirstSeparateMonitorId();
-        if (!sepId.empty())
-        {
-            if (auto* pSep = GetOrCreateImpl(s_separateFlyoutWindow))
-            {
-                pSep->SetTargetMonitor(sepId);
-                pSep->Prewarm();
-            }
-        }
         return true;
     }
     return false;

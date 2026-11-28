@@ -185,6 +185,12 @@ void TrayIcon::InvalidateIconCache() {
         }
     }
     m_customIconCache.clear();
+    m_lastSentIcon = NULL;
+    m_lastSentTip.clear();
+    for (auto& slot : m_extraSlots) {
+        slot.lastSentIcon = NULL;
+        slot.lastSentTip.clear();
+    }
 }
 
 HICON TrayIcon::LoadCustomIconForSpec(const std::wstring& spec, int iconSize) {
@@ -357,6 +363,8 @@ bool TrayIcon::Create(HWND hOwnerWnd, UINT uCallbackMsg, UINT uId) {
 
     m_created = (Shell_NotifyIconW(NIM_ADD, &nid) == TRUE);
     if (m_created) {
+        m_lastSentIcon = nid.hIcon;
+        m_lastSentTip = tip;
         // Request version 4 behavior
         nid.uVersion = NOTIFYICON_VERSION_4;
         Shell_NotifyIconW(NIM_SETVERSION, &nid);
@@ -673,15 +681,23 @@ bool TrayIcon::UpdateBrightnessForTarget(const std::wstring& targetMonitorId, in
         }
         if (!hNewIcon) return false;
 
-        NOTIFYICONDATAW nid = { sizeof(NOTIFYICONDATAW) };
-        nid.hWnd = m_hOwnerWnd;
-        nid.uID = m_uId;
-        nid.uFlags = NIF_ICON | NIF_TIP | NIF_SHOWTIP;
-        nid.hIcon = hNewIcon;
         std::wstring mainName = GetMainMonitorDisplayName();
         std::wstring tip = FormatTrayTip(mainName, brightness, g_Settings.mainMonitorId);
-        StringCchCopyW(nid.szTip, ARRAYSIZE(nid.szTip), tip.c_str());
-        bool ok = (Shell_NotifyIconW(NIM_MODIFY, &nid) == TRUE);
+        bool ok = true;
+        if (m_lastSentIcon != hNewIcon || m_lastSentTip != tip) {
+            NOTIFYICONDATAW nid = { sizeof(NOTIFYICONDATAW) };
+            nid.hWnd = m_hOwnerWnd;
+            nid.uID = m_uId;
+            nid.uFlags = NIF_ICON | NIF_TIP | NIF_SHOWTIP;
+            nid.uCallbackMessage = m_uCallbackMsg;
+            nid.hIcon = hNewIcon;
+            StringCchCopyW(nid.szTip, ARRAYSIZE(nid.szTip), tip.c_str());
+            ok = (Shell_NotifyIconW(NIM_MODIFY, &nid) == TRUE);
+            if (ok) {
+                m_lastSentIcon = hNewIcon;
+                m_lastSentTip = tip;
+            }
+        }
 
         // Also update any Sync-mode separate tray icons with their offsetted brightness
         for (auto& slot : m_extraSlots) {
@@ -721,15 +737,24 @@ bool TrayIcon::UpdateBrightnessForTarget(const std::wstring& targetMonitorId, in
             }
             if (!hNewIcon) return false;
 
+            std::wstring name = !cfg.customName.empty() ? cfg.customName : slot.monitorId;
+            std::wstring tip = FormatTrayTip(name, brightness, slot.monitorId);
+            if (slot.lastSentIcon == hNewIcon && slot.lastSentTip == tip) {
+                return true;
+            }
+
             NOTIFYICONDATAW nid = { sizeof(NOTIFYICONDATAW) };
             nid.hWnd = m_hOwnerWnd;
             nid.uID = slot.uId;
             nid.uFlags = NIF_ICON | NIF_TIP | NIF_SHOWTIP;
             nid.hIcon = hNewIcon;
-            std::wstring name = !cfg.customName.empty() ? cfg.customName : slot.monitorId;
-            std::wstring tip = FormatTrayTip(name, brightness, slot.monitorId);
             StringCchCopyW(nid.szTip, ARRAYSIZE(nid.szTip), tip.c_str());
-            return (Shell_NotifyIconW(NIM_MODIFY, &nid) == TRUE);
+            bool ok = (Shell_NotifyIconW(NIM_MODIFY, &nid) == TRUE);
+            if (ok) {
+                slot.lastSentIcon = hNewIcon;
+                slot.lastSentTip = tip;
+            }
+            return ok;
         }
     }
     return false;
@@ -843,6 +868,8 @@ void TrayIcon::SyncExtraTrayIcons(bool forceRefresh) {
                 nid.uVersion = NOTIFYICON_VERSION_4;
                 Shell_NotifyIconW(NIM_SETVERSION, &nid);
                 slot.created = true;
+                slot.lastSentIcon = nid.hIcon;
+                slot.lastSentTip = tip;
                 m_extraSlots.push_back(slot);
             } else if (hIcon && !hidePctIcon) {
                 DestroyIcon(hIcon);

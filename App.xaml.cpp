@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "App.xaml.h"
+#include <winrt/Microsoft.UI.Dispatching.h>
 #if __has_include("App.g.cpp")
 #include "App.g.cpp"
 #endif
@@ -220,7 +221,7 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
     {
         g_TrayIcon.UpdateBrightness(g_MonitorManager.GetCachedBrightness());
         g_TrayIcon.SyncExtraTrayIcons(true);
-        if (g_FlyoutWindow.IsVisible())
+        if (wParam != 0 || g_FlyoutWindow.IsVisible())
         {
             g_FlyoutWindow.RefreshOnDisplayChange();
         }
@@ -589,7 +590,7 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
         }
         else if (wParam == IDT_POWER_STATE_POLL)
         {
-            if (g_Settings.disableTurnedOffControl && g_MonitorManager.IsDisplayPoweredOn())
+            if ((g_Settings.disableTurnedOffControl || g_MonitorManager.HasUnresponsiveMonitor()) && g_MonitorManager.IsDisplayPoweredOn())
             {
                 g_MonitorManager.RefreshExternalPowerStatesAsync();
             }
@@ -736,11 +737,6 @@ namespace winrt::ClickBrightness::implementation
             // Register TaskbarCreated message for Explorer restarts
             g_uTaskbarRestartMsg = RegisterWindowMessageW(L"TaskbarCreated");
 
-            // Load settings
-            g_Settings.Load();
-        g_Loc.Initialize();
-        g_Loc.SetLanguage(g_Settings.language);
-
             // Register message-only window class
             HINSTANCE hInstance = GetModuleHandleW(NULL);
             WNDCLASSEXW wc = { sizeof(WNDCLASSEXW) };
@@ -783,9 +779,17 @@ namespace winrt::ClickBrightness::implementation
                 SetTimer(g_hMainWnd, IDT_POWER_STATE_POLL, 5000, NULL);
             }
 
-            // Pre-create flyout and overlay windows
+            // Pre-create main flyout immediately; defer secondary prewarms (OSD & separate-monitor flyout)
             g_FlyoutWindow.Create();
-            g_OverlayWindow.Create();
+            if (auto dq = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread())
+            {
+                dq.TryEnqueue(winrt::Microsoft::UI::Dispatching::DispatcherQueuePriority::Low, []()
+                {
+                    if (!g_hMainWnd) return;
+                    g_OverlayWindow.Create();
+                    g_FlyoutWindow.RefreshOnDisplayChange();
+                });
+            }
 
             if (g_hMainWnd)
             {

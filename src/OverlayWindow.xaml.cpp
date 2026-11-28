@@ -55,7 +55,6 @@ namespace winrt::ClickBrightness::implementation
             SetWindowPos(m_hwnd, NULL, -32000, -32000, width, height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
             this->Activate();
             RootGrid().UpdateLayout();
-            ShowWindow(m_hwnd, SW_HIDE);
             if (hPrevForeground && hPrevForeground != m_hwnd)
             {
                 SetForegroundWindow(hPrevForeground);
@@ -523,7 +522,7 @@ namespace winrt::ClickBrightness::implementation
             BOOL cloak = TRUE;
             DwmSetWindowAttribute(m_hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
             m_currentY = targetY + m_slideOffset;
-            SetWindowPos(m_hwnd, hInsertAfter, targetX, m_currentY, width, height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            SetWindowPos(m_hwnd, hInsertAfter, targetX, m_currentY, width, height, SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOCOPYBITS);
             RootGrid().UpdateLayout();
             SetTimer(m_hwnd, IDT_OVERLAY_UNCLOAK, 16, NULL);
             m_isVisible = true;
@@ -857,7 +856,7 @@ namespace winrt::ClickBrightness::implementation
         {
             BOOL cloak = TRUE;
             DwmSetWindowAttribute(m_hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
-            ::ShowWindow(m_hwnd, SW_HIDE);
+            SetWindowPos(m_hwnd, NULL, -32000, -32000, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
         }
     }
 

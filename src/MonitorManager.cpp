@@ -313,6 +313,7 @@ struct EnumContext {
     std::map<std::wstring, std::vector<std::wstring>> friendlyNames;
     std::map<std::wstring, std::vector<std::wstring>> modelIds;
     std::map<std::wstring, int> modelCounts;
+    int unresponsiveCount = 0;
 };
 
 static bool IsExternalMonitorPoweredOffVcp(HANDLE hPhysical) {
@@ -391,6 +392,8 @@ static BOOL CALLBACK MonitorEnumCallback(HMONITOR hMonitor, HDC hdcMonitor, LPRE
                     info.isPoweredOff = IsExternalMonitorPoweredOffVcp(phys[i].hPhysicalMonitor);
                     info.consecutiveWriteFailures = 0;
                     ctx->monitors->push_back(info);
+                } else {
+                    ctx->unresponsiveCount++;
                 }
             }
         }
@@ -469,18 +472,21 @@ static int GetSimMonitorCount() {
 }
 
 void MonitorManager::EnumMonitorsInternal() {
-    if (!m_rawMonitors.empty()) {
-        DestroyPhysicalMonitors((DWORD)m_rawMonitors.size(), m_rawMonitors.data());
-        m_rawMonitors.clear();
-    }
+    std::lock_guard<std::mutex> enumLock(m_enumMutex);
+
+    std::vector<PHYSICAL_MONITOR> newRawMonitors;
+    std::vector<PhysicalMonitorInfo> newMonitors;
+    bool hasUnresponsive = false;
 
     int simCount = GetSimMonitorCount();
     if (simCount > 0) {
         std::map<std::wstring, DWORD> prevSimValues;
-        for (const auto& prev : m_monitors) {
-            prevSimValues[prev.id] = prev.currentBrightness;
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            for (const auto& prev : m_monitors) {
+                prevSimValues[prev.id] = prev.currentBrightness;
+            }
         }
-        m_monitors.clear();
 
         for (int i = 0; i < simCount; ++i) {
             PhysicalMonitorInfo info;
@@ -510,94 +516,107 @@ void MonitorManager::EnumMonitorsInternal() {
             } else {
                 info.currentBrightness = (i == 0) ? 60 : 50;
             }
-            m_monitors.push_back(info);
+            newMonitors.push_back(info);
         }
     } else {
-        m_monitors.clear();
         DisplayConfigSummary dispCfg = QueryDisplayConfigInfo();
         EnumContext ctx;
-        ctx.rawMonitors = &m_rawMonitors;
-        ctx.monitors = &m_monitors;
+        ctx.rawMonitors = &newRawMonitors;
+        ctx.monitors = &newMonitors;
         ctx.friendlyNames = dispCfg.friendlyNames;
         ctx.modelIds = dispCfg.modelIds;
 
         EnumDisplayMonitors(NULL, NULL, MonitorEnumCallback, reinterpret_cast<LPARAM>(&ctx));
-        EnumInternalMonitorsWmi(m_monitors, dispCfg);
+        EnumInternalMonitorsWmi(newMonitors, dispCfg);
+        hasUnresponsive = (ctx.unresponsiveCount > 0);
     }
 
-    if (!m_monitors.empty()) {
-        m_driverAvailable = true;
+    std::vector<PHYSICAL_MONITOR> oldRawMonitors;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        oldRawMonitors.swap(m_rawMonitors);
+        m_rawMonitors.swap(newRawMonitors);
+        m_monitors.swap(newMonitors);
+        m_hasUnresponsiveMonitor = hasUnresponsive;
 
-        // Migrate legacy DISPLAY#i configs to hardware-stable model IDs on first encounter
-        bool migratedAny = false;
-        for (const auto& mon : m_monitors) {
-            if (!mon.legacyId.empty() && _wcsicmp(mon.legacyId.c_str(), mon.id.c_str()) != 0 &&
-                !g_Settings.FindMonitorConfig(mon.id)) {
-                if (const auto* oldCfg = g_Settings.FindMonitorConfig(mon.legacyId)) {
-                    MonitorControlConfig copied = *oldCfg;
-                    g_Settings.monitorConfigs[mon.id] = copied;
-                    g_Settings.monitorConfigs.erase(mon.legacyId);
-                    if (!g_Settings.mainMonitorId.empty() && _wcsicmp(g_Settings.mainMonitorId.c_str(), mon.legacyId.c_str()) == 0) {
-                        g_Settings.mainMonitorId = mon.id;
+        if (!m_monitors.empty()) {
+            m_driverAvailable = true;
+
+            // Migrate legacy DISPLAY#i configs to hardware-stable model IDs on first encounter
+            bool migratedAny = false;
+            for (const auto& mon : m_monitors) {
+                if (!mon.legacyId.empty() && _wcsicmp(mon.legacyId.c_str(), mon.id.c_str()) != 0 &&
+                    !g_Settings.FindMonitorConfig(mon.id)) {
+                    if (const auto* oldCfg = g_Settings.FindMonitorConfig(mon.legacyId)) {
+                        MonitorControlConfig copied = *oldCfg;
+                        g_Settings.monitorConfigs[mon.id] = copied;
+                        g_Settings.monitorConfigs.erase(mon.legacyId);
+                        if (!g_Settings.mainMonitorId.empty() && _wcsicmp(g_Settings.mainMonitorId.c_str(), mon.legacyId.c_str()) == 0) {
+                            g_Settings.mainMonitorId = mon.id;
+                        }
+                        migratedAny = true;
                     }
-                    migratedAny = true;
                 }
             }
-        }
-        if (migratedAny) {
-            g_Settings.Save();
-        }
-
-        // Ensure every detected monitor has a MonitorControlConfig entry
-        bool mainConnected = false;
-        for (const auto& mon : m_monitors) {
-            g_Settings.GetOrCreateMonitorConfig(mon.id, mon.friendlyName);
-            if (!g_Settings.mainMonitorId.empty() && _wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0) {
-                mainConnected = true;
+            if (migratedAny) {
+                g_Settings.Save();
             }
-        }
-        if (!mainConnected) {
+
+            // Ensure every detected monitor has a MonitorControlConfig entry
+            bool mainConnected = false;
             for (const auto& mon : m_monitors) {
-                if (mon.isPrimary) {
-                    g_Settings.mainMonitorId = mon.id;
+                g_Settings.GetOrCreateMonitorConfig(mon.id, mon.friendlyName);
+                if (!g_Settings.mainMonitorId.empty() && _wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0) {
                     mainConnected = true;
-                    break;
                 }
             }
             if (!mainConnected) {
-                g_Settings.mainMonitorId = m_monitors[0].id;
+                for (const auto& mon : m_monitors) {
+                    if (mon.isPrimary) {
+                        g_Settings.mainMonitorId = mon.id;
+                        mainConnected = true;
+                        break;
+                    }
+                }
+                if (!mainConnected) {
+                    g_Settings.mainMonitorId = m_monitors[0].id;
+                }
             }
-        }
 
-        // Prioritize Main Display for cached brightness
-        bool foundMain = false;
-        for (const auto& mon : m_monitors) {
-            if (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0) {
+            // Prioritize Main Display for cached brightness
+            bool foundMain = false;
+            for (const auto& mon : m_monitors) {
+                if (_wcsicmp(mon.id.c_str(), g_Settings.mainMonitorId.c_str()) == 0) {
+                    m_cachedBrightness = SafeCalcBrightnessPercent(mon.currentBrightness, mon.minBrightness, mon.maxBrightness);
+                    foundMain = true;
+                    break;
+                }
+            }
+            if (!foundMain) {
+                const auto& mon = m_monitors[0];
                 m_cachedBrightness = SafeCalcBrightnessPercent(mon.currentBrightness, mon.minBrightness, mon.maxBrightness);
-                foundMain = true;
-                break;
             }
-        }
-        if (!foundMain) {
-            const auto& mon = m_monitors[0];
-            m_cachedBrightness = SafeCalcBrightnessPercent(mon.currentBrightness, mon.minBrightness, mon.maxBrightness);
-        }
-        if (m_cachedBrightness < 0) m_cachedBrightness = 0;
-        if (m_cachedBrightness > 100) m_cachedBrightness = 100;
-        m_syncBaseBrightness = m_cachedBrightness;
-        g_Settings.cachedBrightness = m_cachedBrightness;
+            if (m_cachedBrightness < 0) m_cachedBrightness = 0;
+            if (m_cachedBrightness > 100) m_cachedBrightness = 100;
+            m_syncBaseBrightness = m_cachedBrightness;
+            g_Settings.cachedBrightness = m_cachedBrightness;
 
-        HWND hMain = FindWindowW(L"ClickBrightness_MessageWndClass", L"ClickBrightness_HiddenMsgWindow");
-        if (!hMain) hMain = FindWindowW(L"ClickBrightness_MessageWndClass", NULL);
-        if (hMain) {
-            PostMessageW(hMain, WM_APP_BRIGHTNESS_UPDATED, m_cachedBrightness, 0);
+            HWND hMain = FindWindowW(L"ClickBrightness_MessageWndClass", L"ClickBrightness_HiddenMsgWindow");
+            if (!hMain) hMain = FindWindowW(L"ClickBrightness_MessageWndClass", NULL);
+            if (hMain) {
+                PostMessageW(hMain, WM_APP_BRIGHTNESS_UPDATED, m_cachedBrightness, 0);
+            }
+            m_consecutiveFailures = 0;
+        } else {
+            m_driverAvailable = false;
         }
         m_consecutiveFailures = 0;
-    } else {
-        m_driverAvailable = false;
+        m_lastEnumTick = GetTickCount64();
     }
-    m_consecutiveFailures = 0;
-    m_lastEnumTick = GetTickCount64();
+
+    if (!oldRawMonitors.empty()) {
+        DestroyPhysicalMonitors((DWORD)oldRawMonitors.size(), oldRawMonitors.data());
+    }
 }
 
 bool MonitorManager::Initialize() {
@@ -616,17 +635,18 @@ bool MonitorManager::Initialize() {
 }
 
 bool MonitorManager::Reinitialize() {
-    std::lock_guard<std::mutex> lock(m_mutex);
     EnumMonitorsInternal();
     return m_driverAvailable.load();
 }
 
 int MonitorManager::GetCurrentBrightness() {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::unique_lock<std::mutex> lock(m_mutex);
     if (!m_driverAvailable || m_monitors.empty()) {
         // Attempt quick re-enumeration if it's been more than 1 second since last attempt
         if (GetTickCount64() - m_lastEnumTick > 1000) {
+            lock.unlock();
             EnumMonitorsInternal();
+            lock.lock();
         }
         return m_cachedBrightness;
     }
@@ -992,9 +1012,11 @@ bool MonitorManager::SetMonitorBrightnessTarget(const std::wstring& targetMonito
     }
 
     // Synchronous execution path (fallback or shutdown)
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::unique_lock<std::mutex> lock(m_mutex);
     if (!m_driverAvailable || m_monitors.empty()) {
+        lock.unlock();
         EnumMonitorsInternal();
+        lock.lock();
         if (!m_driverAvailable || m_monitors.empty()) {
             return false;
         }
@@ -1084,12 +1106,34 @@ void MonitorManager::WorkerLoop() {
         }
 
         if (doReinit) {
-            {
-                std::lock_guard<std::mutex> lock(m_mutex);
-                EnumMonitorsInternal();
-            }
+            EnumMonitorsInternal();
             UpdateFnSyncListener();
         } else if (doPowerCheck && GetSimMonitorCount() <= 0) {
+            bool monitorsChanged = false;
+            if (m_hasUnresponsiveMonitor.load()) {
+                std::vector<std::wstring> prevIds;
+                {
+                    std::lock_guard<std::mutex> lock(m_mutex);
+                    for (const auto& mon : m_monitors) prevIds.push_back(mon.id);
+                }
+                EnumMonitorsInternal();
+                {
+                    std::lock_guard<std::mutex> lock(m_mutex);
+                    if (m_monitors.size() != prevIds.size()) {
+                        monitorsChanged = true;
+                    } else {
+                        for (size_t i = 0; i < prevIds.size(); ++i) {
+                            if (_wcsicmp(m_monitors[i].id.c_str(), prevIds[i].c_str()) != 0) {
+                                monitorsChanged = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (monitorsChanged) {
+                    UpdateFnSyncListener();
+                }
+            }
             struct ExtCheck {
                 std::wstring id;
                 HANDLE hPhysical;
@@ -1122,11 +1166,11 @@ void MonitorManager::WorkerLoop() {
                     }
                 }
             }
-            if (anyChanged) {
+            if (monitorsChanged || anyChanged) {
                 HWND hMain = FindWindowW(L"ClickBrightness_MessageWndClass", L"ClickBrightness_HiddenMsgWindow");
                 if (!hMain) hMain = FindWindowW(L"ClickBrightness_MessageWndClass", NULL);
                 if (hMain) {
-                    PostMessageW(hMain, WM_APP_POWER_STATE_UPDATED, 0, 0);
+                    PostMessageW(hMain, WM_APP_POWER_STATE_UPDATED, monitorsChanged ? 1 : 0, 0);
                 }
             }
         }
@@ -1146,9 +1190,11 @@ void MonitorManager::WorkerLoop() {
             bool isSim = (GetSimMonitorCount() > 0);
 
             {
-                std::lock_guard<std::mutex> lock(m_mutex);
+                std::unique_lock<std::mutex> lock(m_mutex);
                 if (!m_driverAvailable || m_monitors.empty()) {
+                    lock.unlock();
                     EnumMonitorsInternal();
+                    lock.lock();
                 }
                 if (m_driverAvailable && !m_monitors.empty()) {
                     bool isSyncTarget = targetMonitorId.empty();

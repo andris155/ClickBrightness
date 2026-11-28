@@ -540,6 +540,19 @@ namespace winrt::ClickBrightness::implementation
             ? ThemeHelper::GetAccentColors().GetForTheme(!isDark)
             : ((effCfg.flyoutUseDualColors && isDark) ? effCfg.flyoutAccentColorDark : effCfg.flyoutAccentColor);
 
+        uint64_t brushKey = (static_cast<uint64_t>(accCol) << 1) | (effCfg.flyoutUseWindowsAccent ? 1ULL : 0ULL);
+        bool hasVisualChildren = winrt::Microsoft::UI::Xaml::Media::VisualTreeHelper::GetChildrenCount(slider) > 0;
+        if (hasVisualChildren)
+        {
+            if (auto tag = slider.Tag())
+            {
+                if (auto prevKey = tag.try_as<uint64_t>(); prevKey && *prevKey == brushKey)
+                {
+                    return;
+                }
+            }
+        }
+
         winrt::Windows::UI::Color accColor = winrt::Microsoft::UI::ColorHelper::FromArgb(
             255, GetRValue(accCol), GetGValue(accCol), GetBValue(accCol)
         );
@@ -569,6 +582,10 @@ namespace winrt::ClickBrightness::implementation
         UpdateSliderVisualElements(slider, defaultBrush, defaultBrush);
         winrt::Microsoft::UI::Xaml::VisualStateManager::GoToState(slider, L"PointerOver", false);
         winrt::Microsoft::UI::Xaml::VisualStateManager::GoToState(slider, L"Normal", false);
+        if (hasVisualChildren)
+        {
+            slider.Tag(winrt::box_value(brushKey));
+        }
     }
 
     void FlyoutWindow::ApplySliderBrushes()
@@ -1121,7 +1138,6 @@ namespace winrt::ClickBrightness::implementation
         m_brightness = (std::clamp)(m_syncBaseBrightness, 0, 100);
         RebuildSyncMonitorsPanel();
         UpdateTheme();
-        ApplySliderBrushes();
 
         POINT pt = { 0, 0 };
         GetCursorPos(&pt);
@@ -1169,7 +1185,6 @@ namespace winrt::ClickBrightness::implementation
         m_brightness = (std::clamp)(m_syncBaseBrightness, 0, 100);
         bool rebuilt = RebuildSyncMonitorsPanel();
         UpdateTheme();
-        ApplySliderBrushes();
 
         RECT rc = {};
         if (m_hwnd) GetWindowRect(m_hwnd, &rc);
@@ -1231,7 +1246,6 @@ namespace winrt::ClickBrightness::implementation
         m_hasPendingBrightness = false;
         bool rebuilt = RebuildSyncMonitorsPanel();
         UpdateTheme();
-        ApplySliderBrushes();
 
         POINT pt;
         if (pTrayPos)

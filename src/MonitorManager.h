@@ -80,6 +80,7 @@ public:
     void OnDisplayPowerOff();
     void OnDisplayPowerOn();
     bool IsDisplayPoweredOn() const { return m_displayPoweredOn.load(); }
+    bool HasUnresponsiveMonitor() const { return m_hasUnresponsiveMonitor.load(); }
 
     void SetSessionLocked(bool locked);
     bool IsSessionLocked() const { return m_sessionLocked.load(); }
@@ -95,12 +96,14 @@ private:
     int GetEffectiveSyncedBrightnessLocked(const std::wstring& monitorId, int baseBrightness) const;
 
     mutable std::mutex m_mutex;
+    mutable std::mutex m_enumMutex;
     std::vector<PHYSICAL_MONITOR> m_rawMonitors;
     std::vector<PhysicalMonitorInfo> m_monitors;
     int m_cachedBrightness;
     int m_syncBaseBrightness{ 45 };
     std::atomic<bool> m_driverAvailable;
     std::atomic<bool> m_displayPoweredOn;
+    std::atomic<bool> m_hasUnresponsiveMonitor{ false };
     std::atomic<bool> m_sessionLocked{ false };
     std::atomic<bool> m_isRemoteSession{ false };
     std::atomic<int> m_consecutiveFailures;
